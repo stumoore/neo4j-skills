@@ -1,19 +1,17 @@
 ---
-name: neo4j-upgrade-skill
-description: Use when upgrading Neo4j drivers to new major versions, or when upgrading Neo4j 4.x and 5.x Cypher queries to 2025.x/2026.x versions
+name: neo4j-migration-skill
+description: Use when upgrading Neo4j drivers to new major versions
 allowed-tools: WebFetch
 ---
 
-# Neo4j upgrade skill
+# Neo4j migration skill
 
-This skill uses online guides to upgrade old Neo4j codebases or queries to newer versions. It handles all official Neo4j drivers as well as Cypher queries.
+This skill uses online guides to upgrade old Neo4j codebases. It handles all official Neo4j drivers.
 
 ## When to use
 
 Use this skill when:
 - a user asks to upgrade a Neo4j driver in languages: .NET, Go, Java, Javascript, Python
-- a user wants to upgrade a database from version 4.x or 5.x to 2025.x or 2026.x
-- a user asks to upgrade Cypher queries to a newer major Neo4j version
 
 ## Instructions
 
@@ -27,7 +25,5 @@ Use this skill when:
     - Java then include [Java migration guide](references/java-driver.md)
     - Javascript/Node.JS then include [Javascript migration guide](references/javascript-driver.md)
     - Python then include [Python migration guide](references/python-driver.md)
-
-3. Analyze the codebase to see if there are any Neo4j Cypher queries used. If so, include [cypher migration guide](references/cypher-queries.md)
 
 Important: when you plan the upgrade, always include replacement of deprecated functions in the plan

@@ -14,14 +14,20 @@ Skills follow a progressive disclosure pattern, loading only what's needed to mi
 
 ## Available Skills
 
-### neo4j-upgrade-skill
+### neo4j-migration-skill
 
-Assists with upgrading Neo4j drivers and Cypher queries to newer versions.
+Assists with upgrading Neo4j drivers to new major versions.
 
 **Use this skill when:**
 - Upgrading Neo4j drivers (.NET, Go, Java, JavaScript, Python)
+
+### neo4j-cypher-skill
+
+Assists with upgrading Cypher queries to newer Neo4j versions.
+
+**Use this skill when:**
 - Migrating databases from Neo4j 4.x or 5.x to 2025.x or 2026.x
-- Updating Cypher queries to newer Neo4j versions
+- Updating Cypher queries to a newer major Neo4j version
 
 ## Usage
 
