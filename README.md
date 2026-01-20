@@ -1,6 +1,6 @@
-# Neo4j Migration Skills
+# Neo4j Agent Skills
 
-A collection of [Agent Skills](https://agentskills.io/specification) designed to help AI agents assist with Neo4j database migrations and driver upgrades.
+A collection of [Agent Skills](https://agentskills.io/specification) designed to help AI agents work effectively with Neo4j graph databases.
 
 ## What are Agent Skills?
 
