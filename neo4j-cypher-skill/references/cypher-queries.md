@@ -2,7 +2,7 @@ This reference file should be used to upgrade Cypher queries for different versi
 
 # Upgrade paths
 
-Important: Do not ever start upgrading the codebase before collecting all changelogs between the current, and the requested version
+Important: Do not ever start upgrading the queries before collecting all changelogs between the current, and the requested version
 
 ## Upgrading
 
