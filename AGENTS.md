@@ -26,3 +26,12 @@ No build/test system exists yet (test harness is a future task). Once tests/harn
 - docs-cheat-sheet is on a newer tag (2026.02.0) than docs-cypher (2026.01.0) — update both together when pinning to new releases.
 - GQL-excluded clauses: LET, FINISH, FILTER, NEXT, INSERT — strip these from all L3 reference files.
 - CYPHER 25 pragma: every generated query must begin with `CYPHER 25`.
+- Asciidoc `[source, role=noheader]` has no language tag — guard against capturing `role` as the language identifier.
+- Asciidoc source block language tracking: set `pending_source_lang` when `[source, lang]` is seen, consume it when `----` is encountered (not via lookback into output_lines).
+- Submodule SHA detection: `docs-cypher/modules/ROOT/pages` is 3 parents up from the submodule root (`pages` → `ROOT` → `modules` → `docs-cypher`).
+- Token budget: reserve ~20 tokens headroom for the truncation notice itself.
+
+## Scripts
+
+- `scripts/extract-references.py` — extract asciidoc → Markdown for L3 reference files. Run with `--dry-run` to preview without writing.
+- `scripts/test-extract-references.py` — test suite for extract-references.py. Run from repo root: `python3 scripts/test-extract-references.py`

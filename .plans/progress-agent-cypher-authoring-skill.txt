@@ -55,3 +55,32 @@ Key Decisions:
 - docs-cheat-sheet-sha: e11fe2f2b9ed9c697bd561df12139f2e00824f01 (2026.02.0)
 
 Next Task: task-003 (Build scripts/extract-references.py extraction script)
+
+================================================================================
+TASK-003: Build scripts/extract-references.py extraction script
+Date: 2026-03-20T00:30:00Z
+================================================================================
+Summary: Created scripts/extract-references.py — a Python extraction pipeline
+that reads asciidoc source files from docs-cypher and docs-cheat-sheet, strips
+asciidoc markup (headings, source blocks, tables, admonitions, inline refs),
+applies GQL exclusion filter (excludes heading lines for LET/FINISH/FILTER/
+NEXT/INSERT), enforces per-file token budget (default 2000 tokens), detects
+missing expected sections with WARNING to stderr, and writes Source header +
+clean Markdown to the output directory. Also created
+scripts/test-extract-references.py with 17 assertions across 7 test groups.
+
+Files Changed:
+- scripts/extract-references.py (created)
+- scripts/test-extract-references.py (created)
+- neo4j-cypher-authoring-skill/references/cypher25-patterns.md (created — test artifact)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-003 status → completed)
+
+Key Decisions:
+- Used pending_source_lang state variable to track [source, cypher] before ---- delimiter
+- [source, role=noheader] correctly produces ``` (no lang) not ```role
+- GQL exclusion applies to both heading lines (after ## conversion) and inline
+- Truncation reserves 20-token buffer for the truncation notice text
+- sha detection uses 3 parent levels: docs-cypher/modules/ROOT/pages → docs-cypher root
+- EXTRACTION_CONFIGS defines 6 output files mapping to source asciidoc files
+
+Next Task: task-004 (Generate cypher25-patterns.md) — depends on task-003

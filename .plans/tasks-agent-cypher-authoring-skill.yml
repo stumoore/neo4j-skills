@@ -45,7 +45,7 @@ tasks:
       per-file token budget via --max-tokens, detects missing expected sections
       with WARNING notices, and writes Source header + clean Markdown to the
       output directory. Supports --dry-run mode.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -55,7 +55,7 @@ tasks:
       - "None of LET / FINISH / FILTER / NEXT / INSERT appear in any generated output file"
       - "When an expected section heading is absent from source, output contains WARNING: section not found and script writes to stderr"
       - "Each output file is within the --max-tokens budget (default 2000)"
-    completed_at: null
+    completed_at: "2026-03-20T00:30:00Z"
 
   - id: task-004
     title: "Generate L3 reference file: cypher25-patterns.md"
