@@ -113,3 +113,30 @@ Key Decisions:
 - DIFFERENT RELATIONSHIPS keyword availability (since Neo4j 2025.06) noted
 
 Next Task: task-005 (Generate cypher25-functions.md)
+
+================================================================================
+TASK-005: Generate L3 reference file: cypher25-functions.md
+Date: 2026-03-20T01:00:00Z
+================================================================================
+Summary: Manually authored a curated cypher25-functions.md reference file covering
+all required function categories within ~1500 tokens (well within the 2000-token
+budget). Chose manual curation over raw extraction (same rationale as task-004):
+docs-cypher source files are verbose with setup graphs and narrative; the curated
+file is denser and more useful as an agent reference. Covers all 8 required
+categories: aggregating (with null-behavior column), list, string, scalar,
+predicate, math (numeric/log/trig), temporal, spatial, and vector functions.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/references/cypher25-functions.md (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-005 status → completed)
+
+Key Decisions:
+- Full null-behavior column in aggregating functions table (critical for agent correctness)
+- String section opens with "all string functions return null when input is null"
+- id() listed as deprecated with note to prefer elementId()
+- vector() function noted as new in Neo4j 2025.10 for version awareness
+- Predicate functions included as a bonus section (not in acceptance criteria but
+  highly useful for agent authors)
+- List comprehension included as a note (not a function, but commonly confused)
+
+Next Task: task-006 (Generate cypher25-indexes.md)

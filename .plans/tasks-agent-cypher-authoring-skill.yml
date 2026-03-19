@@ -82,7 +82,7 @@ tasks:
       list, string, temporal, spatial, vector, mathematical, predicate, and scalar
       function content from both docs-cypher and docs-cheat-sheet sources. Focus
       on function signatures, return types, null behavior, and one example each.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -90,7 +90,7 @@ tasks:
       - "File covers all function categories: aggregating, list, string, temporal, spatial, vector, math"
       - "Null behavior is documented for at least aggregating and string functions"
       - "File is ≤ 2,000 tokens"
-    completed_at: null
+    completed_at: "2026-03-20T01:00:00Z"
 
   - id: task-006
     title: "Generate L3 reference file: cypher25-indexes.md"
