@@ -68,7 +68,7 @@ tasks:
     dependencies:
       - task-003
     acceptance_criteria:
-      - "references/cypher25-patterns.md exists with Source header at correct SHA"
+      - "references/read/cypher25-patterns.md exists with Source header at correct SHA"
       - "File contains QPE syntax table covering {m,n}, +, and * forms"
       - "File contains all four match mode variants with semantic descriptions"
       - "File is ≤ 2,000 tokens"
@@ -86,7 +86,7 @@ tasks:
     dependencies:
       - task-003
     acceptance_criteria:
-      - "references/cypher25-functions.md exists with Source header"
+      - "references/read/cypher25-functions.md exists with Source header"
       - "File covers all function categories: aggregating, list, string, temporal, spatial, vector, math"
       - "Null behavior is documented for at least aggregating and string functions"
       - "File is ≤ 2,000 tokens"
@@ -103,7 +103,7 @@ tasks:
     dependencies:
       - task-003
     acceptance_criteria:
-      - "references/cypher25-indexes.md exists with Source header"
+      - "references/schema/cypher25-indexes.md exists with Source header"
       - "Index type selection table present mapping all 5 index types to their query predicates"
       - "SEARCH clause syntax for both vector and fulltext is present"
       - "USING INDEX and USING TEXT INDEX hint syntax is documented"
@@ -117,16 +117,17 @@ tasks:
       subqueries, correlated subquery scope rules, CALL IN TRANSACTIONS batching
       syntax, and COUNT / COLLECT / EXISTS subquery forms. Distinguish subquery
       forms from their function equivalents (COUNT {} vs count()).
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
-      - "references/cypher25-subqueries.md exists with Source header"
-      - "CALL { ... } IN TRANSACTIONS OF N ROWS syntax is present"
-      - "Scope rules for correlated subqueries are documented"
+      - "references/read/cypher25-subqueries.md exists with Source header (split: read subqueries)"
+      - "references/write/cypher25-call-in-transactions.md exists (split: write/batch subqueries)"
+      - "CALL { ... } IN TRANSACTIONS OF N ROWS syntax is present in write file"
+      - "Scope rules for correlated subqueries are documented in read file"
       - "COUNT {} vs count() distinction is explicit"
-      - "File is ≤ 2,000 tokens"
-    completed_at: null
+      - "Each file is ≤ 2,000 tokens"
+    completed_at: "2026-03-20T03:00:00Z"
 
   - id: task-008
     title: "Generate L3 reference file: cypher25-types-and-nulls.md"
@@ -140,7 +141,7 @@ tasks:
     dependencies:
       - task-003
     acceptance_criteria:
-      - "references/cypher25-types-and-nulls.md exists with Source header"
+      - "references/read/cypher25-types-and-nulls.md exists with Source header"
       - "Null propagation rules documented: null in arithmetic → null, null in comparison → null"
       - "All major casting functions listed with signatures"
       - "Type predicate expression syntax (IS :: TYPE) documented"

@@ -171,3 +171,38 @@ Key Decisions:
   production use with multi-property filtering
 
 Next Task: task-007 (Generate cypher25-subqueries.md)
+
+================================================================================
+TASK-007: Generate L3 reference file: cypher25-subqueries.md
+Date: 2026-03-20T03:00:00Z
+================================================================================
+
+Summary:
+Manually authored a curated cypher25-subqueries.md reference file covering all
+required content in ~1287 tokens (well within the 2000-token budget). The
+auto-generated draft was incomplete (truncated mid-content) and verbose. The
+curated file covers all five acceptance criteria: Source header, CALL IN
+TRANSACTIONS OF N ROWS syntax, scope rules for correlated subqueries, COUNT {}
+vs count() distinction, and token budget compliance.
+
+Content covers: subquery forms summary table, CALL subquery scope clause
+(Cypher 25), OPTIONAL CALL, CALL IN TRANSACTIONS with full syntax and all
+ON ERROR options, CONCURRENT transactions, REPORT STATUS AS pattern, COUNT/
+COLLECT/EXISTS subquery forms with examples, and a scope summary table.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/references/cypher25-subqueries.md (created — curated content replacing auto-draft)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-007 status → completed)
+
+Key Decisions:
+- Manually curated over auto-extracted (same rationale as tasks 004-006): source
+  docs are verbose; curated version is denser and covers all required topics
+- Added upfront "subquery forms at a glance" table for quick agent reference
+- Documented COUNT {} vs count() distinction explicitly at top level (critical
+  for agent correctness — these are commonly confused)
+- Included OPTIONAL CALL and ON ERROR options table — not in acceptance criteria
+  but highly useful for batch-write patterns
+- REPORT STATUS AS pattern included for completeness of CALL IN TRANSACTIONS
+- Scope summary table at bottom reinforces the import rules across all four forms
+
+Next Task: task-008 (Generate cypher25-types-and-nulls.md)
