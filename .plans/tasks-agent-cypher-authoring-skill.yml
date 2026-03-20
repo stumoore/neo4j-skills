@@ -1,7 +1,7 @@
 feature: agent-cypher-authoring-skill
 prd: ./prd-agent-cypher-authoring-skill.md
 created_at: 2026-03-19T00:00:00Z
-updated_at: 2026-03-20T00:00:00Z
+updated_at: 2026-03-20T12:00:00Z
 
 tasks:
   - id: task-001
@@ -174,9 +174,10 @@ tasks:
       required sections: frontmatter, disambiguation, autonomous operation protocol,
       version pragma, schema-first protocol with APOC detection, parameter
       discipline, core pattern cheat sheet (MERGE, QPE, WITH, WHEN, SEARCH),
-      deprecated syntax table, FOREACH/UNWIND rule, USE clause, decision tree,
-      EXPLAIN/PROFILE validation loop, failure recovery, and WebFetch escalation.
-    status: pending
+      deprecated syntax table, FOREACH/UNWIND rule, USE clause, decision tree with
+      READ/WRITE/ADMIN categorization and L3 folder routing, EXPLAIN/PROFILE
+      validation loop, failure recovery, and WebFetch escalation.
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -190,9 +191,10 @@ tasks:
       - "All 13 sections from the PRD section budget are present"
       - "QPE syntax examples use {m,n} / + / * forms, not deprecated [:REL*] forms"
       - "Schema inspection section shows APOC detection query and both APOC/fallback paths"
-      - "Decision tree maps each query type to the correct L3 reference file"
+      - "Decision tree includes READ/WRITE/ADMIN categorization with explicit L3 folder routing (read/ write/ schema/)"
+      - "Decision tree maps each query type to the correct L3 reference file in the correct folder"
       - "PROFILE section documents all four metrics: dbHits, rows, allocatedMemory, elapsedTimeMs"
-    completed_at: null
+    completed_at: "2026-03-20T13:00:00Z"
 
   - id: task-011
     title: "Build scripts/extract-changelog.py changelog parser"
@@ -430,4 +432,23 @@ tasks:
       - "Assistant message contains only the validated Cypher query"
       - "Running on tests/dataset/companies.yml produces valid JSONL parseable by json.loads()"
       - "Filtering by --difficulty basic produces only basic-difficulty records"
+    completed_at: null
+
+  - id: task-023
+    title: "Create references/README.md documenting L3 folder structure and routing"
+    description: |
+      Create neo4j-cypher-authoring-skill/references/README.md documenting the
+      three-folder structure (read/, write/, schema/), category definitions for
+      READ/WRITE/ADMIN queries, which files belong in each folder, and the rationale
+      for splitting CALL subquery (read/) from CALL IN TRANSACTIONS (write/).
+      This file is referenced by SKILL.md's decision tree to orient agents before
+      they load L3 files.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "references/README.md exists with READ/WRITE/ADMIN category definitions"
+      - "Each folder (read/, write/, schema/) is listed with its current files and load conditions"
+      - "CALL subquery vs CALL IN TRANSACTIONS split rationale is documented"
+      - "New L3 file placement guidance states: files spanning categories must be split"
     completed_at: null

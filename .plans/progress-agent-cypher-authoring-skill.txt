@@ -283,3 +283,35 @@ Key Decisions:
 - String quoting section added (relevant to both naming and meta-character rules)
 
 Next Task: task-010 (Author SKILL.md)
+
+================================================================================
+TASK-010: Author SKILL.md (L2) — autonomous operation core
+Date: 2026-03-20T13:00:00Z
+================================================================================
+
+Summary:
+Authored neo4j-cypher-authoring-skill/SKILL.md — the L2 skill file that agents
+load on every trigger. Manually written (no extraction script needed). The file
+covers all 13 PRD sections within the 300-line / 2,500-token budget (298 lines,
+~1860 tokens estimated). All acceptance criteria verified via automated checks.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/SKILL.md (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-010 status → completed)
+
+Key Decisions:
+- Compacted the Schema-First Protocol by putting CYPHER 25 inline on same line
+  as each query (saves ~10 lines vs separate-line pragma)
+- Each section is as dense as possible — prose removed in favor of tables and
+  code examples
+- SEARCH clause documents both the new SEARCH keyword (2026.01 Preview, vector
+  only) and the legacy procedure fallback for fulltext — both paths needed
+- Decision tree uses two tables: one for READ/WRITE/ADMIN categorization, one
+  for file-level routing — keeps each table focused
+- WebFetch section opens with the proactive framing (PRD requirement) before
+  the URL table
+- PROFILE metrics table includes all four required: dbHits, rows,
+  allocatedMemory, elapsedTimeMs with warning and hard-fail thresholds
+
+Next Task: task-011 (Build scripts/extract-changelog.py) or task-020 (Update
+SKILL.md WebFetch section — depends on task-010, may be mergeable here)
