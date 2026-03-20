@@ -129,6 +129,16 @@ The script generates **first drafts** for L3 reference files (not final output).
 - `_prepend_explain()` / `_prepend_profile()` handle both `CYPHER 25\nQUERY` and plain `QUERY` forms.
 - Smoke tests run with: `uv run python3 tests/harness/validator.py` (no DB connection needed).
 
+## Reporter Notes (tests/harness/reporter.py)
+
+- CLI: `reporter.py --input run.json --output run.md`; direct invocation (`python3 reporter.py` no args) runs smoke tests.
+- Standalone — no imports from runner.py or validator.py; defines its own PASS/WARN/FAIL constants for use in isolation (e.g. CI steps with only the JSON artifact).
+- Uses `statistics.median()` from stdlib; no extra deps.
+- Failure Analysis groups FAIL cases by `failed_gate` and WARN cases by `warned_gate` separately.
+- Cypher excerpts in failure blocks capped at 10 lines for readability.
+- `_truncate()` escapes `|` chars in question text to prevent Markdown table breakage.
+- Smoke tests: `uv run python3 tests/harness/reporter.py` (no DB or Claude needed).
+
 ## SKILL.md Authoring Notes
 
 - SKILL.md line budget is 300 lines (not 300 non-blank lines). Inline `CYPHER 25` on the same line as each query to save ~10 lines in the Schema-First Protocol section.

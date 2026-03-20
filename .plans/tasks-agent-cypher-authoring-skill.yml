@@ -300,7 +300,7 @@ tasks:
       results table with verdict and key metrics per test case, db-hits summary
       statistics, and a failure analysis section grouping failures by gate and
       pattern.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -309,7 +309,7 @@ tasks:
       - "Report includes db-hits min/median/max per difficulty level"
       - "Failure analysis section groups failures by gate (1–4) with failing query excerpts"
       - "Report is self-contained — readable without running the harness again"
-    completed_at: null
+    completed_at: "2026-03-20T19:00:00Z"
 
   - id: task-017
     title: "Build tests/harness/generator.py question generator"

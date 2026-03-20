@@ -520,3 +520,46 @@ Key Decisions:
   core harness used in CI.
 
 Next Task: task-016 (Build tests/harness/reporter.py result reporter)
+
+================================================================================
+TASK-016: Build tests/harness/reporter.py result reporter
+Date: 2026-03-20T19:00:00Z
+================================================================================
+
+Summary:
+Created tests/harness/reporter.py — the Markdown report generator for the
+Cypher test harness. Reads runner JSON output (from runner.py write_report())
+and produces a self-contained Markdown report. All five acceptance criteria
+verified via inline smoke tests (run with `uv run python3 tests/harness/reporter.py`).
+
+Report sections generated:
+1. Header: run_id, skill name, start/completed timestamps
+2. Overall Results: total/PASS/WARN/FAIL counts + pass rate
+3. Per-Difficulty Pass Rates: table with PASS/WARN/FAIL/rate per difficulty level
+4. DB-Hits Summary: min/median/max per difficulty (cases with Gate 4 data only)
+5. Test Case Results: full table (verdict, gate, db_hits, duration, question)
+6. Failure Analysis: FAIL grouped by failed_gate, WARN grouped by warned_gate;
+   each case shows gate reason(s) + Cypher excerpt (first 10 lines) + metrics
+7. Footer with generation timestamp
+
+Files Changed:
+- tests/harness/reporter.py (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-016 status → completed)
+
+Key Decisions:
+- reporter.py is standalone — no import from runner.py or validator.py; uses its
+  own PASS/WARN/FAIL constants so it can be used independently (e.g. from CI steps
+  that only have the JSON output).
+- statistics.median() from stdlib; no external deps added.
+- Failure analysis groups by failed_gate (for FAILs) and warned_gate (for WARNs)
+  separately — consistent with how runner.py records these fields.
+- Cypher excerpt capped at 10 lines in failure blocks to keep the report readable.
+- _truncate() escapes pipe characters (|) in questions to prevent Markdown table
+  breakage.
+- Smoke tests cover all acceptance criteria offline (no DB or Claude needed).
+- CLI usage: `reporter.py --input run.json --output run.md`; direct invocation
+  (`python3 reporter.py` no args) runs smoke tests.
+
+Next Task: task-017 (Build tests/harness/generator.py) or task-021 (exporter.py)
+— both depend on completed tasks.
+
