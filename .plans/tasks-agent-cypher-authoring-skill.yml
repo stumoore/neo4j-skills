@@ -421,7 +421,7 @@ tasks:
       (skill instructions summary), user (database name + schema context + question),
       and assistant (validated Cypher query). Supports filtering by difficulty and
       tags. Output is compatible with Anthropic and OpenAI fine-tuning APIs.
-    status: pending
+    status: completed
     dependencies:
       - task-021
     acceptance_criteria:
@@ -432,7 +432,7 @@ tasks:
       - "Assistant message contains only the validated Cypher query"
       - "Running on skill-generation-validation-tools/tests/dataset/companies.yml produces valid JSONL parseable by json.loads()"
       - "Filtering by --difficulty basic produces only basic-difficulty records"
-    completed_at: null
+    completed_at: "2026-03-20T22:00:00Z"
 
   - id: task-023
     title: "Create references/README.md documenting L3 folder structure and routing"

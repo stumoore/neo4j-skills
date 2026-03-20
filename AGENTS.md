@@ -153,6 +153,15 @@ The script generates **first drafts** for L3 reference files (not final output).
 - Dry-run skips Claude calls and all file writes. Use it to verify schema connectivity and inspect what would be generated.
 - Generator imports `extract_profile_metrics` from validator.py at runtime (not at module level) so it works from both `tests/harness/` and repo root paths.
 
+## to_jsonl.py Notes (scripts/to_jsonl.py)
+
+- CLI: `uv run python3 scripts/to_jsonl.py --input tests/dataset/companies.yml --output out.jsonl [--difficulty basic] [--tags search,vector]`
+- Smoke tests: direct invocation with no args (`uv run python3 scripts/to_jsonl.py`).
+- System message is a fixed constant (not read from SKILL.md) — keeps the dataset self-contained and reproducible.
+- Tags filter uses OR semantics: record is included if it has ANY of the specified tags (comma-separated).
+- Directory mode skips `*-generated.yml` files (those require human promotion via exporter.py first).
+- Schema context formatter sorts labels, rel types, and property names for deterministic output.
+
 ## Exporter Notes (tests/harness/exporter.py)
 
 - CLI: `uv run python3 tests/harness/exporter.py --input run.json --domain companies --output-dir tests/dataset/ [--schema schema.json] [--dry-run]`

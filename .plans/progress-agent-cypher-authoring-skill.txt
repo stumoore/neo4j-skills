@@ -642,7 +642,41 @@ Key Decisions:
 - Dedup strategy: load existing IDs into a set before merging, skip if already present
 - No new dependencies added (pyyaml already in pyproject.toml)
 
-Next Task: task-022 (to_jsonl.py YAML → JSONL converter — depends on task-021)
-or task-023 (references/README.md — depends on task-010, now available)
+Next Task: task-023 (references/README.md — depends on task-010, now available)
 or task-020 (SKILL.md WebFetch framing — may already be satisfied per AGENTS.md)
+or task-018 (Create initial test cases for companies database)
+
+================================================================================
+TASK-022: Build scripts/to_jsonl.py YAML dataset → JSONL converter
+Date: 2026-03-20T22:00:00Z
+================================================================================
+
+Summary:
+Created scripts/to_jsonl.py — the YAML training dataset to JSONL converter for
+fine-tuning. Reads YAML dataset files produced by exporter.py, filters by
+difficulty and tags, and writes one JSONL line per record with a messages array
+(system/user/assistant roles) compatible with Anthropic and OpenAI fine-tuning APIs.
+All 6 smoke tests pass (no network or DB connection needed).
+
+Message structure:
+- system: fixed Cypher 25 authoring instruction summary (~10 rules, ~800 chars)
+- user: schema context (labels, rel types, indexes, property semantics) + question
+- assistant: validated Cypher query only
+
+Files Changed:
+- skill-generation-validation-tools/scripts/to_jsonl.py (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-022 status → completed)
+
+Key Decisions:
+- System message is a fixed constant (not read from SKILL.md at runtime) — ensures
+  the fine-tuning dataset is self-contained and reproducible without the skill file
+- Schema context formatter uses sorted keys for deterministic output across runs
+- Directory mode skips *-generated.yml files (pending human review gate from exporter)
+- Tags filter uses OR semantics (record matches if it has ANY of the specified tags)
+  which is more useful for exploration than AND semantics
+- No new dependencies added (pyyaml already in pyproject.toml)
+- Direct invocation with no args runs smoke tests (same pattern as other harness tools)
+
+Next Task: task-023 (references/README.md — depends on task-010, now available)
+or task-020 (SKILL.md WebFetch framing — may already be done per AGENTS.md)
 
