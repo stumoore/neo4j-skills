@@ -137,7 +137,7 @@ tasks:
       functions (toInteger, toString, toFloat, toBoolean, date, datetime), and
       type predicate expressions (IS :: INTEGER, IS :: STRING?). This file
       prevents the most common autonomous agent runtime failures.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -146,7 +146,7 @@ tasks:
       - "All major casting functions listed with signatures"
       - "Type predicate expression syntax (IS :: TYPE) documented"
       - "File is ≤ 2,000 tokens"
-    completed_at: null
+    completed_at: "2026-03-20T04:00:00Z"
 
   - id: task-009
     title: "Generate L3 reference file: cypher-style-guide.md"

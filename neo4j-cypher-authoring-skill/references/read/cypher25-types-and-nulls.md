@@ -1,163 +1,205 @@
-> Source: git@github.com:neo4j/docs-cypher.git + git@github.com:neo4j/docs-cheat-sheet.git@238ab12a / e11fe2f2
-> Generated: 2026-03-20T00:11:34Z
-> Files: values-and-types/working-with-null.adoc (cypher), values-and-types/casting-data.adoc (cypher), values-and-types/property-structural-constructed.adoc (cypher), expressions/predicates/type-predicate-expressions.adoc (cypher)
+> Source: git@github.com:neo4j/docs-cypher.git@238ab12a
+> Generated: 2026-03-20T00:11:34Z — manually curated
+> Files: values-and-types/working-with-null.adoc, values-and-types/casting-data.adoc, values-and-types/property-structural-constructed.adoc, expressions/predicates/type-predicate-expressions.adoc
 
-# Working with `null`
-## Logical operations with `null`
+# Cypher 25 — Types and Nulls
 
-The boolean operators (`AND`, `OR`, `XOR`, `NOT`) treat `null` as the ***unknown value*** of three-valued logic.
+## Type hierarchy (quick reference)
 
-| a | b | a `AND` b | a `OR` b | a `XOR` b | `NOT` a |
-| --- | --- | --- | --- | --- | --- |
-| `false` | `false` | `false` | `false` | `false` | `true` |
+| Category | Types |
+|---|---|
+| **Property** (storable) | `BOOLEAN`, `INTEGER`, `FLOAT`, `STRING`, `DATE`, `LOCAL DATETIME`, `ZONED DATETIME`, `LOCAL TIME`, `ZONED TIME`, `DURATION`, `POINT`, `VECTOR`, `LIST<T>` (homogeneous, no nulls) |
+| **Structural** (not storable) | `NODE`, `RELATIONSHIP`, `PATH` |
+| **Constructed** | `MAP`, `LIST<ANY>` (heterogeneous) |
+| **Special** | `NULL`, `ANY` (supertype), `NOTHING` (empty set) |
+
+## Null propagation rules
+
+**Core rule:** `null` represents a missing/unknown value. Most expressions propagate `null` when any input is `null`.
+
+| Context | Result |
+|---|---|
+| Arithmetic: `1 + null` | `null` |
+| Comparison: `1 < null` | `null` |
+| Missing property: `n.missingProp` | `null` |
+| Missing list element: `[][0]`, `head([])` | `null` |
+| `null = null` | `null` (not `true`) |
+| `null <> null` | `null` |
+| `NOT null` | `null` |
+
+**WHERE clause:** anything that is not `true` (including `null`) is treated as `false` — rows with null predicates are filtered out.
+
+### Logical operators (three-valued logic)
+
+| a | b | AND | OR | XOR | NOT a |
+|---|---|---|---|---|---|
 | `false` | `null` | `false` | `null` | `null` | `true` |
-| `false` | `true` | `false` | `true` | `true` | `true` |
-| `true` | `false` | `false` | `true` | `true` | `false` |
 | `true` | `null` | `null` | `true` | `null` | `false` |
-| `true` | `true` | `true` | `true` | `false` | `false` |
-| `null` | `false` | `false` | `null` | `null` | `null` |
 | `null` | `null` | `null` | `null` | `null` | `null` |
-| `null` | `true` | `null` | `true` | `null` | `null` |
 
-## The `IN` operator and `null`
-
-The `IN` operator follows similar logic.
-If Cypher can ascertain that something exists in a list, the result will be `true`.
-Any list that contains a `null` and does not have a matching element will return `null`.
-Otherwise, the result will be `false`.
+### IN operator and null
 
 | Expression | Result |
-| --- | --- |
-| 2 IN [1, 2, 3] | true |
-| 2 IN [1, null, 3] | null |
-| 2 IN [1, 2, null] | true |
-| 2 IN [1] | false |
-| 2 IN [] | false |
-| null IN [1, 2, 3] | null |
-| null IN [1, null, 3] | null |
-| null IN [] | false |
+|---|---|
+| `2 IN [1, null, 3]` | `null` |
+| `2 IN [1, 2, null]` | `true` |
+| `null IN [1, 2, 3]` | `null` |
+| `null IN []` | `false` |
 
-Using `all`, `any`, `none`, and `single` follows a similar rule.
-If the result can be calculated definitively, `true` or `false` is returned.
-Otherwise `null` is produced.
-
-## The `[]` operator and `null`
-
-Accessing a list or a map with `null` will result in `null`:
+### [] accessor and null
 
 | Expression | Result |
-| --- | --- |
-| [1, 2, 3][null] | null |
-| [1, 2, 3, 4][null..2] | null |
-| [1, 2, 3][1..null] | null |
-| {age: 25}[null] | null |
+|---|---|
+| `[1,2,3][null]` | `null` |
+| `{age:25}[null]` | `null` |
 
-Using parameters to pass in the bounds, such as `a[$lower..$upper]`, may result in a `null` for the lower or upper bound (or both).
-The following workaround will prevent this from happening by setting the absolute minimum and maximum bound values:
-```syntax
-a[coalesce($lower,0)..coalesce($upper,size(a))]
-```
+Workaround for nullable bounds: `a[coalesce($lower,0)..coalesce($upper,size(a))]`
 
-## Expressions that return `null`
+## IS NULL / IS NOT NULL
 
-* Getting a missing element from a list: `[][0]`, `head([])`.
-* Trying to access a property that does not exist on a node or relationship: `n.missingProperty`.
-* Comparisons when either side is `null`: `1 < null`.
-* Arithmetic expressions containing `null`: `1 + null`.
-* Some function calls where any argument is `null`: e.g., `sin(null)`.
-
-## Using `IS NULL` and `IS NOT NULL`
-Testing any value against `null`, either with the `=` operator or with the `<>` operator, always evaluates to `null`.
-Therefore,  use the special equality operators `IS NULL` or `IS NOT NULL`.
-
----
-
-# Casting data values
-## Functions for converting data values
-
-The following functions are available for casting data values:
-
-| Function | Description |
-| --- | --- |
-| `toBoolean()` | Converts a `STRING`, `INTEGER`, or `BOOLEAN` value to a `BOOLEAN` value. |
-| toBooleanList() | Converts a `LIST<ANY>` and returns a `LIST<BOOLEAN>` values. |
-| toBooleanOrNull() | Converts a `STRING`, `INTEGER` or `BOOLEAN` value to a `BOOLEAN` value. |
-| toFloat() | Converts an `INTEGER`, `FLOAT`, or a `STRING` value to a `FLOAT` value. |
-| toFloatList() | Converts a `LIST<ANY>` or, as of Neo4j 2025.10, additionally `VECTOR` and returns a `LIST<FLOAT>` values. |
-| toFloatOrNull() | Converts an `INTEGER`, `FLOAT`, or a `STRING` value to a `FLOAT`. |
-| toInteger() | Converts a `BOOLEAN`, `INTEGER`, `FLOAT` or a `STRING` value to an `INTEGER` value. |
-| toIntegerList() | Converts a `LIST<ANY>` or, as of Neo4j 2025.10, additionally `VECTOR` to a `LIST<INTEGER>` values. If any values are not convertible to `INTEGER` they will be null in the `LIST<INTEGER>` returned. |
-| toIntegerOrNull() | Converts a `BOOLEAN`, `INTEGER`, `FLOAT` or a `STRING` value to an `INTEGER` value. |
-| toString() | Converts an `INTEGER`, `FLOAT`, `BOOLEAN`, `STRING`, `POINT`, `DURATION`, `DATE`, `ZONED TIME`, `LOCAL TIME`, `LOCAL DATETIME`, or `ZONED DATETIME` value to a `STRING` value. |
-| toStringList() | Converts a `LIST<ANY>` and returns a `LIST<STRING>` values. |
-| toStringOrNull() | Converts an `INTEGER`, `FLOAT`, `BOOLEAN`, `STRING`, `POINT`, `DURATION`, `DATE`, `ZONED TIME`, `LOCAL TIME`, `LOCAL DATETIME`, or `ZONED DATETIME` value to a `STRING`. |
-
-More information about these, and many other functions, can be found in the section on .
-
-## Examples
-
-The following graph is used for the examples below:
-
-To recreate it, run the following query against an empty Neo4j database:
+**Never use `= null` or `<> null`** — both always return `null`.
+Use the dedicated operators:
 
 ```cypher
-CREATE (keanu:Person {name:'Keanu Reeves', age: 58, active:true}),
-       (carrieAnne:Person  {name:'Carrie-Anne Moss', age: 55, active:true}),
-       (keanu)-[r:KNOWS {since:1999}]->(carrieAnne)
+MATCH (n:Person)
+WHERE n.email IS NOT NULL
+RETURN n.name, n.email
 ```
-
-### Returning converted values
-
-In the below query, the function `toFloat` is used to cast two `STRING` values.
-It shows that `null` is returned if the data casting is not possible.
 
 ```cypher
-MATCH (keanu:Person {name:'Keanu Reeves'})
-RETURN toFloat(keanu.age), toInteger(keanu.name)
+MATCH (n:Person)
+WHERE n.phone IS NULL
+RETURN n.name
 ```
 
-If the function `toFloat` is passed an unsupported value (such as a `DATE` value), it will throw an error:
+## coalesce()
 
-However, if the same value is passed to the function `toFloatOrNull`, `null` will be returned.
+Returns the first non-null value from its arguments. Signature: `coalesce(expr [, expr]...) → ANY`.
 
-It is also possible to return casted values as a list.
-The below query uses the `toStringList` to cast all passed values into `STRING` values, and return them in as a `LIST<STRING>`:
+```cypher
+MATCH (n:Person)
+RETURN n.name, coalesce(n.nickname, n.name) AS displayName
+```
 
-### Updating property value types
+- Evaluates arguments left to right, returns first non-null
+- Returns `null` if all arguments are `null`
 
-The functions to cast data values can be used to update property values on nodes and relationships.
-The below query casts the `age` (`INTEGER`), `active` (`BOOLEAN`), and `since`(`INTEGER`) properties to `STRING` values:
+## Casting functions
 
----
+All casting functions return `null` when input cannot be converted (OrNull variants) or throw an error (base variants).
 
-# Property, structural, and constructed values
-## Property types
+| Function | Input types | Returns | On unconvertible |
+|---|---|---|---|
+| `toBoolean(x)` | `STRING`, `INTEGER`, `BOOLEAN` | `BOOLEAN` | error |
+| `toBooleanOrNull(x)` | any | `BOOLEAN` | `null` |
+| `toInteger(x)` | `BOOLEAN`, `INTEGER`, `FLOAT`, `STRING` | `INTEGER` | error |
+| `toIntegerOrNull(x)` | any | `INTEGER` | `null` |
+| `toFloat(x)` | `INTEGER`, `FLOAT`, `STRING` | `FLOAT` | error |
+| `toFloatOrNull(x)` | any | `FLOAT` | `null` |
+| `toString(x)` | `INTEGER`, `FLOAT`, `BOOLEAN`, `STRING`, `POINT`, `DURATION`, all temporal | `STRING` | error |
+| `toStringOrNull(x)` | any | `STRING` | `null` |
+| `date(x)` | `STRING` (ISO 8601), `MAP`, `DATE` | `DATE` | error |
+| `datetime(x)` | `STRING`, `MAP`, temporal | `ZONED DATETIME` | error |
+| `localdatetime(x)` | `STRING`, `MAP`, temporal | `LOCAL DATETIME` | error |
+| `time(x)` | `STRING`, `MAP`, temporal | `ZONED TIME` | error |
+| `localtime(x)` | `STRING`, `MAP`, temporal | `LOCAL TIME` | error |
+| `duration(x)` | `STRING` (ISO 8601), `MAP` | `DURATION` | error |
 
-A property type value is one that can be stored as a node or relationship property.
+List variants: `toBooleanList()`, `toIntegerList()`, `toFloatList()`, `toStringList()` — convert `LIST<ANY>`, nulls in input become nulls in output.
 
-Property types are the most primitive types in Cypher and include the following: `BOOLEAN`, `DATE`, `DURATION`, `FLOAT`, `INTEGER`, `LIST`, `LOCAL DATETIME`, `LOCAL TIME`, `POINT`, `STRING`, `VECTOR`, `ZONED DATETIME`, and `ZONED TIME`.
+## Type predicate expressions
 
-* Property types can be returned from Cypher queries.
-* Property types can be used as parameters.
-* Property types can be stored as properties.
-* Property types can be constructed with Cypher literals.
+Syntax: `<expr> IS :: <TYPE>` — returns `BOOLEAN`.
 
-Homogeneous lists of simple types can be stored as properties (with the exeption of `VECTOR` types, which cannot be stored in lists), although lists in general (see Constructed types) cannot be stored as properties.
-Lists stored as properties cannot contain `null` values.
+**Key rule:** All Cypher types include `null`. `IS :: TYPE` returns `true` for `null` unless `NOT NULL` is appended.
 
-Storing `VECTOR` type values as properties is only supported in the Neo4j Enterprise Edition using block format or on Aura instances. This functionality is not available in Neo4j Community Edition.
+```cypher
+-- Basic type check
+UNWIND [42, true, 'abc', null] AS val
+RETURN val, val IS :: INTEGER AS isInt
+-- Results: true, false, false, true  ← null matches any type
+```
 
-Cypher also provides pass-through support for byte arrays, which can be stored as property values.
-Byte arrays are supported for performance reasons, since using Cypher's generic data type, `LIST<INTEGER>` (where each `INTEGER` has a 64-bit representation), would be too costly.
-However, byte arrays are *not* considered a first class data type by Cypher, so they do not have a literal representation.
+```cypher
+-- Exclude null: append NOT NULL
+RETURN NULL IS :: BOOLEAN NOT NULL AS isNotNullBoolean
+-- Result: false
+```
 
-## Structural types
+```cypher
+-- Negation
+RETURN val IS NOT :: STRING AS notString
+-- null → false (null is "not not a string"? no — null matches all, so IS NOT :: returns false for null)
+```
 
-The following data types are included in the structural types category: `NODE`, `RELATIONSHIP`, and `PATH`.
+### NOT NULL suffix
 
-* Structural types can be returned from Cypher queries.
-* Structural types cannot be used as parameters.
-* Structural types cannot be stored as properties.
-* Structural types cannot be constructed with Cypher literals.
+| Expression | null result | non-null result |
+|---|---|---|
+| `x IS :: INTEGER` | `true` | `true` if INTEGER, else `false` |
+| `x IS :: INTEGER NOT NULL` | `false` | `true` if INTEGER, else `false` |
+| `x IS NOT :: STRING` | `false` | `true` if not STRING, else `false` |
+| `x IS NOT :: STRING NOT NULL` | `true` | `true` if not STRING, else `false` |
 
-> **Note**: Content truncated to token budget.
+### Closed Dynamic Unions
+
+Test multiple types in one predicate using `|`:
+
+```cypher
+UNWIND [42, 42.0, "42"] AS val
+RETURN val, val IS :: INTEGER | FLOAT AS isNumber
+-- Results: true, true, false
+```
+
+All inner types must have the same nullability (all nullable or all `NOT NULL`).
+
+### List type predicates
+
+```cypher
+-- All elements must match the inner type
+RETURN [42, null] IS :: LIST<INTEGER> AS ok  -- true (null allowed)
+RETURN [42, 42.0] IS :: LIST<INTEGER> AS ok  -- false (FLOAT ≠ INTEGER)
+RETURN [] IS :: LIST<NOTHING> AS ok          -- true (empty matches any)
+```
+
+### Alternative syntax
+
+```cypher
+x IS TYPED INTEGER       -- same as IS :: INTEGER
+x IS NOT TYPED INTEGER   -- same as IS NOT :: INTEGER
+x :: INTEGER             -- shorthand (same semantics)
+```
+
+### Type predicate for property filtering
+
+```cypher
+MATCH (n:Person)
+WHERE n.age IS :: INTEGER AND n.age > 18
+RETURN n.name, n.age
+-- Only returns nodes where age is an INTEGER (filters out STRING ages)
+```
+
+### Special types ANY and NOTHING
+
+```cypher
+RETURN 42 IS :: ANY AS t     -- true (ALL values match ANY)
+RETURN 42 IS :: NOTHING AS t -- false (no value matches NOTHING)
+```
+
+### PROPERTY VALUE type
+
+```cypher
+-- Check if storable as a property
+RETURN {a:1} IS :: PROPERTY VALUE AS ok  -- false (MAP not storable)
+RETURN 42 IS :: PROPERTY VALUE AS ok     -- true
+```
+
+## Common agent pitfalls
+
+| Mistake | Correct pattern |
+|---|---|
+| `WHERE n.x = null` | `WHERE n.x IS NULL` |
+| `WHERE n.x <> null` | `WHERE n.x IS NOT NULL` |
+| `toFloat('abc')` (crashes) | `toFloatOrNull('abc')` |
+| Casting DATE to FLOAT | Use `toString(date_val)` first |
+| `IS :: INTEGER` accepts null | Append `NOT NULL` to exclude null |

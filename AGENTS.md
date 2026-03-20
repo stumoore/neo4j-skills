@@ -47,6 +47,10 @@ No build/test system exists yet (test harness is a future task). Once tests/harn
 - `CALL { ... } IN TRANSACTIONS` is only allowed in implicit transactions — not inside explicit `BEGIN`/`COMMIT` blocks. Batching applies to input rows fed *outside* the subquery; matching inside the subquery collapses to one transaction.
 - `COUNT {}` vs `count()`: `COUNT { pattern }` is a subquery counting rows; `count(expr)` is an aggregating function. They are not interchangeable — `count()` must appear in a clause that has an aggregation context.
 - CALL subquery scope clause (`CALL (x, y) { }`) is Cypher 25 standard; importing `WITH` as first clause inside CALL is deprecated. Use `CALL ()` for isolated, `CALL (*)` for all-vars, `CALL (x)` for specific imports.
+- Type predicates: `IS :: TYPE` returns `true` for `null` by default (all types include null). Append `NOT NULL` to exclude null: `x IS :: INTEGER NOT NULL`. Negation `IS NOT ::` returns `false` for null by default.
+- Closed Dynamic Unions: `val IS :: INTEGER | FLOAT` tests multiple types; all inner types must have same nullability (all nullable or all `NOT NULL`).
+- Casting: base functions (`toFloat`, `toInteger`, etc.) throw on unconvertible input; `OrNull` variants (`toFloatOrNull`, etc.) return `null` instead — prefer OrNull in agent-authored queries to avoid runtime errors.
+- `null = null` → `null` (not `true`); `null <> null` → `null`. Always use `IS NULL` / `IS NOT NULL`.
 
 ## Scripts
 
