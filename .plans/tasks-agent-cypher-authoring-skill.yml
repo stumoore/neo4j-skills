@@ -444,7 +444,7 @@ tasks:
       schema DDL (schema/) from database admin (admin/).
       This file is referenced by SKILL.md's decision tree to orient agents before
       they load L3 files.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -453,4 +453,4 @@ tasks:
       - "CALL subquery vs CALL IN TRANSACTIONS split rationale is documented"
       - "SCHEMA (indexes/constraints/DDL) vs ADMIN (databases, users, roles, transactions) distinction is documented"
       - "New L3 file placement guidance states: files spanning categories must be split"
-    completed_at: null
+    completed_at: "2026-03-20T23:30:00Z"

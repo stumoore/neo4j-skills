@@ -709,3 +709,40 @@ Key Decisions:
 Next Task: task-023 (references/README.md — depends on task-010, now done)
 or task-018 (Create initial test cases for companies database)
 
+================================================================================
+TASK-023: Create references/README.md documenting L3 folder structure and routing
+Date: 2026-03-20T23:30:00Z
+================================================================================
+
+Summary:
+Created neo4j-cypher-authoring-skill/references/README.md — the companion
+reference for the SKILL.md decision tree. Documents the four-folder structure
+(read/, write/, schema/, admin/) with category definitions, full folder inventory
+tables (current files + load conditions), split rationales for two commonly
+conflated distinctions, and guidance for adding new L3 files.
+
+All 5 acceptance criteria verified:
+- READ/WRITE/SCHEMA/ADMIN category definitions ✓ (Category Definitions table)
+- Each folder listed with current files and load conditions ✓ (Folder Inventory)
+- CALL subquery vs CALL IN TRANSACTIONS split rationale ✓ (Split Rationale section)
+- SCHEMA vs ADMIN distinction documented ✓ (Split Rationale section)
+- New L3 file placement guidance: "files spanning categories must be split" ✓
+
+Stats: 83 lines, ~1,157 tokens (well within the 2,000-token budget).
+
+Files Changed:
+- neo4j-cypher-authoring-skill/references/README.md (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-023 status → completed)
+
+Key Decisions:
+- admin/ folder documented as intentionally empty (admin queries are handled by
+  neo4j-cli-tools-skill); this prevents future confusion about what goes there
+- Split Rationale section explains the subtle distinctions with "why it matters
+  operationally" (wrong category causes runtime errors or privilege failures)
+- Adding New L3 Files section (5 steps) provides clear checklist for humans and
+  agents adding files, ensuring SKILL.md routing table stays in sync with README
+
+Next Task: task-018 (Create initial test cases for companies database — depends
+on task-017, now complete) or task-019 (advanced/complex test cases — depends on
+task-018)
+
