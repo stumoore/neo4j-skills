@@ -243,7 +243,7 @@ tasks:
       the companies test database using repo secrets for connection credentials and
       the Anthropic API key. Uploads test result artifacts and fails the PR check
       if any FAIL-grade gates are triggered.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -252,7 +252,7 @@ tasks:
       - "Workflow reads NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, ANTHROPIC_API_KEY from secrets"
       - "Test result Markdown is uploaded as a workflow artifact"
       - "Workflow exits non-zero when any test case receives a FAIL verdict"
-    completed_at: null
+    completed_at: "2026-03-20T16:00:00Z"
 
   - id: task-014
     title: "Build tests/harness/validator.py validation rules"

@@ -96,6 +96,10 @@ The script generates **first drafts** for L3 reference files (not final output).
 - `workflow_dispatch` `target_tag` input applies to both submodules. Use the same version tag for both unless you need independent control.
 - Changelog `--since` arg should be the OLD (current) tag, not the new one, so only new-release entries appear in the PR body.
 - heredoc in a GH Actions `run:` block works for VERSION file rewrite — use `<<EOF` / `EOF` with `cat >` to avoid quoting issues.
+- Test workflows should handle missing harness gracefully: use a harness-availability check step + placeholder report so structural checks still run before harness tasks are complete.
+- Store harness exit code as a step output, then evaluate in a separate step — ensures artifact upload runs even when harness reports failures.
+- `actions/github-script@v7` is simpler than `gh pr comment` for posting multi-line dynamic content to PRs.
+- Include `run_id` in artifact names to avoid collisions on concurrent workflow runs.
 
 ## Changelog Parser Notes (extract-changelog.py)
 

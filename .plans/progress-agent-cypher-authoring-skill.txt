@@ -390,3 +390,47 @@ Key Decisions:
 Next Task: task-013 (Create GH Action: test-cypher-skill.yml) — depends on task-012.
 Also available: task-014 (validator.py), task-020 (SKILL.md WebFetch framing — may
 already be done), task-023 (references/README.md).
+
+================================================================================
+TASK-013: Create GH Action: test-cypher-skill.yml
+Date: 2026-03-20T16:00:00Z
+================================================================================
+
+Summary:
+Created .github/workflows/test-cypher-skill.yml — the PR-triggered test workflow
+that validates the neo4j-cypher-authoring-skill on every pull request touching that
+directory. Workflow handles the case where the test harness is not yet built
+(tasks 014-015) by running structural checks and posting a placeholder report, so
+PRs are not hard-blocked before the harness exists. yamllint passes with zero
+warnings or errors.
+
+Structural checks (always run, harness-independent):
+- SKILL.md exists and is within the 300-line budget
+- All 6 required L3 reference files are present in the correct folders
+
+Harness run (when runner.py + test cases exist):
+- Passes NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, ANTHROPIC_API_KEY from secrets
+- Supports difficulty filtering via workflow_dispatch input
+- Exits 0 (all-pass), 1 (any FAIL), 2 (any WARN, no FAIL) per runner.py contract
+
+Report handling:
+- Test result Markdown always uploaded as artifact (retention: 30 days)
+- Report also posted as PR comment via actions/github-script@v7
+- Placeholder report generated when harness not yet available
+
+Files Changed:
+- .github/workflows/test-cypher-skill.yml (created)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-013 status → completed)
+
+Key Decisions:
+- Harness-availability check prevents hard failure when harness is not yet built
+  (tasks 014-015 are still pending); structural checks provide immediate value
+- Two-step exit code evaluation: harness exit code stored as step output, then
+  evaluated in a separate step — allows artifact upload to run even on failures
+- PR comment posting uses actions/github-script@v7 (simpler than gh CLI for
+  multi-line bodies with dynamic content)
+- workflow_dispatch trigger added for manual runs with optional difficulty filter
+- Artifact name includes run_id to avoid collisions across concurrent runs
+
+Next Task: task-014 (Build tests/harness/validator.py) or task-020 (SKILL.md
+WebFetch framing — may already be done) or task-023 (references/README.md)

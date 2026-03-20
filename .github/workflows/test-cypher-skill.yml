@@ -1,0 +1,243 @@
+name: Test Cypher Skill
+
+on:
+  pull_request:
+    paths:
+      - 'neo4j-cypher-authoring-skill/**'
+  workflow_dispatch:
+    inputs:
+      cases_path:
+        description: 'Path to test cases directory or file (default: tests/cases/)'
+        required: false
+        default: 'tests/cases/'
+      difficulty:
+        description: 'Filter by difficulty: basic, intermediate, advanced, complex (leave blank for all)'
+        required: false
+        default: ''
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+          enable-cache: true
+
+      - name: Create virtual environment
+        run: uv venv
+
+      # -----------------------------------------------------------------------
+      # Verify test harness exists (harness may not yet be built)
+      # -----------------------------------------------------------------------
+      - name: Check harness availability
+        id: harness_check
+        run: |
+          if [ -f "tests/harness/runner.py" ]; then
+            echo "harness_available=true" >> "$GITHUB_OUTPUT"
+            echo "Test harness found."
+          else
+            echo "harness_available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::tests/harness/runner.py not found — skipping execution tests."
+            echo "Once the test harness is built (task-015), this workflow will run live tests."
+          fi
+
+      # -----------------------------------------------------------------------
+      # Validate SKILL.md structure (always runs)
+      # -----------------------------------------------------------------------
+      - name: Validate SKILL.md exists and is within line budget
+        run: |
+          SKILL_FILE="neo4j-cypher-authoring-skill/SKILL.md"
+          if [ ! -f "$SKILL_FILE" ]; then
+            echo "::error::$SKILL_FILE does not exist"
+            exit 1
+          fi
+          LINE_COUNT=$(wc -l < "$SKILL_FILE")
+          echo "SKILL.md line count: $LINE_COUNT"
+          if [ "$LINE_COUNT" -gt 300 ]; then
+            echo "::error::SKILL.md exceeds 300-line budget (got $LINE_COUNT lines)"
+            exit 1
+          fi
+          echo "SKILL.md line budget OK."
+
+      # -----------------------------------------------------------------------
+      # Validate L3 reference files exist
+      # -----------------------------------------------------------------------
+      - name: Validate L3 reference files
+        run: |
+          MISSING=0
+          REFS="neo4j-cypher-authoring-skill/references"
+          for f in \
+            "$REFS/read/cypher25-patterns.md" \
+            "$REFS/read/cypher25-functions.md" \
+            "$REFS/read/cypher25-subqueries.md" \
+            "$REFS/read/cypher25-types-and-nulls.md" \
+            "$REFS/schema/cypher25-indexes.md" \
+            "$REFS/cypher-style-guide.md"
+          do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing L3 reference file: $f"
+              MISSING=$((MISSING + 1))
+            else
+              echo "  OK: $f"
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::error::$MISSING L3 reference file(s) missing"
+            exit 1
+          fi
+          echo "All required L3 reference files present."
+
+      # -----------------------------------------------------------------------
+      # Validate test case YAML files exist (advisory — harness may be pending)
+      # -----------------------------------------------------------------------
+      - name: Check test case files
+        id: cases_check
+        run: |
+          CASES_PATH="${{ github.event.inputs.cases_path || 'tests/cases/' }}"
+          if [ -d "$CASES_PATH" ] && [ "$(ls -A "$CASES_PATH" 2>/dev/null)" ]; then
+            CASE_COUNT=$(find "$CASES_PATH" -name "*.yml" | wc -l)
+            echo "Found $CASE_COUNT YAML file(s) in $CASES_PATH"
+            echo "cases_available=true" >> "$GITHUB_OUTPUT"
+          elif [ -f "$CASES_PATH" ]; then
+            echo "Using single case file: $CASES_PATH"
+            echo "cases_available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No test case files found in $CASES_PATH — harness will be skipped."
+            echo "cases_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Run the test harness (only when harness + cases are available)
+      # -----------------------------------------------------------------------
+      - name: Run test harness
+        if: >
+          steps.harness_check.outputs.harness_available == 'true' &&
+          steps.cases_check.outputs.cases_available == 'true'
+        id: harness
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          CASES_PATH="${{ github.event.inputs.cases_path || 'tests/cases/' }}"
+          REPORT_PATH="tests/results/report-${{ github.run_id }}.md"
+          mkdir -p tests/results
+
+          DIFFICULTY_FLAG=""
+          if [ -n "${{ github.event.inputs.difficulty }}" ]; then
+            DIFFICULTY_FLAG="--difficulty ${{ github.event.inputs.difficulty }}"
+          fi
+
+          # runner.py exits: 0 = all pass, 1 = any FAIL, 2 = any WARN no FAIL
+          set +e
+          uv run python3 tests/harness/runner.py \
+            --cases "$CASES_PATH" \
+            --skill neo4j-cypher-authoring-skill \
+            --report "$REPORT_PATH" \
+            $DIFFICULTY_FLAG
+          EXIT_CODE=$?
+          set -e
+
+          echo "report_path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          echo "Harness exit code: $EXIT_CODE (0=all-pass, 1=fail, 2=warn)"
+
+      # -----------------------------------------------------------------------
+      # Generate a placeholder report when harness is not yet available
+      # -----------------------------------------------------------------------
+      - name: Generate placeholder report
+        if: >
+          steps.harness_check.outputs.harness_available != 'true' ||
+          steps.cases_check.outputs.cases_available != 'true'
+        id: placeholder_report
+        run: |
+          REPORT_PATH="tests/results/report-${{ github.run_id }}.md"
+          mkdir -p tests/results
+
+          cat > "$REPORT_PATH" <<'EOF'
+          # Cypher Skill Test Report
+
+          **Status**: Harness not yet available
+
+          The test harness (`tests/harness/runner.py`) has not been built yet.
+          Structural checks (SKILL.md line budget, L3 reference file presence) passed.
+
+          Once the test harness is built (see task-015), this workflow will execute
+          live Cypher generation tests against the companies Neo4j database.
+
+          ## Structural Checks
+
+          | Check | Result |
+          |---|---|
+          | SKILL.md line budget (≤ 300) | PASS |
+          | L3 reference files present | PASS |
+
+          EOF
+
+          echo "report_path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # Upload test report artifact
+      # -----------------------------------------------------------------------
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypher-skill-test-report-${{ github.run_id }}
+          path: |
+            ${{ steps.harness.outputs.report_path || steps.placeholder_report.outputs.report_path }}
+          retention-days: 30
+
+      # -----------------------------------------------------------------------
+      # Post report summary to PR (pull_request event only)
+      # -----------------------------------------------------------------------
+      - name: Post summary to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '${{ steps.harness.outputs.report_path || steps.placeholder_report.outputs.report_path }}';
+            let body = '## Cypher Skill Test Results\n\n';
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              body += report.slice(0, 65000); // GitHub comment limit
+            } else {
+              body += '_Test report not available._';
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      # -----------------------------------------------------------------------
+      # Fail the check if any FAIL verdicts were recorded
+      # -----------------------------------------------------------------------
+      - name: Evaluate test results
+        if: steps.harness.outputs.exit_code != ''
+        run: |
+          EXIT_CODE="${{ steps.harness.outputs.exit_code }}"
+          if [ "$EXIT_CODE" = "1" ]; then
+            echo "::error::Test harness reported FAIL verdicts. See uploaded report for details."
+            exit 1
+          elif [ "$EXIT_CODE" = "2" ]; then
+            echo "::warning::Test harness reported WARN verdicts (no FAILs). Review report."
+            exit 0
+          else
+            echo "All tests passed."
+            exit 0
+          fi
