@@ -211,3 +211,6 @@ __marimo__/
 
 # Intellij
 .idea
+# Integration credentials — never commit passwords
+integration.env
+**/integration.env

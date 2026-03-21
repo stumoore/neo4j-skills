@@ -724,6 +724,37 @@ def invoke_claude(
 # ---------------------------------------------------------------------------
 
 
+def _load_integration_env(path: Optional[Path] = None) -> dict[str, str]:
+    """
+    Load an integration.env file (KEY=VALUE lines, # comments ignored).
+
+    Searches in order: explicit path, ./integration.env, tests/integration.env,
+    skill-generation-validation-tools/integration.env.
+
+    Returns an empty dict if no file is found.
+    """
+    candidates: list[Path] = []
+    if path:
+        candidates.append(path)
+    candidates += [
+        Path("integration.env"),
+        _HERE.parent / "integration.env",
+        _REPO_ROOT / "integration.env",
+    ]
+    for p in candidates:
+        if p.exists():
+            env: dict[str, str] = {}
+            for line in p.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    env[k.strip()] = v.strip()
+            return env
+    return {}
+
+
 def _get_driver(
     uri: Optional[str],
     username: Optional[str],
@@ -745,6 +776,50 @@ def _get_driver(
     password = password or os.environ.get("NEO4J_PASSWORD", "neo4j")
 
     return neo4j.GraphDatabase.driver(uri, auth=(username, password))
+
+
+def _build_domain_drivers(
+    dataset_schemas: dict[str, dict[str, Any]],
+    integration_env: dict[str, str],
+    fallback_password: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Create per-domain Neo4j drivers from dataset YAML connection info.
+
+    Password resolution order per domain:
+    1. integration.env key  {DOMAIN}_PASSWORD  (e.g. COMPANIES_PASSWORD)
+    2. Env var              NEO4J_{DOMAIN}_PASSWORD
+    3. Same as username     (demo.neo4jlabs.com pattern: user == password)
+    4. fallback_password    (from --neo4j-password CLI arg)
+
+    Returns a dict mapping domain name → driver (or None if neo4j not installed).
+    """
+    try:
+        import neo4j  # type: ignore
+    except ImportError:
+        return {}
+
+    drivers: dict[str, Any] = {}
+    for domain, dataset in dataset_schemas.items():
+        connection = dataset.get("connection", {})
+        uri = connection.get("uri") or os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+        username = connection.get("username") or os.environ.get("NEO4J_USERNAME", "neo4j")
+
+        domain_key = domain.upper()
+        password = (
+            integration_env.get(f"{domain_key}_PASSWORD")
+            or os.environ.get(f"NEO4J_{domain_key}_PASSWORD")
+            or username  # demo.neo4jlabs.com convention: password == username
+            or fallback_password
+            or "neo4j"
+        )
+
+        try:
+            drivers[domain] = neo4j.GraphDatabase.driver(uri, auth=(username, password))
+        except Exception as exc:
+            print(f"WARNING: could not create driver for domain '{domain}': {exc}", file=sys.stderr)
+
+    return drivers
 
 
 # ---------------------------------------------------------------------------
@@ -963,6 +1038,8 @@ def run_all(
     cases_path: Optional[Path] = None,
     schema_dir: Optional[Path] = None,
     workers: int = 1,
+    integration_env: Optional[dict[str, str]] = None,
+    fallback_password: Optional[str] = None,
 ) -> RunReport:
     """
     Run all test cases and return an aggregate RunReport.
@@ -970,6 +1047,10 @@ def run_all(
     Schema injection priority:
     1. Primary: dataset: sections in YAML case files (co-located schema)
     2. Override: external JSON/YAML files in schema_dir (for shared/externalized schema)
+
+    Driver selection per case:
+    - If the domain has a dataset: connection section, a domain-specific driver is used.
+    - Falls back to the shared `driver` arg for domains without connection info.
     """
     started_at = datetime.now(timezone.utc).isoformat()
     run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
@@ -982,6 +1063,9 @@ def run_all(
     # Value hints cache: domain → formatted sample/enum/range data for prompt injection
     value_hints_cache: dict[str, Optional[str]] = {}
 
+    # Per-domain drivers (each domain may connect to a different Neo4j instance/user)
+    domain_drivers: dict[str, Any] = {}
+
     if cases_path:
         dataset_schemas = load_dataset_schemas(cases_path)
         for domain, dataset in dataset_schemas.items():
@@ -990,6 +1074,20 @@ def run_all(
             if verbose:
                 hint_note = " (with value hints)" if value_hints_cache[domain] else ""
                 print(f"[schema] Loaded dataset schema for '{domain}' from YAML{hint_note}", flush=True)
+
+        # Build per-domain drivers from connection info in dataset YAML
+        if not dry_run:
+            domain_drivers = _build_domain_drivers(
+                dataset_schemas,
+                integration_env or {},
+                fallback_password=fallback_password,
+            )
+            for domain, d in domain_drivers.items():
+                if verbose:
+                    ds = dataset_schemas[domain]
+                    uri = ds.get("connection", {}).get("uri", "default")
+                    user = ds.get("connection", {}).get("username", "default")
+                    print(f"[driver] Domain '{domain}' → {uri} as {user}", flush=True)
 
     if schema_dir:
         unique_domains = {tc.domain for tc in cases}
@@ -1023,8 +1121,9 @@ def run_all(
         for i, tc in enumerate(cases, 1):
             schema_text = schema_cache.get(tc.domain)
             value_hints = value_hints_cache.get(tc.domain)
+            tc_driver = domain_drivers.get(tc.domain, driver)
             result, log_lines = _run_case_buffered(
-                tc, skill_name, driver,
+                tc, skill_name, tc_driver,
                 idx=i, total=len(cases),
                 dry_run=dry_run,
                 claude_timeout_s=claude_timeout_s,
@@ -1053,9 +1152,10 @@ def run_all(
             for i, tc in enumerate(cases, 1):
                 schema_text = schema_cache.get(tc.domain)
                 value_hints = value_hints_cache.get(tc.domain)
+                tc_driver = domain_drivers.get(tc.domain, driver)
                 future = executor.submit(
                     _run_case_buffered,
-                    tc, skill_name, driver,
+                    tc, skill_name, tc_driver,
                     idx=i, total=len(cases),
                     dry_run=dry_run,
                     claude_timeout_s=claude_timeout_s,
@@ -1275,7 +1375,16 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help=(
             "Number of parallel workers for Claude invocations (default: 1 = serial). "
             "Each worker runs an independent claude subprocess. "
-            "Useful for speeding up large test suites — the Neo4j driver is shared and thread-safe."
+            "Per-domain Neo4j drivers are created from dataset YAML connection info."
+        ),
+    )
+    parser.add_argument(
+        "--integration-env",
+        default=None,
+        help=(
+            "Path to an integration.env file with per-domain passwords "
+            "(format: DOMAIN_PASSWORD=secret). "
+            "Searched automatically in ./integration.env and tests/integration.env if not set."
         ),
     )
     return parser.parse_args(argv)
@@ -1324,7 +1433,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"  - {tc.id} ({tc.difficulty}): {tc.question[:80]}", flush=True)
         return 0
 
-    # Set up Neo4j driver
+    # Load integration credentials (per-domain passwords)
+    integ_env_path = Path(args.integration_env) if getattr(args, "integration_env", None) else None
+    integration_env = _load_integration_env(integ_env_path)
+
+    # Set up fallback Neo4j driver (used for domains without dataset: connection info)
     driver = _get_driver(args.neo4j_uri, args.neo4j_username, args.neo4j_password)
 
     # External schema override directory (optional — schema lives in YAML files by default)
@@ -1350,6 +1463,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         cases_path=cases_path,
         schema_dir=schema_dir,
         workers=args.workers,
+        integration_env=integration_env,
+        fallback_password=args.neo4j_password,
     )
 
     # Print summary
