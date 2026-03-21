@@ -783,3 +783,64 @@ tasks:
       - "cypher25-subqueries.md deprecated CALL example uses MATCH (n:Label {id: x})"
       - "No other L3 reference file contains a label-free MATCH as a positive/canonical example"
     completed_at: "2026-03-21T21:00:00Z"
+
+  - id: task-038
+    title: "Evaluate and add negative examples to SKILL.md for stale training patterns"
+    description: |
+      Analyze harness failure logs to identify patterns the model persistently generates
+      despite SKILL.md guidance — these are likely baked in from older Cypher training
+      data. Evaluate which pattern types (deprecated syntax, label-free MATCH, multi-hop
+      MERGE, importing-WITH in CALL, etc.) need explicit DO-NOT examples added to SKILL.md
+      or L3 reference files. Author prioritised bad→good rewrite examples and measure
+      impact by re-running the harness against the same cases. This task also quantifies
+      how much negative example injection reduces per-category failure rates.
+    status: pending
+    dependencies:
+      - task-035
+    acceptance_criteria:
+      - "Failure log analysis identifies ≥ 3 persistent pattern categories caused by stale training data"
+      - "Each identified category gets a DO-NOT / DO block with annotated explanation added to SKILL.md or an L3 file"
+      - "Harness re-run shows reduction in targeted failure category counts vs baseline"
+      - "SKILL.md remains within 300-line token budget after additions"
+    completed_at: null
+
+  - id: task-039
+    title: "Validate unclassified failures: run generated queries against live DBs and integrate learnings"
+    description: |
+      For all harness test cases that returned FAIL but whose failure reason was not clearly
+      classified (wrong query structure, 0-row results, timeout, etc.), manually run the
+      generated Cypher queries against the live databases to determine the actual root cause.
+      For each: determine whether it is a skill gap, a bad test expectation, or a data issue;
+      update the test case expectation if the query is actually correct; and if it is a skill
+      gap, add the root cause as a new observation in the improvement report and integrate
+      a corresponding SKILL.md fix or negative example.
+    status: pending
+    dependencies:
+      - task-035
+    acceptance_criteria:
+      - "All FAIL test cases with unclassified root cause are manually validated against live DBs"
+      - "Test cases with incorrect expectations are corrected with verified min_results values"
+      - "Root causes that are skill gaps produce at least one SKILL.md edit or negative example"
+      - "Updated improvement report records the disposition of each previously unclassified case"
+      - "Harness pass rate improves by ≥ 5 percentage points after expectation corrections"
+    completed_at: null
+
+  - id: task-040
+    title: "Enforce MERGE safety rules in SKILL.md Core Pattern Cheat Sheet"
+    description: |
+      Expand the MERGE Safety section in SKILL.md Core Pattern Cheat Sheet to enforce three
+      explicit rules: (1) single-node MERGE uses only constrained key properties in the
+      pattern; (2) relationship MERGE requires pre-bound start and end nodes; (3) every MERGE
+      must have both ON CREATE SET and ON MATCH SET. Add DO-NOT examples for the two most
+      common violations: multi-property node MERGE and relationship MERGE with unbound endpoints.
+      Add a MERGE row to the MUST VALIDATE checklist. Verify by checking all harness-generated
+      MERGE queries in existing test results and confirming none violate these rules.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "SKILL.md MERGE Safety section states all three rules explicitly with DO / DO-NOT examples"
+      - "MUST VALIDATE checklist contains a MERGE pattern row"
+      - "DO-NOT examples cover: multi-property node MERGE, unbound-endpoint relationship MERGE"
+      - "Existing test result queries reviewed — any MERGE violations noted as improvement items"
+    completed_at: "2026-03-21T22:00:00Z"

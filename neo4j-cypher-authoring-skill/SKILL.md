@@ -127,6 +127,7 @@ When `interactive` is the mode (default), wrap `query_literals` in a ` ```cypher
 | Relationship type `-[:TYPE]->` | Type exists in schema's Relationship Types | Replace with nearest match from schema |
 | Property `n.propName` | `propName` listed for that label in Node Properties | Remove or replace with a valid property |
 | Index name in procedure call | Index name exists in schema's Indexes | Use correct index name from schema |
+| **MERGE pattern** | Single-node with key only; rel MERGE has pre-bound endpoints; both `ON CREATE SET` and `ON MATCH SET` present | Refactor per MERGE Safety rules |
 
 **Label-free `MATCH (n)` is forbidden** except in two narrow cases: (1) re-referencing a variable already bound with a label earlier in the same query; (2) inside a QPE group variable where the label is implied by the path pattern. In every other case, always specify the label. A label-free MATCH causes an `AllNodesScan` and will scan the entire graph.
 
@@ -171,6 +172,9 @@ Users speak in business language; the database stores domain-specific codes or f
 | "bolt 134" | Transaction IDs: `["BOLT-001-INV", "BOLT-134-INV"]` | `"BOLT-134-INV"` |
 | "active customers" | status values: `["ACTIVE", "INACTIVE", "SUSPENDED"]` | `"ACTIVE"` |
 | "last year" | year range 1990–2024 | `datetime().year - 1` |
+| "The Matrix" | title sample: `["Matrix, The", "Toy Story"]` | `"Matrix, The"` (article-inversion) |
+
+**Article-inversion**: some datasets sort by moving leading articles (The, A, An) to the end — `"The Matrix"` → `"Matrix, The"`. When schema samples show this pattern, apply it to all user-supplied titles.
 
 **Rule**: When you infer a translation, state it explicitly in a comment above the query:
 ```cypher
@@ -216,12 +220,33 @@ If `values:` and `sample:` are absent for a property, apply common-sense transfo
 
 ### MERGE Safety
 
+**Rules:**
+1. **Single-node pattern** — `MERGE` a node using only its constrained key property(ies). Never include non-key properties in the MERGE pattern; set them in `ON CREATE SET` / `ON MATCH SET`.
+2. **Single-relationship pattern** — `MERGE` a relationship only after both its start and end nodes are already bound (via a prior `MATCH` or `MERGE`). Never `MERGE` a multi-hop path or a relationship with an unbound endpoint — this creates unintended nodes.
+3. **Always include both sub-clauses** — every `MERGE` must have `ON CREATE SET` (initialise new node/rel) and `ON MATCH SET` (update existing). Omitting either is a silent logic error.
+
 ```cypher
+-- CORRECT: single-node MERGE on key property only
 CYPHER 25
 MERGE (p:Person {id: $id})
-ON CREATE SET p.name = $name, p.createdAt = datetime()
-ON MATCH SET p.updatedAt = datetime()
+  ON CREATE SET p.name = $name, p.createdAt = datetime()
+  ON MATCH SET p.updatedAt = datetime()
 RETURN p;
+
+-- CORRECT: relationship MERGE with both endpoints pre-bound
+CYPHER 25
+MATCH (a:Person {id: $fromId})
+MATCH (b:Person {id: $toId})
+MERGE (a)-[r:KNOWS]->(b)
+  ON CREATE SET r.since = date()
+  ON MATCH SET r.lastSeen = date()
+RETURN r;
+
+-- WRONG: multi-property MERGE pattern (over-broad, creates duplicates)
+-- MERGE (p:Person {id: $id, name: $name, email: $email})
+
+-- WRONG: relationship MERGE without pre-bound endpoints (creates ghost nodes)
+-- MERGE (:Person {id: $fromId})-[:KNOWS]->(:Person {id: $toId})
 ```
 
 ### Quantified Path Expressions (QPEs)

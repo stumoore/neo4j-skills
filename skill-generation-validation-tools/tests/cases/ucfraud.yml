@@ -24,16 +24,16 @@ dataset:
           transactionID: {type: STRING,  description: "Unique transaction identifier"}
           amount:        {type: FLOAT,   min: 0.01, description: "Transaction amount in currency units"}
           date:          {type: DATE,    sample: ["2025-01-15", "2025-06-30"]}
-          type:          {type: STRING,  values: [transfer, payment, withdrawal, deposit]}
-          status:        {type: STRING,  values: [completed, pending, failed, flagged]}
+          type:          {type: STRING,  values: [Transfer, Deposit, Withdrawal], description: "Title case — 'Transfer' not 'transfer'"}
+          status:        {type: STRING,  values: [Completed, Pending, Failed], description: "Title case — 'Completed' not 'completed'"}
       Account:
         description: "A bank account belonging to a customer"
         properties:
           accountID:        {type: STRING}
           accountNumber:    {type: STRING}
-          accountType:      {type: STRING,  values: [savings, checking, business, credit]}
+          accountType:      {type: STRING,  values: [Savings, Checking], description: "Title case — 'Savings' not 'savings'"}
           balance:          {type: FLOAT,   description: "Current account balance"}
-          status:           {type: STRING,  values: [active, closed, frozen, suspended]}
+          status:           {type: STRING,  values: [Active, Closed, Frozen], description: "Title case — 'Active' not 'active'. No 'suspended' value in dataset."}
           louvainCommunity: {type: INTEGER, description: "Fraud ring cluster ID from Louvain community detection — same value = same suspected fraud cluster"}
           pagerank:         {type: FLOAT,   description: "Network influence score (PageRank)"}
       Customer:
@@ -42,7 +42,7 @@ dataset:
           customerID:       {type: STRING}
           name:             {type: STRING,  sample: ["John Smith", "Maria Garcia"], description: "Full name — searchable via fulltext index 'customerNames'"}
           dateOfBirth:      {type: DATE}
-          fraudFlag:        {type: BOOLEAN, description: "true = customer is flagged as fraudulent"}
+          fraudFlag:        {type: STRING,  values: ["True", "False"], description: "STRING not boolean — use: WHERE c.fraudFlag = 'True'"}
           louvainCommunity: {type: INTEGER, description: "Fraud ring cluster ID — matches Account.louvainCommunity for linked accounts"}
           betweenness:      {type: FLOAT,   description: "Betweenness centrality — high value = bridge node in fraud network"}
           pagerank:         {type: FLOAT,   description: "Network influence score"}
@@ -101,7 +101,8 @@ dataset:
     - "Write queries ARE ALLOWED on this local database (MERGE, SET, CALL IN TRANSACTIONS)"
     - "QPE {m,n} syntax is fully supported here — use for bounded fraud chain traversal"
     - "SHORTEST N syntax is supported for shortest path queries"
-    - "Customer.fraudFlag = true means the customer has been flagged as fraudulent"
+    - "Customer.fraudFlag is a STRING 'True'/'False' — NOT a boolean. Use: WHERE c.fraudFlag = 'True'"
+    - "All enum values are Title case: Account.status='Active'/'Closed'/'Frozen', Transaction.type='Transfer'/'Deposit'/'Withdrawal', Transaction.status='Completed'/'Pending'/'Failed'"
     - "louvainCommunity groups accounts into suspected fraud clusters — same integer = same cluster"
 
 cases:

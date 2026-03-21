@@ -22,7 +22,7 @@ dataset:
         description: "A company or corporate entity"
         note: "ALWAYS :Organization — NEVER :Company, :Firm, :Corporation or any other label"
         properties:
-          name:        {type: STRING,  sample: ["Apple", "Microsoft", "Blackstone Group"]}
+          name:        {type: STRING,  sample: ["Apple", "Microsoft", "Blackstone"]}
           description: {type: STRING}
           nbrEmployees: {type: INTEGER, min: 1, max: 2400000}
           revenue:      {type: FLOAT,   min: 0, description: "Annual revenue in USD"}
