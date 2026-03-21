@@ -656,3 +656,60 @@ cases:
              score
       ORDER BY score DESC
       LIMIT 20
+
+  # ---------------------------------------------------------------------------
+  # VALUE-GROUNDED & CASUAL-LANGUAGE CASES
+  # These use concrete values from the schema or casual business language that
+  # requires value translation (enum → property value, range normalization).
+  # ---------------------------------------------------------------------------
+  - id: "ucf-casual-001"
+    question: "Show me all open alerts that have been marked as critical — I want to see the most urgent outstanding issues."
+    difficulty: intermediate
+    tags: [match, filter, casual-language, value-translation, alert]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "casual 'open / critical' → Alert.severity = 'critical' (lowercase enum) + AlertStatus.status = 'open' (lowercase enum); both require schema-driven enum resolution"
+
+  - id: "ucf-casual-002"
+    question: "Which savings accounts are frozen right now? I need a list of accounts that are locked and can't transact."
+    difficulty: basic
+    tags: [match, filter, casual-language, value-translation, account]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'savings / frozen' → Account.accountType = 'Savings' + Account.status = 'Frozen' (both Title case enums per schema); 'locked and can't transact' maps to 'Frozen' not 'Closed'"
+
+  - id: "ucf-casual-003"
+    question: "What transactions failed to go through? Show me unsuccessful payments recorded in our system."
+    difficulty: basic
+    tags: [match, filter, casual-language, value-translation]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'failed to go through / unsuccessful payments' → Transaction.status = 'Failed' (Title case per schema: 'Completed','Pending','Failed'); no temporal restriction added to ensure results exist"
+
+  - id: "ucf-casual-004"
+    question: "Which customers have been marked as suspicious in our system? I want to see anyone flagged for potential fraud, sorted by how central they are to our transaction network."
+    difficulty: basic
+    tags: [match, filter, casual-language, value-translation, fraud]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'marked as suspicious / flagged for potential fraud' → Customer.fraudFlag = 'True' (STRING not boolean, per schema); 'central to the network' → ORDER BY c.pagerank DESC"

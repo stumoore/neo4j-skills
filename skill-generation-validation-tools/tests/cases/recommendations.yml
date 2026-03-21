@@ -650,3 +650,59 @@ cases:
       RETURN u.name AS userName, u.userId AS userId, neighborhoodSize
       ORDER BY neighborhoodSize DESC
       LIMIT 10
+
+  # ─── VALUE-GROUNDED & CASUAL-LANGUAGE CASES ──────────────────────────────────
+  # These cases use concrete entity values from the schema or casual business
+  # language that requires value translation (enum → property value, range normalization).
+
+  - id: rec-casual-001
+    question: "What are some well-reviewed action films in our catalogue? Show me action movies that audiences and critics both liked."
+    database: recommendations
+    difficulty: intermediate
+    tags: [match, relationship, filter, casual-language, value-translation]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "casual 'well-reviewed action films' → Genre.name = 'Action' + imdbRating >= 7.0; 'audiences and critics' implies both imdbRating and user ratings are relevant"
+
+  - id: rec-casual-002
+    question: "Show me movies that came out in the nineties — films from the 1990s decade."
+    database: recommendations
+    difficulty: basic
+    tags: [match, filter, temporal, casual-language, value-translation, concrete-value]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'nineties / 1990s decade' → m.released >= '1990-01-01' AND m.released < '2000-01-01'; released is stored as STRING in ISO-8601 format"
+
+  - id: rec-casual-003
+    question: "Which movies were genuine box office hits — films where the revenue clearly outpaced the production budget? Show the top 15."
+    database: recommendations
+    difficulty: intermediate
+    tags: [match, filter, casual-language, value-translation, financial]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "casual 'box office hits / revenue outpaced budget' → m.revenue > m.budget; both fields may be null for many movies, guard with IS NOT NULL"
+
+  - id: rec-casual-004
+    question: "How many sci-fi films are in our catalogue?"
+    database: recommendations
+    difficulty: basic
+    tags: [match, aggregation, count, relationship, casual-language, value-translation]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'sci-fi' → Genre.name = 'Sci-Fi' (exact enum value with hyphen, not 'Science Fiction'); schema shows Genre.name sample: ['Action','Comedy','Drama','Sci-Fi','Thriller']"

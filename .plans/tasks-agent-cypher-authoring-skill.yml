@@ -1,7 +1,7 @@
 feature: agent-cypher-authoring-skill
 prd: ./prd-agent-cypher-authoring-skill.md
 created_at: 2026-03-19T00:00:00Z
-updated_at: 2026-03-21T10:00:00Z
+updated_at: 2026-03-21T13:00:00Z
 
 tasks:
   - id: task-001
@@ -729,7 +729,7 @@ tasks:
       open alerts" not "severity='high' AND status='open'"). Aim for ≤ 30% casual-language
       questions per domain — the majority of cases remain technical. Update min_results
       and expected thresholds for any new cases by running them against the live DB.
-    status: pending
+    status: completed
     dependencies:
       - task-030
       - task-032
@@ -739,7 +739,7 @@ tasks:
       - "Casual-language questions do not use raw Cypher syntax in the question text"
       - "All new cases have min_results ≥ 1 verified against the live database"
       - "Total casual-language questions ≤ 30% of total cases per domain"
-    completed_at: null
+    completed_at: "2026-03-21T14:30:00Z"
 
   - id: task-029
     title: "Update SKILL.md: SEARCH clause GA in Neo4j 2026.02.1"
@@ -844,3 +844,168 @@ tasks:
       - "DO-NOT examples cover: multi-property node MERGE, unbound-endpoint relationship MERGE"
       - "Existing test result queries reviewed — any MERGE violations noted as improvement items"
     completed_at: "2026-03-21T22:00:00Z"
+
+  - id: task-041
+    title: "Add version-conditional test case support to harness runner"
+    description: |
+      Add a min_version field to test case YAML and a --neo4j-version VERSION flag to
+      runner.py. When a case has min_version set and the detected (or provided) server
+      version is lower, record the case as SKIPPED with a clear reason string instead
+      of executing it. Auto-detect server version via dbms.components() if flag is
+      absent. Reporter must include SKIPPED cases in the per-difficulty breakdown with
+      count and list of skipped IDs. This prevents false Gate 2 failures for
+      SEARCH-clause and GRAPH TYPE cases on pre-2026.02 demo servers.
+    status: pending
+    dependencies:
+      - task-034
+    acceptance_criteria:
+      - "runner.py accepts --neo4j-version VERSION flag (e.g. '2026.01', '2026.02')"
+      - "Without --neo4j-version, runner queries dbms.components() to detect version automatically"
+      - "Cases with min_version > detected version are recorded as SKIPPED, not FAIL"
+      - "SKIPPED verdict appears in reporter per-difficulty breakdown with count and case IDs"
+      - "Dry-run mode validates min_version field format (semver-style YYYY.MM) without DB connection"
+    completed_at: null
+
+  - id: task-042
+    title: "Update SEARCH test cases and tooling for upgraded demo.neo4jlabs.com (2026.02)"
+    description: |
+      After demo.neo4jlabs.com is upgraded to Neo4j 2026.02.x (planned 2026-03-24):
+      add ≥ 2 SEARCH-clause vector test cases to companies.yml (news vector index) and
+      ≥ 2 to recommendations.yml (moviePlots vector index), all marked min_version:
+      "2026.02". Update AGENTS.md to remove the "SEARCH clause not available" demo
+      server constraint and reflect the new version. Update SKILL.md version-conditional
+      SEARCH guidance to remove the "use procedure for demo" caveat. Run the harness
+      against the upgraded demo to confirm the new cases pass. Fulltext queries on demo
+      continue to use db.index.fulltext.queryNodes() — SEARCH is vector-only.
+    status: pending
+    dependencies:
+      - task-041
+      - task-029
+    acceptance_criteria:
+      - "companies.yml contains ≥ 2 new SEARCH-clause vector cases with min_version: '2026.02'"
+      - "recommendations.yml contains ≥ 2 new SEARCH-clause vector cases with min_version: '2026.02'"
+      - "AGENTS.md demo server constraints note updated: version 2026.02.x, 'SEARCH clause not available' removed"
+      - "SKILL.md SEARCH section no longer says procedure fallback required for demo"
+      - "Harness run on upgraded demo: new SEARCH cases pass Gate 1 (syntax) and Gate 2 (results)"
+    completed_at: null
+
+  - id: task-043
+    title: "Author cypher25-graph-types.md L3 reference and add GRAPH TYPE to SKILL.md routing"
+    description: |
+      Create references/schema/cypher25-graph-types.md covering the GRAPH TYPE Preview
+      feature in Neo4j 2026.02 Enterprise Edition: ALTER CURRENT GRAPH TYPE SET, EXTEND
+      GRAPH TYPE, SHOW GRAPH TYPES, DROP GRAPH TYPE ELEMENTS, ALTER ELEMENT TYPES,
+      element type syntax with :: annotations, mandatory property enforcement, property
+      type validation, and open-model semantics. Include a prominent PREVIEW callout
+      (Enterprise-only, not GA, not for production). Update SKILL.md Query Construction
+      Decision Tree to list GRAPH TYPE clauses under SCHEMA and route to this file.
+      Add ≥ 3 GRAPH TYPE test cases to ucfraud.yml (writeable Enterprise local instance).
+    status: pending
+    dependencies:
+      - task-006
+      - task-010
+    acceptance_criteria:
+      - "references/schema/cypher25-graph-types.md exists with Source header and PREVIEW callout"
+      - "File covers all GRAPH TYPE clauses: ALTER CURRENT, EXTEND, SHOW, DROP ELEMENTS, ALTER ELEMENT TYPES"
+      - "Element type syntax documented with :: annotation examples for nodes and relationships"
+      - "Open-model semantics explained: only declared element types are constrained"
+      - "SKILL.md SCHEMA category in decision tree lists GRAPH TYPE and routes to cypher25-graph-types.md"
+      - "ucfraud.yml contains ≥ 3 GRAPH TYPE test cases (SCHEMA category, is_write_query: true)"
+      - "File is ≤ 2,000 tokens"
+    completed_at: null
+
+  - id: task-044
+    title: "Expand QPP/QPE coverage: REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS, + shorthand validation"
+    description: |
+      Expand QPP test coverage to exercise features available since Neo4j 2025.06 and
+      validate + / * shorthand behavior on the upgraded demo server. Add ≥ 2 test cases
+      per relevant domain using REPEATABLE ELEMENTS with bounded quantifiers. Add ≥ 1
+      DIFFERENT RELATIONSHIPS test case. After the demo upgrade empirically confirm
+      whether + and * shorthands work on 2026.02 and update the QPE quantifier
+      compatibility table in SKILL.md accordingly. Update cypher25-patterns.md to cover
+      REPEATABLE ELEMENTS semantics more thoroughly (bounded quantifier requirement,
+      repeated-traversal-across-constituent-patterns behavior).
+    status: pending
+    dependencies:
+      - task-004
+      - task-042
+    acceptance_criteria:
+      - "companies.yml and ucfraud.yml each contain ≥ 2 REPEATABLE ELEMENTS test cases"
+      - "At least 1 DIFFERENT RELATIONSHIPS test case added to any domain"
+      - "cypher25-patterns.md documents REPEATABLE ELEMENTS with bounded-quantifier restriction and semantic description"
+      - "SKILL.md QPE quantifier compatibility table updated with empirically confirmed + / * status on 2026.02 demo"
+      - "Total ≥ 5 new QPP test cases across all domains"
+      - "cypher25-patterns.md remains ≤ 2,000 tokens"
+    completed_at: null
+
+  - id: task-045
+    title: "Split dataset:/database: blocks in domain YAMLs and inject version into harness prompts"
+    description: |
+      Refactor companies.yml, recommendations.yml, and ucfraud.yml to split the current
+      monolithic connection/schema block into two distinct top-level keys: dataset:
+      (name, description, schema — nodes, relationships, indexes) and database: (uri,
+      username, database, neo4j_version, cypher_version). Update the harness runner to
+      read database.neo4j_version and database.cypher_version and inject them into every
+      Claude prompt alongside the schema context block. Dry-run must validate the new
+      YAML structure without errors.
+    status: pending
+    dependencies:
+      - task-030
+    acceptance_criteria:
+      - "companies.yml, recommendations.yml, and ucfraud.yml each have separate dataset: and database: top-level keys"
+      - "database: block contains: uri, username, database, neo4j_version, cypher_version"
+      - "dataset: block contains: name, description, schema (nodes + relationships + indexes)"
+      - "runner.py reads database.neo4j_version and appends it to the injected schema context block"
+      - "Claude prompt now includes 'Database version: YYYY.MM.PATCH / Cypher: 25' line"
+      - "Harness dry-run validates new YAML structure without errors"
+    completed_at: null
+
+  - id: task-046
+    title: "Create references/version-matrix.md and add inline version callouts to L3 files"
+    description: |
+      Create references/version-matrix.md as a central cross-cutting reference listing
+      which Cypher 25 features are gated by Neo4j version, derived from the changelog
+      asciidoc. Cover: CYPHER 25 pragma, SHORTEST keyword, REPEATABLE ELEMENTS /
+      DIFFERENT RELATIONSHIPS (2025.06), vector() constructor (2025.10), SEARCH clause
+      (2026.02.1 GA), GRAPH TYPE (2026.02 Preview Enterprise), + / * QPE shorthands
+      (TBC). Extend extract-changelog.py to auto-generate this matrix from the
+      deprecations-additions-removals-compatibility.adoc. Add inline version callouts
+      to cypher25-indexes.md (SEARCH), cypher25-patterns.md (REPEATABLE ELEMENTS),
+      and the new cypher25-graph-types.md (GRAPH TYPE).
+    status: pending
+    dependencies:
+      - task-011
+      - task-004
+      - task-006
+    acceptance_criteria:
+      - "references/version-matrix.md exists with ≥ 7 version-gated features in a table"
+      - "Matrix columns: Feature, Min Version, Edition (All/Enterprise), GA/Preview status"
+      - "extract-changelog.py --version-matrix flag generates a version-matrix markdown section"
+      - "cypher25-indexes.md SEARCH section has '> Available: Neo4j 2026.02.1+' callout"
+      - "cypher25-patterns.md REPEATABLE ELEMENTS section has '> Available: Neo4j 2025.06+' callout"
+      - "version-matrix.md is ≤ 2,000 tokens and has a Source: header"
+    completed_at: null
+
+  - id: task-047
+    title: "Add version-aware query generation protocol to SKILL.md and Autonomous Operation Protocol"
+    description: |
+      Add version-aware query generation as a non-negotiable step in SKILL.md's
+      Autonomous Operation Protocol. The step must define the three-tier version
+      resolution: (1) prefer neo4j_version from injected database: block; (2) fallback
+      to CALL dbms.components() with explicit Aura caveat (Aura always reports an
+      internal version — treat as latest); (3) unknown → conservative defaults.
+      Cross-reference references/version-matrix.md for feature gating. When an
+      auto-fallback is applied, add an inline comment to the generated query. Update
+      the WebFetch escalation table to include references/version-matrix.md as a
+      local-first lookup before fetching docs.
+    status: pending
+    dependencies:
+      - task-010
+      - task-046
+    acceptance_criteria:
+      - "SKILL.md Autonomous Operation Protocol has a 'Version' step with 3-tier resolution logic"
+      - "Aura caveat is explicitly documented: 'Aura reports internal version — treat as always latest'"
+      - "SKILL.md instructs agents to cross-reference version-matrix.md before using version-gated features"
+      - "SKILL.md states: when auto-fallback applied, add inline comment explaining substitution"
+      - "SKILL.md body remains ≤ 300 lines after the addition"
+    completed_at: null

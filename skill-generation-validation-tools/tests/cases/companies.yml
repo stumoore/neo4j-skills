@@ -567,3 +567,59 @@ cases:
     max_allocated_memory_bytes: null
     max_runtime_ms: null
     is_write_query: true
+
+  # ─── VALUE-GROUNDED & CASUAL-LANGUAGE CASES ──────────────────────────────────
+  # These cases use concrete entity values from the schema or casual business
+  # language that requires value translation (enum → property value).
+
+  - id: companies-casual-001
+    question: "Which companies are getting really bad press right now? Show me firms that appear mostly in negative news coverage — articles with strongly unfavourable tone."
+    database: companies
+    difficulty: intermediate
+    tags: [filter, aggregation, sentiment, casual-language, value-translation]
+    domain: companies
+    min_results: 1
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "casual 'bad press / unfavourable tone' → a.sentiment < -0.3; aggregation needed so only companies with consistently negative coverage appear"
+
+  - id: companies-casual-002
+    question: "Show me all the technology companies in our database — firms classified under the Technology sector."
+    database: companies
+    difficulty: basic
+    tags: [match, relationship, category, casual-language, value-translation]
+    domain: companies
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'technology companies' → MATCH (o:Organization)-[:HAS_CATEGORY]->(c:IndustryCategory) WHERE c.name = 'Technology'"
+
+  - id: companies-casual-003
+    question: "Which companies are part of Comcast's business empire — everything it owns, directly or through subsidiaries?"
+    database: companies
+    difficulty: advanced
+    tags: [qpe, quantified-path, subsidiary, concrete-value, ownership-chain]
+    domain: companies
+    min_results: 1
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 50000000
+    max_runtime_ms: 30000
+    is_write_query: false
+    notes: "concrete entity name 'Comcast'; ownership chain at any depth → QPE {1,} on HAS_SUBSIDIARY"
+
+  - id: companies-casual-004
+    question: "Are there any energy or utilities companies in our corporate database? List them."
+    database: companies
+    difficulty: basic
+    tags: [match, relationship, category, casual-language, value-translation]
+    domain: companies
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "casual 'energy or utilities' → c.name IN ['Energy', 'Utilities'] (or OR clause); user did not supply exact category value — requires schema-driven translation"

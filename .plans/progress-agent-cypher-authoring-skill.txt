@@ -1225,3 +1225,36 @@ Key Decisions:
 
 Next Task: task-036 (Expand test coverage to 10 database domains) or task-033
 (Enrich domain case files with value-grounded and casual-language questions)
+
+================================================================================
+TASK-033: Enrich domain case files with value-grounded and casual-language questions
+Date: 2026-03-21T14:30:00Z
+================================================================================
+
+Summary:
+Added 4 new test cases per domain (12 total) that exercise value-grounded and
+casual-language question patterns. Each new case uses either concrete entity
+values from the schema (e.g. "Comcast", "Action" genre, "Frozen" account status)
+or casual business language that requires the skill to perform value translation
+(e.g. "bad press" → sentiment < -0.3, "nineties" → date string range, "failed
+to go through" → Transaction.status = 'Failed'). All questions pass the AGENTS.md
+question validation checklist (no Cypher keywords, no raw labels or rel types,
+pure business language). YAML dry-run validates all 106 cases across all 3 domains.
+
+Files Changed:
+- skill-generation-validation-tools/tests/cases/companies.yml (added 4 cases: companies-casual-001 through 004)
+- skill-generation-validation-tools/tests/cases/recommendations.yml (added 4 cases: rec-casual-001 through 004)
+- skill-generation-validation-tools/tests/cases/ucfraud.yml (added 4 cases: ucf-casual-001 through 004)
+- .plans/tasks-agent-cypher-authoring-skill.yml (marked task-033 completed)
+
+Key Decisions:
+- Added `notes:` field to each new case documenting the expected translation mapping
+  (e.g. "casual 'bad press' → a.sentiment < -0.3") for human reviewers
+- Removed temporal filter from ucf-casual-003 ("failed transactions") because the
+  ucfraud dataset only has 2025 data — "last year" would yield 0 rows in 2026
+- Kept casual-language cases at ≤ 30% of total per domain:
+  companies 4/44 = 9.1%, recommendations 4/31 = 12.9%, ucfraud 4/31 = 12.9%
+- Companies already had ≥3 concrete-value questions (Apple, Blackstone, Amazon, Microsoft);
+  recommendations had Tom Hanks, The Matrix, Kevin Bacon; ucfraud had Hoffman, Poole, Michael
+
+Next Task: task-036 (Expand test coverage to 10 database domains) or task-038 (Negative examples in SKILL.md)

@@ -245,6 +245,12 @@ PASS if the output format is implied naturally ("show", "list", "how many", "ran
 - Avoid the word "batch" in question text — use "groups of N at a time" instead.
 - "Full-text search" as a concept (not index name) is acceptable business language; "db.index.fulltext.queryNodes()" is not.
 
+## Value-Grounded and Casual-Language Test Case Authoring
+
+- Use a `notes:` field on casual-language cases to document the expected value translation (e.g. `"casual 'bad press' → a.sentiment < -0.3"`). This helps human reviewers verify the case without running the harness.
+- Watch out for temporal questions that reference relative periods ("last year", "this month") when the dataset has a fixed date range. If the dataset only covers 2025, "last year" in 2026 → 0 rows. Either drop the temporal constraint or use a fixed year.
+- Casual-language enum cases: always verify the exact case of enum values against the schema (ucfraud uses Title case: 'Active', 'Frozen', 'Failed'; alert severity is lowercase: 'critical', 'open').
+
 ## SKILL.md Critical Syntax Notes (verified on Neo4j 2026.02.1)
 
 - `CASE WHEN ... THEN ... ELSE ... END` is correct; standalone `WHEN ... THEN ... END` (without CASE) is NOT supported in Neo4j 2026.02.1 — syntax error.
