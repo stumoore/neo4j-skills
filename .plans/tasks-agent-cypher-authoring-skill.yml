@@ -583,6 +583,164 @@ tasks:
       - "Improvement report committed to skill-generation-validation-tools/tests/results/"
     completed_at: null
 
+  - id: task-030
+    title: "Add structured dataset: schema sections to all domain YAML files"
+    description: |
+      Replace the comment-block headers in companies.yml, recommendations.yml, and
+      ucfraud.yml with a structured dataset: top-level YAML key containing: name,
+      database, connection, description (business language), schema (nodes with typed
+      properties and optional min/max/sample/values, relationships with from/to direction,
+      indexes with type and call example), and notes. This is the canonical schema
+      source for the harness and for schema injection into Claude prompts.
+    status: completed
+    dependencies:
+      - task-018
+      - task-025
+      - task-026
+    acceptance_criteria:
+      - "companies.yml, recommendations.yml, and ucfraud.yml each have a dataset: top-level key"
+      - "Each dataset: section includes name, database, connection, description, schema (nodes + relationships + indexes), and notes"
+      - "Node properties include type and at least one of: min/max, values, sample, or description"
+      - "Relationship entries include from: and to: direction labels"
+      - "Harness dry-run loads all 3 domains without errors"
+    completed_at: "2026-03-21T20:00:00Z"
+
+  - id: task-031
+    title: "Add MUST VALIDATE schema fidelity + dual output format sections to SKILL.md"
+    description: |
+      Add two new sections to SKILL.md: (1) MUST VALIDATE: Schema Fidelity — a mandatory
+      checklist table requiring agents to verify every label, relationship type, property,
+      and index name against the provided schema before returning; includes a vocabulary
+      discipline table and QPE quantifier compatibility table. (2) Output Mode: Literals
+      vs Parameters — defines the dual YAML output format (query_literals, query_parametrized,
+      parameters) that must always be returned. Update the harness runner prompt to request
+      this dual format, and update extract_cypher() to prefer the YAML block.
+    status: completed
+    dependencies:
+      - task-010
+      - task-030
+    acceptance_criteria:
+      - "SKILL.md contains MUST VALIDATE: Schema Fidelity section with validation checklist table"
+      - "Vocabulary discipline table maps business terms (company, sends money) to schema labels"
+      - "QPE quantifier compatibility table distinguishes local 2026.x vs demo.neo4jlabs.com support"
+      - "Output Mode section defines YAML dual-format with query_literals, query_parametrized, parameters"
+      - "Runner _build_claude_prompt requests YAML dual-format output"
+      - "extract_cypher() prefers query_literals from YAML block over raw cypher block"
+    completed_at: "2026-03-21T20:00:00Z"
+
+  - id: task-032
+    title: "Add value normalization section to SKILL.md and value hints injection to runner"
+    description: |
+      Add a Value Normalization and Domain Translation section to SKILL.md with four rules:
+      schema-driven value translation, numeric range validation with elicitation triggers,
+      ID pattern recognition, and common-sense normalization when schema provides no values.
+      Add _collect_value_hints() to runner.py that extracts sample/enum/range data per
+      label/property from the dataset: schema and injects a REPRESENTATIVE DATA VALUES block
+      into Claude prompts. Value hint fields are all optional — harness handles absence
+      gracefully. Add note that output format details ($param, YAML keys) must never be
+      surfaced in user-facing communication.
+    status: completed
+    dependencies:
+      - task-031
+      - task-030
+    acceptance_criteria:
+      - "SKILL.md Value Normalization section covers all 4 rules"
+      - "Rule 2 documents 4 specific triggers requiring explicit elicitation (not silent guessing)"
+      - "Rule 4 states: use common-sense transformation; elicit only when info is genuinely insufficient"
+      - "Section header notes that $param/YAML keys are internal and must not appear in user communication"
+      - "_collect_value_hints() in runner.py returns formatted value hints or None when no data present"
+      - "run_all() passes value_hints per domain to run_case(); absence is handled gracefully"
+    completed_at: "2026-03-21T20:00:00Z"
+
+  - id: task-034
+    title: "Add parallel test case execution to runner (--workers flag)"
+    description: |
+      Add a --workers N flag to runner.py enabling concurrent Claude Code invocations.
+      When N > 1, dispatch up to N cases simultaneously using concurrent.futures or
+      asyncio. Buffer per-case stdout output and flush atomically after each case to
+      prevent garbled output. Database connections must be created per-worker (or pooled).
+      Default remains 1 (serial). Worker count capped at min(N, len(cases)).
+      Progress line format: "[completed/total] id (difficulty) — question[:60]"
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "runner.py accepts --workers N flag (default 1)"
+      - "With --workers 4, 4 cases execute concurrently; total wall time < serial time / 3"
+      - "Output lines are not interleaved — each case's output appears atomically"
+      - "Results are identical to serial run (same verdicts per case)"
+      - "Dry-run mode ignores --workers (no concurrency needed)"
+    completed_at: null
+
+  - id: task-035
+    title: "Critical skill review and improvement pass based on harness failures"
+    description: |
+      Perform a critical review of SKILL.md combining: (a) the failure patterns from
+      the 3-domain harness run (companies 28/35, recommendations 21/27, ucfraud 14/27);
+      (b) general agent skill design principles; (c) best-practice review of rule
+      actionability and token budget. Top failure patterns to address: QPE quantifier
+      form (12 cases), CALL subquery scope syntax (7 cases), SEARCH clause fulltext
+      misuse (4 cases), and value matching failures on ucfraud (accounts/customers
+      returning 0 rows). Produce prioritized before/after edits and apply them. Re-run
+      harness on affected domains to confirm improvement. Also investigate the ucfraud
+      0-row failures — likely the test database has sparse/empty data for some cases.
+    status: pending
+    dependencies:
+      - task-028
+    acceptance_criteria:
+      - "SKILL.md QPE section explicitly shows {1,} form as the universal default with + as opt-in"
+      - "SKILL.md CALL subquery section uses CALL (x) { ... } as the only shown form"
+      - "SKILL.md SEARCH section has a callout: vector-only on demo; fulltext requires procedure"
+      - "Basic pass rate improves from 72.7% toward 90% target"
+      - "ucfraud 0-row failures investigated: root cause documented (data sparsity vs wrong query)"
+      - "SKILL.md body remains ≤ 300 lines"
+    completed_at: null
+
+  - id: task-036
+    title: "Expand test coverage to 10 database domains"
+    description: |
+      Add 7 new database domains to reach 10 total, starting with available demo.neo4jlabs.com
+      databases: northwind (retail ERP), stackoverflow (Q&A tag network), movies (cast/crew),
+      airports (transportation). Confirm available databases and credentials by connecting to
+      demo.neo4jlabs.com. For each new domain: (1) inspect schema and add a dataset: section
+      to a new YAML case file; (2) author ≥ 25 test cases across all 5 difficulty tiers; (3)
+      run the harness to validate. Each domain must demonstrate a distinct graph shape not
+      already covered. Document all 10 domains in the PRD domain catalogue.
+    status: pending
+    dependencies:
+      - task-030
+      - task-034
+    acceptance_criteria:
+      - "10 domain case files exist in tests/cases/ each with a dataset: section"
+      - "Each domain has ≥ 25 test cases across basic through expert tiers"
+      - "PRD domain catalogue table is complete with all 10 domains, hosts, and connection details"
+      - "Harness runs without errors against all 10 domains (gate failures acceptable)"
+      - "Each new domain demonstrates a structurally distinct graph shape from existing domains"
+    completed_at: null
+
+  - id: task-033
+    title: "Enrich domain case files with value-grounded and casual-language questions"
+    description: |
+      Review each domain case file (companies.yml, recommendations.yml, ucfraud.yml) and
+      add or update a set of test questions that use concrete values from the dataset:
+      schema (real entity names, enum values, realistic ranges). A subset should be
+      phrased in casual business-user language that requires the skill to perform value
+      translation (e.g., "show flagged accounts" not "status='flagged'"; "high-severity
+      open alerts" not "severity='high' AND status='open'"). Aim for ≤ 30% casual-language
+      questions per domain — the majority of cases remain technical. Update min_results
+      and expected thresholds for any new cases by running them against the live DB.
+    status: pending
+    dependencies:
+      - task-030
+      - task-032
+    acceptance_criteria:
+      - "Each domain case file contains ≥ 3 questions using concrete entity values from the dataset: schema"
+      - "Each domain case file contains ≥ 2 casual-language questions requiring value translation (enum, range, or ID normalization)"
+      - "Casual-language questions do not use raw Cypher syntax in the question text"
+      - "All new cases have min_results ≥ 1 verified against the live database"
+      - "Total casual-language questions ≤ 30% of total cases per domain"
+    completed_at: null
+
   - id: task-029
     title: "Update SKILL.md: SEARCH clause GA in Neo4j 2026.02.1"
     description: |

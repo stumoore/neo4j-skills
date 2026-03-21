@@ -1,0 +1,1440 @@
+{
+  "run_id": "run-20260321T131057",
+  "started_at": "2026-03-21T13:10:57.564020+00:00",
+  "completed_at": "2026-03-21T13:20:48.300726+00:00",
+  "skill": "neo4j-cypher-authoring-skill",
+  "summary": {
+    "total": 27,
+    "passed": 14,
+    "warned": 0,
+    "failed": 13,
+    "pass_rate": 0.5185
+  },
+  "cases": [
+    {
+      "case_id": "ucf-basic-001",
+      "question": "How many transactions are recorded in the system in total?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "count",
+        "labels"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)\nRETURN count(t) AS totalTransactions",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 2.5837080000004065,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 2.5837080000004065,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 5.087
+    },
+    {
+      "case_id": "ucf-basic-002",
+      "question": "Which active accounts have the highest balances? Show the account number and current balance for the top 20.",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "filter",
+        "property"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account {status: \"active\"})\nRETURN a.accountNumber AS accountNumber, a.balance AS balance\nORDER BY a.balance DESC\nLIMIT 20",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 11.639875000000188,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 11.639875000000188,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 5.127
+    },
+    {
+      "case_id": "ucf-basic-003",
+      "question": "What types of transactions does the system support?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "distinct",
+        "aggregation"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)\nRETURN DISTINCT t.type AS transactionType\nORDER BY transactionType",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 6.549582999998194,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 3 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 6.549582999998194,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 6.575
+    },
+    {
+      "case_id": "ucf-basic-004",
+      "question": "Show me the customers who have been flagged for fraud. Who are the most at-risk based on their network influence score?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "filter",
+        "fraud"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (c:Customer)\nWHERE c.fraudFlag = true\nRETURN c.customerID, c.name, c.pagerank, c.betweenness, c.louvainCommunity\nORDER BY c.pagerank DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 15.205458000000505,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 15.205458000000505,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 10.236
+    },
+    {
+      "case_id": "ucf-basic-005",
+      "question": "What are the largest transactions in the system? Show the top 10 by amount, including transaction type and status.",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "order",
+        "limit"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (sender:Account)-[:SENT]->(t:Transaction)-[:RECEIVED]->(receiver:Account)\nRETURN t.transactionID, t.amount, t.type, t.status, t.date,\n       sender.accountNumber AS senderAccount,\n       receiver.accountNumber AS receiverAccount\nORDER BY t.amount DESC\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 21.866332999998406,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 21.866332999998406,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 5.411
+    },
+    {
+      "case_id": "ucf-basic-006",
+      "question": "How many accounts of each type (savings, checking, etc.) are in the system?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "aggregation",
+        "groupby"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account)\nRETURN a.accountType AS accountType, count(a) AS accountCount\nORDER BY accountCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 10.728292000003137,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 2 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 10.728292000003137,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 9.369
+    },
+    {
+      "case_id": "ucf-intermediate-001",
+      "question": "Which accounts are sending the most money? Show the total amount sent and number of transactions per account.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "traversal",
+        "aggregation"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account)-[:SENT]->(t:Transaction)\nRETURN a.accountID        AS accountID,\n       a.accountNumber    AS accountNumber,\n       a.accountType      AS accountType,\n       a.status           AS accountStatus,\n       sum(t.amount)      AS totalSent,\n       count(t)           AS transactionCount\nORDER BY totalSent DESC\nLIMIT 25",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 19.02116699999823,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 25 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 19.02116699999823,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 15.526
+    },
+    {
+      "case_id": "ucf-intermediate-002",
+      "question": "Show me which customers own which accounts, including the account balance and account type.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "traversal",
+        "join"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (c:Customer)-[:HAS_ACCOUNT]->(a:Account)\nRETURN c.name AS customer, c.customerID AS customerID,\n       a.accountID AS accountID, a.accountType AS accountType,\n       a.balance AS balance\nORDER BY c.name, a.accountType",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 18.52799999998922,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 67 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 18.52799999998922,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 7.378
+    },
+    {
+      "case_id": "ucf-intermediate-003",
+      "question": "What does transaction activity look like across 2025? Break down the count and total value by transaction type.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "temporal",
+        "aggregation"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)\nWHERE t.date >= date('2025-01-01') AND t.date <= date('2025-12-31')\nRETURN t.type AS transactionType,\n       count(t) AS transactionCount,\n       round(sum(t.amount), 2) AS totalValue\nORDER BY totalValue DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 17.561166999996658,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 17.561166999996658,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 10.353
+    },
+    {
+      "case_id": "ucf-intermediate-004",
+      "question": "Which accounts appear to be linked to each other through shared personal details? Show the pairs of linked account numbers.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "traversal",
+        "fraud",
+        "shared-identifiers"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account)-[:SHARED_IDENTIFIERS]->(b:Account)\nWHERE a.accountNumber < b.accountNumber\nRETURN a.accountNumber AS account1, b.accountNumber AS account2\nORDER BY account1, account2",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 11.873249999993618,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 11.873249999993618,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 14.147
+    },
+    {
+      "case_id": "ucf-intermediate-005",
+      "question": "Are there customers using more than one email address? Show those customers and how many email addresses they have on file.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "filter",
+        "email"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (c:Customer)-[:USES_EMAIL]->(e:Email)\nWITH c, count(e) AS emailCount\nWHERE emailCount > 1\nRETURN c.customerID, c.name, emailCount\nORDER BY emailCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 13.511542000003374,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 13.511542000003374,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 8.053
+    },
+    {
+      "case_id": "ucf-intermediate-006",
+      "question": "What is the average, highest, and total number of transactions for each transaction status (pending, completed, etc.)?",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "groupby"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)\nRETURN\n  t.status                  AS status,\n  count(t)                  AS totalTransactions,\n  round(avg(t.amount), 2)   AS avgAmount,\n  max(t.amount)             AS highestAmount\nORDER BY totalTransactions DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 13.254625000001852,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 3 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 13.254625000001852,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 33.929
+    },
+    {
+      "case_id": "ucf-advanced-001",
+      "question": "Which accounts are indirectly linked to each other through chains of shared personal details? I want to see account pairs that are connected through two to four intermediate links.",
+      "difficulty": "advanced",
+      "tags": [
+        "qpe",
+        "fraud-ring",
+        "quantified-path"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 1,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)\nWHERE elementId(a) < elementId(b)\nRETURN a.accountID AS accountA,\n       a.accountType AS typeA,\n       a.status AS statusA,\n       b.accountID AS accountB,\n       b.accountType AS typeB,\n       b.status AS statusB,\n       a.louvainCommunity AS communityA,\n       b.louvainCommunity AS communityB\nORDER BY a.accountID\nLIMIT 100",
+      "metrics": {},
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "FAIL",
+          "reason": "Syntax error: {code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input '-': expected '(' (line 2, column 54 (offset: 63))\n\"EXPLAIN MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)\"\n                                                      ^}",
+          "details": {}
+        }
+      ],
+      "error": null,
+      "duration_s": 20.018
+    },
+    {
+      "case_id": "ucf-advanced-002",
+      "question": "What is the shortest chain of linked accounts connecting a savings account to a checking account?",
+      "difficulty": "advanced",
+      "tags": [
+        "shortest-path",
+        "traversal",
+        "fraud"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH p = SHORTEST 1\n  (start:Account {accountType: 'savings'})-[:TRANSACTED_TO|SHARED_IDENTIFIERS]-{1,}(end:Account {accountType: 'checking'})\nRETURN\n  [n IN nodes(p) | n.accountID]    AS accountChain,\n  [r IN relationships(p) | type(r)] AS linkTypes,\n  length(p)                          AS chainLength",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 15.435709000001907,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 15.435709000001907,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 36.428
+    },
+    {
+      "case_id": "ucf-advanced-003",
+      "question": "Which customers sit at the center of the most financial connections in our network? For each, show whether they have any open alerts or investigations.",
+      "difficulty": "advanced",
+      "tags": [
+        "optional-match",
+        "centrality",
+        "alert"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (c:Customer)\nWITH c ORDER BY c.betweenness DESC LIMIT 20\nOPTIONAL MATCH (c)-[:HAS_ACCOUNT]->(a:Account)-[:HAS_ALERT]->(al:Alert)-[:HAS_STATUS]->(alertStatus:AlertStatus)\nWHERE alertStatus.status IN ['open', 'investigating']\nRETURN c.customerID           AS customerId,\n       c.name                 AS customerName,\n       c.betweenness          AS betweenness,\n       c.pagerank             AS pagerank,\n       c.fraudFlag            AS fraudFlag,\n       count(DISTINCT al)     AS activeAlertCount,\n       collect(DISTINCT {\n         alertId:     al.alertId,\n         description: al.description,\n         severity:    al.severity,\n         status:      alertStatus.status\n       })                     AS activeAlerts\nORDER BY betweenness DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 39.021375000004355,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 20 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 39.021375000004355,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 26.898
+    },
+    {
+      "case_id": "ucf-advanced-004",
+      "question": "Which accounts have been particularly active \u2014 sending more than three transactions? Show the account number, type, and transaction count.",
+      "difficulty": "advanced",
+      "tags": [
+        "subquery",
+        "count",
+        "filter"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a:Account)-[:SENT]->(t:Transaction)\nWITH a, count(t) AS txCount\nWHERE txCount > 3\nRETURN a.accountNumber AS accountNumber, a.accountType AS accountType, txCount\nORDER BY txCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 15.454167000001462,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 25 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 15.454167000001462,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 7.66
+    },
+    {
+      "case_id": "ucf-advanced-005",
+      "question": "Which transactions are unusually large compared to other transactions of the same type? Show transactions that exceed the average for their category.",
+      "difficulty": "advanced",
+      "tags": [
+        "aggregation",
+        "filter",
+        "with"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)\nWITH t.type AS txType, avg(t.amount) AS avgAmount\nWITH collect({type: txType, avgAmount: avgAmount}) AS typeAvgs\nMATCH (tx:Transaction)\nWITH tx, [ta IN typeAvgs WHERE ta.type = tx.type | ta.avgAmount][0] AS typeAvg\nWHERE tx.amount > typeAvg\nRETURN\n  tx.transactionID          AS transactionID,\n  tx.type                   AS type,\n  tx.amount                 AS amount,\n  tx.date                   AS date,\n  tx.status                 AS status,\n  round(typeAvg, 2)         AS typeAverage,\n  round(tx.amount - typeAvg, 2)                        AS excessAmount,\n  round((tx.amount - typeAvg) / typeAvg * 100.0, 1)   AS excessPct\nORDER BY excessPct DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 31.060332999970797,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 151 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 31.060332999970797,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 38.332
+    },
+    {
+      "case_id": "ucf-advanced-006",
+      "question": "Look up customers with the surname 'Hoffman'. Are any of them flagged for fraud, and how prominent are they in our customer network?",
+      "difficulty": "advanced",
+      "tags": [
+        "search",
+        "fulltext",
+        "index"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nCALL db.index.fulltext.queryNodes('customerNames', 'Hoffman') YIELD node AS customer, score\nRETURN customer.customerID    AS customerID,\n       customer.name          AS name,\n       customer.fraudFlag     AS fraudFlag,\n       customer.pagerank      AS pagerank,\n       customer.betweenness   AS betweenness,\n       score                  AS nameMatchScore\nORDER BY customer.fraudFlag DESC, customer.pagerank DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 13.640665999957946,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 13.640665999957946,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 18.559
+    },
+    {
+      "case_id": "ucf-complex-001",
+      "question": "Find pairs of accounts that share personal details where at least one account belongs to a customer flagged for fraud. Who owns these accounts?",
+      "difficulty": "complex",
+      "tags": [
+        "fraud-ring",
+        "shared-identifiers",
+        "call-subquery",
+        "fraud"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (a1:Account)-[:SHARED_IDENTIFIERS]-(a2:Account)\nWHERE elementId(a1) < elementId(a2)\nMATCH (c1:Customer)-[:HAS_ACCOUNT]->(a1)\nMATCH (c2:Customer)-[:HAS_ACCOUNT]->(a2)\nWHERE c1.fraudFlag = true OR c2.fraudFlag = true\nRETURN\n  c1.name          AS owner1,\n  c1.customerID    AS owner1ID,\n  c1.fraudFlag     AS owner1Flagged,\n  a1.accountID     AS account1ID,\n  a1.accountType   AS account1Type,\n  a1.status        AS account1Status,\n  c2.name          AS owner2,\n  c2.customerID    AS owner2ID,\n  c2.fraudFlag     AS owner2Flagged,\n  a2.accountID     AS account2ID,\n  a2.accountType   AS account2Type,\n  a2.status        AS account2Status\nORDER BY c1.fraudFlag DESC, c2.fraudFlag DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 19.97579199996835,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 19.97579199996835,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 24.677
+    },
+    {
+      "case_id": "ucf-complex-002",
+      "question": "Which accounts received unusually large sums of money within a single month in 2025? Flag any account that received more than $10,000 in one calendar month.",
+      "difficulty": "complex",
+      "tags": [
+        "temporal",
+        "aggregation",
+        "fraud",
+        "with"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (t:Transaction)-[:RECEIVED]->(a:Account)\nWHERE t.date.year = 2025\n  AND t.status = 'completed'\nWITH a,\n     t.date.year AS yr,\n     t.date.month AS mo,\n     sum(t.amount) AS monthlyTotal\nWHERE monthlyTotal > 10000\nRETURN a.accountID       AS accountID,\n       a.accountNumber   AS accountNumber,\n       a.accountType     AS accountType,\n       a.status          AS accountStatus,\n       yr                AS year,\n       mo                AS month,\n       round(monthlyTotal, 2) AS totalReceived\nORDER BY totalReceived DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 18.395166000004792,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 18.395166000004792,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 16.562
+    },
+    {
+      "case_id": "ucf-complex-003",
+      "question": "Are there customers in the same fraud network cluster who are also sharing phone numbers or email addresses with each other? This could indicate coordinated activity.",
+      "difficulty": "complex",
+      "tags": [
+        "community",
+        "shared-identifiers",
+        "fraud",
+        "collect"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (c1:Customer)-[:USES_EMAIL|USES_PHONE]->(shared)<-[:USES_EMAIL|USES_PHONE]-(c2:Customer)\nWHERE c1.louvainCommunity = c2.louvainCommunity\n  AND c1.louvainCommunity IS NOT NULL\n  AND c1.customerID < c2.customerID\nWITH c1, c2,\n     collect(DISTINCT CASE WHEN shared:Email        THEN shared.email       END) AS sharedEmails,\n     collect(DISTINCT CASE WHEN shared:PhoneNumber  THEN shared.phoneNumber END) AS sharedPhones\nRETURN c1.louvainCommunity                        AS fraudCluster,\n       c1.name                                    AS customer1,\n       c1.fraudFlag                               AS customer1Flagged,\n       c2.name                                    AS customer2,\n       c2.fraudFlag                               AS customer2Flagged,\n       sharedEmails,\n       sharedPhones,\n       size(sharedEmails) + size(sharedPhones)    AS totalSharedIdentifiers\nORDER BY fraudCluster ASC, totalSharedIdentifiers DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 25.34095900000466,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 62 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 25.34095900000466,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 50.095
+    },
+    {
+      "case_id": "ucf-complex-004",
+      "question": "For money transfer transactions, can you trace the flow of funds \u2014 showing which account sent money, which transaction carried it, and which account received it? Show the largest transfers first.",
+      "difficulty": "complex",
+      "tags": [
+        "search",
+        "fulltext",
+        "traversal",
+        "money-flow"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (sender:Account)-[:SENT]->(t:Transaction)-[:RECEIVED]->(receiver:Account)\nWHERE t.type = 'transfer'\nRETURN sender.accountNumber AS senderAccount,\n       sender.accountType   AS senderType,\n       t.transactionID      AS transactionID,\n       t.amount             AS amount,\n       t.date               AS date,\n       t.status             AS status,\n       receiver.accountNumber AS receiverAccount,\n       receiver.accountType   AS receiverType\nORDER BY t.amount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 18.101250000029268,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 18.101250000029268,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 10.66
+    },
+    {
+      "case_id": "ucf-expert-001",
+      "question": "Find all customers named Michael. Are any of them flagged for fraud, and which fraud network cluster do they belong to?",
+      "difficulty": "expert",
+      "tags": [
+        "search",
+        "fulltext",
+        "ga-2026",
+        "fraud"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nCALL db.index.fulltext.queryNodes('customerNames', 'Michael') YIELD node AS c, score\nWHERE c.name CONTAINS 'Michael'\nRETURN\n  c.customerID            AS customerId,\n  c.name                  AS name,\n  c.fraudFlag             AS isFlagged,\n  c.louvainCommunity      AS fraudCluster,\n  c.betweenness           AS betweenness,\n  c.pagerank              AS pagerank\nORDER BY c.fraudFlag DESC, c.louvainCommunity;",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 18.22233400002915,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 3 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 18.22233400002915,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 14.141
+    },
+    {
+      "case_id": "ucf-expert-002",
+      "question": "Among the most influential accounts in our network, which pairs are most directly connected through shared identity links? Show the tightest connections first.",
+      "difficulty": "expert",
+      "tags": [
+        "all-shortest",
+        "qpe",
+        "fraud-ring",
+        "paths"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH p = SHORTEST 1 (a:Account)-[:SHARED_IDENTIFIERS]-{1,4}(b:Account)\nWHERE elementId(a) < elementId(b)\n  AND a.pagerank IS NOT NULL\n  AND b.pagerank IS NOT NULL\nWITH a, b, length(p) AS hopCount,\n     a.pagerank + b.pagerank AS combinedInfluence\nORDER BY hopCount ASC, combinedInfluence DESC\nRETURN\n  a.accountID             AS accountA,\n  round(a.pagerank, 4)    AS pagerankA,\n  b.accountID             AS accountB,\n  round(b.pagerank, 4)    AS pagerankB,\n  hopCount,\n  round(combinedInfluence, 4) AS combinedInfluence\nLIMIT 20",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 32.463917000029596,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 32.463917000029596,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 53.017
+    },
+    {
+      "case_id": "ucf-expert-003",
+      "question": "Are there active accounts sending money through multiple intermediate accounts before reaching a destination \u2014 a pattern that could indicate layering in money laundering? Show account pairs with multiple such routing paths.",
+      "difficulty": "expert",
+      "tags": [
+        "qpe",
+        "money-laundering",
+        "traversal",
+        "deep-path"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH p = (src:Account {status: 'active'})-[:TRANSACTED_TO]->{3,5}(dst:Account {status: 'active'})\nWHERE src <> dst\n  AND ALL(n IN nodes(p) WHERE n.status = 'active')\nWITH src, dst,\n     count(p)                             AS routingPathCount,\n     collect(DISTINCT size(nodes(p)) - 1) AS distinctHopCounts\nWHERE routingPathCount >= 2\nRETURN\n  src.accountID        AS sourceAccountID,\n  src.accountNumber    AS sourceAccountNumber,\n  dst.accountID        AS destinationAccountID,\n  dst.accountNumber    AS destinationAccountNumber,\n  routingPathCount,\n  distinctHopCounts\nORDER BY routingPathCount DESC\nLIMIT 20",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 20.019792000084635,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 20.019792000084635,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 66.958
+    },
+    {
+      "case_id": "ucf-expert-004",
+      "question": "Mark all customers who belong to the same network cluster as known fraudsters as 'suspicious due to network association'. Process them in small batches to avoid overloading the system.",
+      "difficulty": "expert",
+      "tags": [
+        "call-in-transactions",
+        "batch",
+        "write",
+        "fraud-flagging"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\n// Step 1: collect community IDs that contain at least one known fraudster\nMATCH (fraudster:Customer {fraudFlag: true})\nWHERE fraudster.louvainCommunity IS NOT NULL\nWITH collect(DISTINCT fraudster.louvainCommunity) AS fraudCommunities\n\n// Step 2: find non-fraudulent customers in those same communities\nMATCH (c:Customer)\nWHERE c.louvainCommunity IN fraudCommunities\n  AND NOT coalesce(c.fraudFlag, false)\n\n// Step 3: batch-write the suspicion marker in small commits\nCALL (c) {\n  SET c.suspicionReason   = 'suspicious due to network association',\n      c.suspicionUpdatedAt = datetime()\n} IN TRANSACTIONS OF 500 ROWS\nRETURN count(*) AS suspiciousCustomersMarked",
+      "metrics": {},
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Execution error: {code: Neo.ClientError.Statement.TypeError} {message: Don't know how to treat that as a boolean: String(\"True\") (Transactions committed: 0)}",
+          "details": {}
+        }
+      ],
+      "error": null,
+      "duration_s": 50.132
+    },
+    {
+      "case_id": "ucf-expert-005",
+      "question": "Search for customers with the surname 'Poole' and trace how many accounts in our system are linked to their accounts \u2014 directly or through up to three degrees of shared identity.",
+      "difficulty": "expert",
+      "tags": [
+        "fulltext",
+        "qpe",
+        "fraud-ring",
+        "hybrid"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nCALL db.index.fulltext.queryNodes('customerNames', 'Poole') YIELD node AS customer, score\nWITH customer\nMATCH (customer)-[:HAS_ACCOUNT]->(startAccount:Account)\nOPTIONAL MATCH (startAccount)-[:SHARED_IDENTIFIERS]-{1,3}(linkedAccount:Account)\nWHERE linkedAccount <> startAccount\nRETURN customer.name        AS customerName,\n       customer.customerID  AS customerID,\n       collect(DISTINCT startAccount.accountID) AS ownedAccountIDs,\n       count(DISTINCT linkedAccount)             AS linkedAccountCount\nORDER BY linkedAccountCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 21.27679199998056,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 21.27679199998056,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 25.376
+    }
+  ]
+}

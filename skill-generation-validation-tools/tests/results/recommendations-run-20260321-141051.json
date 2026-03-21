@@ -1,0 +1,1497 @@
+{
+  "run_id": "run-20260321T131052",
+  "started_at": "2026-03-21T13:10:52.418376+00:00",
+  "completed_at": "2026-03-21T13:20:17.510354+00:00",
+  "skill": "neo4j-cypher-authoring-skill",
+  "summary": {
+    "total": 27,
+    "passed": 21,
+    "warned": 0,
+    "failed": 6,
+    "pass_rate": 0.7778
+  },
+  "cases": [
+    {
+      "case_id": "rec-basic-001",
+      "question": "Show me a sample of movies in our catalogue \u2014 just give me 10 titles to start.",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "label",
+        "limit"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)\nRETURN m.title\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 321.79116700000066,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 10)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 321.79116700000066,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 6.691
+    },
+    {
+      "case_id": "rec-basic-002",
+      "question": "How many movies are in our catalogue in total?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "aggregation",
+        "count"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)\nRETURN count(m) AS totalMovies",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 236.06495799999828,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 236.06495799999828,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 8.984
+    },
+    {
+      "case_id": "rec-basic-003",
+      "question": "What are the 10 most recently released movies in our catalogue from after the year 2000?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "filter",
+        "order-by",
+        "limit"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)\nWHERE m.released > 2000\nRETURN m.title, m.released, m.imdbRating\nORDER BY m.released DESC\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 287.4092079999997,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 10",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 10
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 287.4092079999997,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 16.656
+    },
+    {
+      "case_id": "rec-basic-004",
+      "question": "What genres are available in our movie catalogue?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "label",
+        "return"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (g:Genre)\nRETURN g.name AS genre\nORDER BY g.name",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 290.1536250000021,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 20 rows (min: 5)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 290.1536250000021,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 15.092
+    },
+    {
+      "case_id": "rec-basic-005",
+      "question": "Who were the actors in The Matrix?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "relationship",
+        "filter"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (p:Person)-[:ACTED_IN]->(m:Movie {title: 'The Matrix'})\nRETURN p.name AS actor, p.born AS birthYear\nORDER BY p.name",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 250.39820899999654,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 250.39820899999654,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 6.017
+    },
+    {
+      "case_id": "rec-basic-006",
+      "question": "How many movie ratings have been submitted by users in total?",
+      "difficulty": "basic",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH ()-[:RATED]->()\nRETURN count(*) AS totalRatings",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 269.55591699999815,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 269.55591699999815,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 7.209
+    },
+    {
+      "case_id": "rec-intermediate-001",
+      "question": "What are the top 10 highest-rated movies, among those that have been rated by at least 5 users? Show the title, average rating, and how many people rated it.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "avg",
+        "order-by",
+        "limit",
+        "filter"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User)-[r:RATED]->(m:Movie)\nWITH m, avg(r.rating) AS avgRating, count(u) AS ratingCount\nWHERE ratingCount >= 5\nRETURN m.title AS title, round(avgRating, 2) AS avgRating, ratingCount\nORDER BY avgRating DESC\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 484.0340000000083,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 484.0340000000083,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 12.591
+    },
+    {
+      "case_id": "rec-intermediate-002",
+      "question": "Which genres have more than 20 movies? Show the genre name and how many movies belong to each.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "order-by",
+        "filter",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)-[:IN_GENRE]->(g:Genre)\nWITH g.name AS genre, count(m) AS movieCount\nWHERE movieCount > 20\nRETURN genre, movieCount\nORDER BY movieCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 281.186500000004,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 19 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 281.186500000004,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 8.383
+    },
+    {
+      "case_id": "rec-intermediate-003",
+      "question": "What movies has Tom Hanks appeared in? Show titles and release years, most recent first.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "relationship",
+        "filter",
+        "return"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (p:Person {name: 'Tom Hanks'})-[:ACTED_IN]->(m:Movie)\nRETURN m.title AS title, m.released AS released\nORDER BY m.released DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 252.64287500000648,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 38 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 252.64287500000648,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 5.907
+    },
+    {
+      "case_id": "rec-intermediate-004",
+      "question": "Which users have been the most active reviewers \u2014 rating more than 10 movies? Show their name and rating count.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "filter",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User)-[:RATED]->(m:Movie)\nWITH u, count(m) AS ratingCount\nWHERE ratingCount > 10\nRETURN u.name AS userName, ratingCount\nORDER BY ratingCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 407.8109579999989,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 671 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 407.8109579999989,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 9.583
+    },
+    {
+      "case_id": "rec-intermediate-005",
+      "question": "Which genres tend to receive the highest IMDb ratings on average? Rank genres by their average IMDb score.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "avg",
+        "order-by",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)-[:IN_GENRE]->(g:Genre)\nWHERE m.imdbRating IS NOT NULL\nWITH g.name AS genre, avg(m.imdbRating) AS avgRating, count(m) AS movieCount\nORDER BY avgRating DESC\nRETURN genre, round(avgRating, 2) AS avgImdbRating, movieCount",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 413.79004200000225,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 20 rows (min: 5)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 413.79004200000225,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 10.079
+    },
+    {
+      "case_id": "rec-intermediate-006",
+      "question": "Which directors have the most films in our catalogue? Show directors with more than 3 films and how many they've directed.",
+      "difficulty": "intermediate",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "filter",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (p:Person)-[:DIRECTED]->(m:Movie)\nWITH p.name AS director, count(m) AS filmCount\nWHERE filmCount > 3\nRETURN director, filmCount\nORDER BY filmCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 328.43683300001203,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 753 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 328.43683300001203,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 8.19
+    },
+    {
+      "case_id": "rec-advanced-001",
+      "question": "For active users who have rated at least 3 movies, which films did they give a perfect 5-star rating to? Show each user alongside their personal list of top-rated movies.",
+      "difficulty": "advanced",
+      "tags": [
+        "match",
+        "collect",
+        "filter",
+        "aggregation",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User)-[r:RATED]->(m:Movie)\nWITH u, count(r) AS totalRatings\nWHERE totalRatings >= 3\nMATCH (u)-[r2:RATED]->(top:Movie)\nWHERE r2.rating = 5.0\nRETURN u.name, u.userId, collect(top.title) AS topRatedMovies\nORDER BY u.userId",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 702.5451250000003,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 644 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 702.5451250000003,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 20.443
+    },
+    {
+      "case_id": "rec-advanced-002",
+      "question": "Show all movies alongside their average user rating. Movies that haven't been rated yet should still appear. Sort by IMDb score, showing the top 10.",
+      "difficulty": "advanced",
+      "tags": [
+        "optional-match",
+        "aggregation",
+        "avg",
+        "null",
+        "order-by",
+        "limit"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)\nOPTIONAL MATCH (u:User)-[r:RATED]->(m)\nWITH m, avg(r.rating) AS avgUserRating\nRETURN m.title, m.imdbRating, avgUserRating\nORDER BY m.imdbRating DESC\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 457.0525420000138,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 10)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 457.0525420000138,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 11.328
+    },
+    {
+      "case_id": "rec-advanced-003",
+      "question": "What movies would you recommend to User 1 based on what similar users enjoyed? Suggest films that User 1 hasn't seen yet but were highly rated by people with overlapping tastes. Show the top 10.",
+      "difficulty": "advanced",
+      "tags": [
+        "match",
+        "filter",
+        "aggregation",
+        "count",
+        "collaborative-filtering",
+        "not-exists"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User {userId: '1'})-[:RATED]->(seen:Movie)\nWITH u, collect(seen) AS seenMovies\n\nMATCH (u)-[:RATED]->(shared:Movie)<-[:RATED]-(similar:User)\nWHERE similar <> u\nWITH u, seenMovies, similar, count(shared) AS overlap\nORDER BY overlap DESC\nLIMIT 50\n\nMATCH (similar)-[r:RATED]->(rec:Movie)\nWHERE NOT rec IN seenMovies\n  AND r.rating >= 4.0\nWITH rec, count(DISTINCT similar) AS recommenders, avg(r.rating) AS avgRating\nORDER BY recommenders DESC, avgRating DESC\n\nRETURN rec.title            AS title,\n       rec.released         AS released,\n       rec.imdbRating       AS imdbRating,\n       recommenders,\n       round(avgRating, 2)  AS avgRatingBySimilarUsers\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 427.83929099999796,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 427.83929099999796,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 27.96
+    },
+    {
+      "case_id": "rec-advanced-004",
+      "question": "For each genre, what are the five best-reviewed movies based on IMDb ratings? Show each genre with its top 5 film titles.",
+      "difficulty": "advanced",
+      "tags": [
+        "collect-subquery",
+        "aggregation",
+        "order-by",
+        "limit",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (g:Genre)\nWITH g, COLLECT {\n  MATCH (m:Movie)-[:IN_GENRE]->(g)\n  WHERE m.imdbRating IS NOT NULL\n  RETURN m.title\n  ORDER BY m.imdbRating DESC\n  LIMIT 5\n} AS topMovies\nRETURN g.name AS genre, topMovies\nORDER BY g.name",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 279.929041999992,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 20 rows (min: 5)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 279.929041999992,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 26.325
+    },
+    {
+      "case_id": "rec-advanced-005",
+      "question": "Which actors have worked with cast members from The Matrix, but never appeared in The Matrix themselves? Show their names.",
+      "difficulty": "advanced",
+      "tags": [
+        "variable-length",
+        "match",
+        "relationship",
+        "filter",
+        "depth"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (matrix:Movie {title: 'The Matrix'})<-[:ACTED_IN]-(matrixActor:Person)\nMATCH (matrixActor)-[:ACTED_IN]->(otherMovie:Movie)<-[:ACTED_IN]-(costar:Person)\nWHERE NOT (costar)-[:ACTED_IN]->(matrix)\n  AND costar <> matrixActor\nRETURN DISTINCT costar.name AS name\nORDER BY name",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 266.72183400000904,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 266.72183400000904,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 14.024
+    },
+    {
+      "case_id": "rec-advanced-006",
+      "question": "Search for movies with 'star wars' in the title. What are their release years and IMDb ratings?",
+      "difficulty": "advanced",
+      "tags": [
+        "fulltext",
+        "index",
+        "search",
+        "match"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nCALL db.index.fulltext.queryNodes('movieTitles', 'star wars') YIELD node AS m, score\nRETURN m.title, m.released, m.imdbRating, score\nORDER BY m.released ASC",
+      "metrics": {},
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Execution error: {code: Neo.ClientError.Procedure.ProcedureCallFailed} {message: Failed to invoke procedure `db.index.fulltext.queryNodes`: Caused by: java.lang.IllegalArgumentException: There is no such fulltext schema index: movieTitles}",
+          "details": {}
+        }
+      ],
+      "error": null,
+      "duration_s": 7.968
+    },
+    {
+      "case_id": "rec-complex-001",
+      "question": "What are the top 5 movies I should recommend to User 534? Base it on what users with similar viewing histories rated highly, excluding anything User 534 has already seen.",
+      "difficulty": "complex",
+      "tags": [
+        "match",
+        "collaborative-filtering",
+        "aggregation",
+        "count",
+        "not-exists",
+        "filter",
+        "order-by",
+        "limit"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User {userId: '534'})-[:RATED]->(common:Movie)<-[:RATED]-(similar:User)\nWHERE similar <> u\nWITH u, similar, count(common) AS overlap\n\nMATCH (similar)-[r:RATED]->(candidate:Movie)\nWHERE NOT EXISTS { (u)-[:RATED]->(candidate) }\n  AND r.rating >= 4.0\n\nWITH candidate, sum(overlap * r.rating) AS score\nRETURN candidate.title AS title, candidate.imdbRating AS imdbRating, score\nORDER BY score DESC\nLIMIT 5",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 1066.1489999999958,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 5 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 1066.1489999999958,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 24.706
+    },
+    {
+      "case_id": "rec-complex-002",
+      "question": "Which people in our database have both acted in and directed movies? For each, show how many films they've acted in and how many they've directed.",
+      "difficulty": "complex",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "filter",
+        "multiple-relationships",
+        "exists"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (p:Person)-[:ACTED_IN]->(m:Movie)\nWITH p, count(m) AS actedCount\nMATCH (p)-[:DIRECTED]->(d:Movie)\nWITH p, actedCount, count(d) AS directedCount\nRETURN p.name AS person, actedCount, directedCount\nORDER BY directedCount DESC, actedCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 379.1422919999832,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 487 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 379.1422919999832,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 10.254
+    },
+    {
+      "case_id": "rec-complex-003",
+      "question": "Which genres have the most consistent audience ratings \u2014 meaning the least variation between reviewers? Only include genres with at least 50 ratings, and rank from most to least consistent.",
+      "difficulty": "complex",
+      "tags": [
+        "match",
+        "aggregation",
+        "stddev",
+        "filter",
+        "order-by",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User)-[r:RATED]->(m:Movie)-[:IN_GENRE]->(g:Genre)\nWITH g.name AS genre,\n     count(r)        AS ratingCount,\n     avg(r.rating)   AS avgRating,\n     stDev(r.rating) AS ratingStdDev\nWHERE ratingCount >= 50\nRETURN genre, ratingCount,\n       round(avgRating, 2)    AS avgRating,\n       round(ratingStdDev, 4) AS ratingStdDev\nORDER BY ratingStdDev ASC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 737.5643329999662,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 19 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 737.5643329999662,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 18.488
+    },
+    {
+      "case_id": "rec-complex-004",
+      "question": "For the 10 most-rated movies in our catalogue, what genres do they belong to and what is their average user rating?",
+      "difficulty": "complex",
+      "tags": [
+        "call-subquery",
+        "collect",
+        "aggregation",
+        "avg",
+        "order-by",
+        "limit",
+        "relationship"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (m:Movie)<-[r:RATED]-(:User)\nWITH m, count(r) AS ratingCount, avg(r.rating) AS avgRating\nORDER BY ratingCount DESC\nLIMIT 10\nMATCH (m)-[:IN_GENRE]->(g:Genre)\nRETURN m.title AS title,\n       collect(g.name) AS genres,\n       round(avgRating, 2) AS avgUserRating,\n       ratingCount\nORDER BY ratingCount DESC",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 526.3902500000199,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 526.3902500000199,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 21.171
+    },
+    {
+      "case_id": "rec-expert-001",
+      "question": "What is the shortest connection between Tom Hanks and Kevin Bacon through shared movie appearances? List the films on the path.",
+      "difficulty": "expert",
+      "tags": [
+        "shortest-path",
+        "match",
+        "relationship",
+        "path",
+        "qpe"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH p = SHORTEST 1\n  (tom:Person {name: 'Tom Hanks'})-[:ACTED_IN]-{1,}(kevin:Person {name: 'Kevin Bacon'})\nRETURN\n  [n IN nodes(p) WHERE n:Movie | n.title] AS films,\n  length(p)                                AS hops",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 258.78216699999257,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 1 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 258.78216699999257,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 61.722
+    },
+    {
+      "case_id": "rec-expert-002",
+      "question": "Starting from The Matrix, what other movies can you reach by following chains of shared cast members \u2014 up to three films away? Show all the reachable titles.",
+      "difficulty": "expert",
+      "tags": [
+        "qpe",
+        "quantified-path",
+        "match",
+        "relationship",
+        "depth",
+        "bounded"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (start:Movie {title: 'The Matrix'})\n      ((:Movie)<-[:ACTED_IN]-(:Person)-[:ACTED_IN]->(:Movie)){1,3}\n      (other:Movie)\nWHERE other <> start\nRETURN DISTINCT other.title AS title\nORDER BY title\nLIMIT 100",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 265.03450000001294,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 265.03450000001294,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 67.133
+    },
+    {
+      "case_id": "rec-expert-003",
+      "question": "Which 5 movies in our catalogue have the most similar storylines to The Matrix, based on their plot descriptions?",
+      "difficulty": "expert",
+      "tags": [
+        "vector",
+        "index",
+        "similarity",
+        "search"
+      ],
+      "verdict": "FAIL",
+      "failed_gate": 2,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (ref:Movie {title: 'The Matrix'})\nCALL db.index.vector.queryNodes('moviePlots', 6, ref.plotEmbedding) YIELD node AS m, score\nWHERE m <> ref\nRETURN m.title AS title, m.released AS released, m.imdbRating AS imdbRating, score\nORDER BY score DESC\nLIMIT 5",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 273.3020410000222,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "FAIL",
+          "reason": "Query returned 0 rows, expected \u2265 1",
+          "details": {
+            "actual_rows": 0,
+            "min_results": 1
+          }
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 273.3020410000222,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 12.831
+    },
+    {
+      "case_id": "rec-expert-004",
+      "question": "What are the top 10 movies to recommend to User 1, factoring in both what similar users enjoyed and whether the movie's genres match their viewing history? Weight peer ratings more heavily than genre overlap.",
+      "difficulty": "expert",
+      "tags": [
+        "match",
+        "collaborative-filtering",
+        "genre-overlap",
+        "aggregation",
+        "filter",
+        "scoring",
+        "not-exists",
+        "order-by",
+        "limit"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User {userId: '1'})-[:RATED]->(watched:Movie)\nWITH u, collect(watched) AS watchedMovies\n\nMATCH (w:Movie)-[:IN_GENRE]->(g:Genre)\nWHERE w IN watchedMovies\nWITH u, watchedMovies, collect(DISTINCT g.name) AS userGenres\n\nMATCH (u)-[:RATED]->(common:Movie)<-[:RATED]-(peer:User)\nWHERE peer <> u\nWITH watchedMovies, userGenres, peer, count(common) AS sharedCount\n\nMATCH (peer)-[pr:RATED]->(candidate:Movie)\nWHERE NOT candidate IN watchedMovies\n  AND pr.rating >= 3.5\nWITH userGenres, candidate,\n     count(DISTINCT peer)                                AS peerCount,\n     sum(sharedCount * pr.rating) / sum(sharedCount)    AS weightedPeerRating\n\nMATCH (candidate)-[:IN_GENRE]->(cg:Genre)\nWITH userGenres, candidate, peerCount, weightedPeerRating,\n     collect(cg.name) AS candidateGenres\n\nWITH candidate, peerCount, weightedPeerRating,\n     toFloat(size([g IN candidateGenres WHERE g IN userGenres]))\n       / size(candidateGenres)                           AS genreOverlap\n\nWITH candidate, peerCount, weightedPeerRating,\n     0.7 * (weightedPeerRating / 5.0) + 0.3 * genreOverlap AS score\n\nRETURN candidate.title                            AS title,\n       candidate.released                         AS released,\n       candidate.imdbRating                       AS imdbRating,\n       round(weightedPeerRating * 100) / 100      AS weightedPeerRating,\n       peerCount,\n       round(score * 1000) / 1000                 AS score\nORDER BY score DESC\nLIMIT 10",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 952.0252080000091,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 952.0252080000091,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 85.247
+    },
+    {
+      "case_id": "rec-expert-005",
+      "question": "Which users have the broadest influence in our community \u2014 meaning the most other users who share similar taste in movies? Show the top 10 most well-connected users.",
+      "difficulty": "expert",
+      "tags": [
+        "match",
+        "aggregation",
+        "count",
+        "filter",
+        "graph-analysis",
+        "collaborative-filtering"
+      ],
+      "verdict": "PASS",
+      "failed_gate": null,
+      "warned_gate": null,
+      "generated_cypher": "CYPHER 25\nMATCH (u:User)-[:RATED]->(m:Movie)<-[:RATED]-(other:User)\nWHERE u <> other\nWITH u, other, count(DISTINCT m) AS sharedMovies\nWHERE sharedMovies >= 3\nWITH u, count(DISTINCT other) AS influenceReach\nORDER BY influenceReach DESC\nLIMIT 10\nRETURN u.userId, u.name, influenceReach",
+      "metrics": {
+        "totalDbHits": null,
+        "totalAllocatedMemory": null,
+        "elapsedTimeMs": 4458.692499999984,
+        "totalRows": null
+      },
+      "gate_details": [
+        {
+          "gate": 1,
+          "verdict": "PASS",
+          "reason": "EXPLAIN succeeded",
+          "details": {}
+        },
+        {
+          "gate": 2,
+          "verdict": "PASS",
+          "reason": "Returned 10 rows (min: 1)",
+          "details": {}
+        },
+        {
+          "gate": 3,
+          "verdict": "PASS",
+          "reason": "No deprecated syntax or operators detected",
+          "details": {}
+        },
+        {
+          "gate": 4,
+          "verdict": "PASS",
+          "reason": "Performance within thresholds (dbHits=None, memory=None bytes)",
+          "details": {
+            "totalDbHits": null,
+            "totalAllocatedMemory": null,
+            "elapsedTimeMs": 4458.692499999984,
+            "totalRows": null
+          }
+        }
+      ],
+      "error": null,
+      "duration_s": 40.075
+    }
+  ]
+}
