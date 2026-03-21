@@ -505,17 +505,20 @@ tasks:
   - id: task-026
     title: "Create ucfraud domain test cases (25+ across all difficulty tiers)"
     description: |
-      Inspect the ucfraud database schema at demo.neo4jlabs.com (credentials:
-      ucfraud/ucfraud), then hand-author 25+ test cases across basic, intermediate,
-      advanced, complex, and expert difficulty tiers. Cases must exercise: fraud ring
-      detection via QPE ({2,5} bounded quantifiers), transaction graph traversal
+      Inspect the ucfraud database schema at the local Neo4j 2026.02.1 instance
+      (bolt://localhost, credentials: neo4j/password, database: ucfraud). This
+      instance is writeable and has all 2026.02.1 features including the GA SEARCH
+      clause. Hand-author 25+ test cases across basic, intermediate, advanced,
+      complex, and expert difficulty tiers. Cases must exercise: fraud ring detection
+      via QPE ({2,5} bounded quantifiers), transaction graph traversal
       (Account→Transaction→Merchant multi-hop), temporal fraud patterns using
       date/datetime and duration comparisons, SHORTEST path for tracing money flow,
-      and CALL IN TRANSACTIONS batch flagging (marked is_write_query: true). Expert
-      cases must combine ring detection QPE with temporal filters or SHORTEST k
-      enumeration. Save to tests/cases/ucfraud.yml and run the full harness to
-      validate against the live DB.
-    status: pending
+      SEARCH clause with fulltext or vector indexes (≥2 cases), write queries for
+      fraud flagging with MERGE/SET (marked is_write_query: true), and CALL IN
+      TRANSACTIONS batch flagging. Expert cases must combine ring detection QPE with
+      temporal filters or SHORTEST k enumeration. Save to tests/cases/ucfraud.yml
+      and run the full harness to validate against the local DB.
+    status: in_progress
     dependencies:
       - task-015
     acceptance_criteria:
@@ -524,8 +527,9 @@ tasks:
       - "At least one case uses QPE {m,n} for fraud ring detection"
       - "At least one case uses temporal date/datetime predicates"
       - "At least one case uses SHORTEST path for money-flow tracing"
-      - "Write-query cases are marked is_write_query: true"
-      - "Harness run on ucfraud.yml completes without runner errors"
+      - "At least 2 cases use the SEARCH clause (fulltext or vector)"
+      - "Write-query cases (MERGE/SET/CALL IN TRANSACTIONS) are marked is_write_query: true"
+      - "Harness run on ucfraud.yml completes against bolt://localhost without runner errors"
       - "Pass rate: ≥ 90% basic, ≥ 80% intermediate, ≥ 70% advanced"
     completed_at: null
 
@@ -577,4 +581,24 @@ tasks:
       - "At least one SKILL.md improvement is applied based on the report recommendations"
       - "Overall pass rate across all 3 domains: ≥ 85% (basic+intermediate combined)"
       - "Improvement report committed to skill-generation-validation-tools/tests/results/"
+    completed_at: null
+
+  - id: task-029
+    title: "Update SKILL.md: SEARCH clause GA in Neo4j 2026.02.1"
+    description: |
+      Update SKILL.md to reflect that the SEARCH clause is GA as of Neo4j 2026.02.1
+      (no longer Preview). The SEARCH section must note: (a) SEARCH clause is GA for
+      vector indexes in 2026.02.1+; (b) fulltext indexes still require the
+      db.index.fulltext.queryNodes() procedure fallback for pre-2026.02 databases;
+      (c) agents should check the database version before choosing between SEARCH
+      syntax and the procedure fallback. Also update AGENTS.md gotcha entry for the
+      SEARCH clause to reflect the GA status and version boundary.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "SKILL.md SEARCH/vector section notes that SEARCH clause is GA in Neo4j 2026.02.1+"
+      - "SKILL.md includes version-conditional guidance: SEARCH for 2026.02+, procedure for older"
+      - "AGENTS.md gotcha for SEARCH clause updated from 'Preview' to 'GA in 2026.02.1'"
+      - "SKILL.md body remains ≤ 300 lines after the update"
     completed_at: null
