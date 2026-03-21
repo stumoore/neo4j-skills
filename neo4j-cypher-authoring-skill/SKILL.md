@@ -119,9 +119,12 @@ When `interactive` is the mode (default), wrap `query_literals` in a ` ```cypher
 | Element | Check | Action on failure |
 |---|---|---|
 | Node label `(n:Label)` | Label exists in schema's Node Labels | Replace with correct label from schema |
+| **Label-free node** `(n)` | **Never emit unless strictly required** | **Add the correct label from schema** |
 | Relationship type `-[:TYPE]->` | Type exists in schema's Relationship Types | Replace with nearest match from schema |
 | Property `n.propName` | `propName` listed for that label in Node Properties | Remove or replace with a valid property |
 | Index name in procedure call | Index name exists in schema's Indexes | Use correct index name from schema |
+
+**Label-free `MATCH (n)` is forbidden** except in two narrow cases: (1) re-referencing a variable already bound with a label earlier in the same query; (2) inside a QPE group variable where the label is implied by the path pattern. In every other case, always specify the label. A label-free MATCH causes an `AllNodesScan` and will scan the entire graph.
 
 ### Vocabulary discipline
 
@@ -355,7 +358,7 @@ CYPHER 25 EXPLAIN MATCH (n:Person {name: $name}) RETURN n;
 
 | Operator | Problem | Fix |
 |---|---|---|
-| `AllNodesScan` | Missing index | Add `USING INDEX` hint or create index |
+| `AllNodesScan` | Missing index **or label-free `MATCH (n)`** | Add label + `USING INDEX` hint, or create index |
 | `CartesianProduct` | Unconstrained cross-join | Add join predicate via `WHERE` |
 | `NodeByLabelScan` (large label) | No property index | Use index or filter earlier with `WITH` |
 

@@ -760,3 +760,26 @@ tasks:
       - "AGENTS.md gotcha for SEARCH clause updated from 'Preview' to 'GA in 2026.02.1'"
       - "SKILL.md body remains ≤ 300 lines after the update"
     completed_at: null
+
+  - id: task-037
+    title: "Enforce label-free MATCH prohibition across SKILL.md and L3 reference files"
+    description: |
+      Label-free MATCH (n) causes AllNodesScan and must be avoided in all generated
+      queries. Two L3 reference files contained label-free examples that teach the model
+      bad patterns: cypher-style-guide.md (MATCH (n) in a formatting example) and
+      cypher25-subqueries.md (MATCH (n {id: x}) in the deprecated CALL form). Fix all
+      label-free node patterns in L3 files. Add an explicit prohibition rule to SKILL.md's
+      MUST VALIDATE section: label-free MATCH is forbidden except for (1) re-referencing
+      an already-bound variable, (2) QPE group variables where the label is implied.
+      Extend the EXPLAIN/PROFILE AllNodesScan row to include label-free MATCH as a cause.
+      Audit all test case expected queries for label-free patterns and fix any found.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "SKILL.md MUST VALIDATE section has an explicit 'Label-free node (n) — Never emit unless strictly required' row"
+      - "AllNodesScan EXPLAIN table row names label-free MATCH as a cause alongside missing index"
+      - "cypher-style-guide.md contains no label-free MATCH (n) examples without a label"
+      - "cypher25-subqueries.md deprecated CALL example uses MATCH (n:Label {id: x})"
+      - "No other L3 reference file contains a label-free MATCH as a positive/canonical example"
+    completed_at: "2026-03-21T21:00:00Z"

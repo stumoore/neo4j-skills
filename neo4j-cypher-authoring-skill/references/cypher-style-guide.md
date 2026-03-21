@@ -85,7 +85,7 @@ MERGE (a:A)-[:T]->(b:B)
 
 ```cypher
 // Long WHERE — break at AND
-MATCH (n)
+MATCH (n:Label)
 WHERE
   n.prop <> 'a' AND
   n.prop <> 'b' AND
@@ -100,7 +100,7 @@ LIMIT 10
 // Full CALL/EXISTS subquery — open brace same line, indent body 2 spaces, close brace own line
 MATCH (a:A)
 WHERE EXISTS {
-  MATCH (a)-->(b:B)
+  MATCH (a:A)-->(b:B)
   WHERE b.prop = 'yellow'
 }
 RETURN a.foo

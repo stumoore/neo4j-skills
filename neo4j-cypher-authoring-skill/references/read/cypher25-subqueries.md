@@ -52,7 +52,7 @@ Scope clause variants:
 -- DEPRECATED
 CALL {
   WITH x        -- importing WITH, must be first clause
-  MATCH (n {id: x})
+  MATCH (n:Label {id: x})
   RETURN n
 }
 ```
