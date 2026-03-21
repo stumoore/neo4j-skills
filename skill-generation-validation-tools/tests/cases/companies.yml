@@ -1,24 +1,80 @@
 # companies.yml — Test cases for neo4j-cypher-authoring-skill
-# Database: demo.neo4jlabs.com — companies / companies
-#
-# Schema summary:
-#   Nodes:      Organization (name, description, nbrEmployees, revenue, summary, wikipediaUrl)
-#               Article (title, text, summary, sentiment, url, date)
-#               Chunk   (text, embedding <Vector(1536)>)
-#               IndustryCategory (name)
-#   Relations:  (Organization)-[:HAS_SUBSIDIARY]->(Organization)
-#               (Article)-[:MENTIONS]->(Organization)
-#               (Article)-[:HAS_CHUNK]->(Chunk)
-#               (Organization)-[:IN_INDUSTRY]->(IndustryCategory)
-#   Indexes:    entity  — fulltext on Organization.name
-#               news    — vector on Chunk.embedding
-#
-# Baseline metrics were captured against demo.neo4jlabs.com on 2026-03-20.
-# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
-#             max_runtime_ms = observed × 5.
-#
 # NOTE: companies-generated.yml (generator output) is gitignored.
 # Promote stubs from generated → this file after human review.
+# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
+#             max_runtime_ms = observed × 5.
+
+dataset:
+  name: companies
+  database: companies
+  connection:
+    uri: neo4j+s://demo.neo4jlabs.com:7687
+    username: companies
+    password: companies
+  description: |
+    A corporate intelligence knowledge graph of publicly traded companies, their news coverage,
+    and corporate ownership structures. Use to explore which companies belong to which industries,
+    who owns whom (parent/subsidiary relationships), how companies are covered in the press,
+    and what the sentiment of that coverage is. Data sourced from Wikipedia and financial news.
+  schema:
+    nodes:
+      Organization:
+        description: "A company or corporate entity"
+        note: "ALWAYS :Organization — NEVER :Company, :Firm, :Corporation or any other label"
+        properties:
+          name:        {type: STRING,  sample: ["Apple", "Microsoft", "Blackstone Group"]}
+          description: {type: STRING}
+          nbrEmployees: {type: INTEGER, min: 1, max: 2400000}
+          revenue:      {type: FLOAT,   min: 0, description: "Annual revenue in USD"}
+          summary:      {type: STRING}
+          wikipediaUrl: {type: STRING}
+      Article:
+        description: "A news article that may mention one or more companies"
+        properties:
+          title:     {type: STRING}
+          text:      {type: STRING}
+          summary:   {type: STRING}
+          sentiment: {type: FLOAT,  min: -1.0, max: 1.0, description: "negative<0, neutral≈0, positive>0"}
+          url:       {type: STRING}
+          date:      {type: DATE,   sample: ["2023-01-15", "2024-06-03"]}
+      Chunk:
+        description: "A text segment from an Article, with vector embedding for semantic search"
+        properties:
+          text:      {type: STRING}
+          embedding: {type: VECTOR, dimensions: 1536, similarity: cosine}
+      IndustryCategory:
+        description: "An industry sector classification"
+        properties:
+          name: {type: STRING, sample: ["Technology", "Finance", "Healthcare", "Energy"]}
+    relationships:
+      - {type: HAS_SUBSIDIARY,   from: Organization, to: Organization, description: "Parent company directly owns the subsidiary"}
+      - {type: MENTIONS,         from: Article,      to: Organization}
+      - {type: HAS_CHUNK,        from: Article,      to: Chunk}
+      - {type: IN_INDUSTRY,      from: Organization, to: IndustryCategory}
+      - {type: HAS_SUPPLIER,     from: Organization, to: Organization}
+      - {type: HAS_BOARD_MEMBER, from: Organization, to: Organization}
+      - {type: HAS_CATEGORY,     from: Organization, to: IndustryCategory}
+    indexes:
+      - name: entity
+        type: FULLTEXT
+        on: Organization(name)
+        call: "CALL db.index.fulltext.queryNodes('entity', $q) YIELD node, score"
+        description: "Full-text search on company names"
+      - name: news
+        type: VECTOR
+        on: Chunk(embedding)
+        dimensions: 1536
+        similarity: cosine
+        call: "CALL db.index.vector.queryNodes('news', N, $vec) YIELD node, score"
+        description: "Vector similarity search on article text chunks"
+  notes:
+    - "CRITICAL: Companies are :Organization nodes — NEVER use :Company"
+    - "QPE '+' quantifier NOT supported on demo.neo4jlabs.com — always use {1,} instead"
+    - "Demo DB is read-only — write queries (MERGE/CREATE/SET/DELETE) will fail with Security.Forbidden"
+    - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes() for vectors"
+    - "Independent companies (no parent): NOT EXISTS { (o)<-[:HAS_SUBSIDIARY]-() }"
+    - "Largest subsidiary owner: Blackstone (~1037 direct subsidiaries)"
+    - "Sentiment filter: positive = a.sentiment > 0, negative = a.sentiment < 0"
 
 cases:
 

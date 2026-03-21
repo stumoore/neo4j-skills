@@ -24,12 +24,13 @@ compatibility: Neo4j >= 2025.01; Cypher 25
 Non-negotiable defaults — apply before writing any query:
 
 1. **CYPHER 25 always** — first token of every query
-2. **Schema first** — inspect schema before writing any `MATCH` clause
-3. **Params always** — `$param` for all predicates and MERGE keys; never inline literals (exception: `LIMIT N`)
-4. **MERGE safety** — every `MERGE` must have `ON CREATE SET` and `ON MATCH SET`
-5. **Validate** — `EXPLAIN` every query; `PROFILE` when performance matters
-6. **Recover** — handle 0-result queries, TypeErrors, timeouts autonomously
-7. **READ/WRITE/ADMIN first** — categorize, then load only the relevant L3 folder
+2. **Schema first** — inspect schema before writing any `MATCH` clause; if schema is provided in the prompt, use it directly
+3. **Output mode** — check invocation context for `interactive` (literals) or `programmatic` (parameters); default to `interactive`; always return both (see Output Mode section)
+4. **Schema fidelity** — after generating Cypher, validate every label, rel-type, and property against the schema before returning (see MUST VALIDATE section)
+5. **MERGE safety** — every `MERGE` must have `ON CREATE SET` and `ON MATCH SET`
+6. **Validate** — `EXPLAIN` every query; `PROFILE` when performance matters
+7. **Recover** — handle 0-result queries, TypeErrors, timeouts autonomously
+8. **READ/WRITE/ADMIN first** — categorize, then load only the relevant L3 folder
 
 ---
 
@@ -82,17 +83,125 @@ Run 5a when `apocAvailable = true`; run 5b otherwise.
 
 ---
 
-## Parameter Discipline
+## Output Mode: Literals vs Parameters
 
-```cypher
--- Correct
-CYPHER 25 MATCH (n:Person {name: $name}) RETURN n;
+**Interactive mode** (human running queries directly): use literal values. Immediately executable, no runtime config needed.
 
--- Never do this
-CYPHER 25 MATCH (n:Person {name: 'Alice'}) RETURN n;
+**Programmatic mode** (queries used in application code): use `$param` placeholders. Enables plan caching; prevents injection. Pass via `.execute_query(query, name="Alice")`.
+
+**Always return both formats** as a YAML block, plus a parameter resolution section:
+
+```yaml
+query_literals: |
+  CYPHER 25
+  MATCH (n:Organization {name: 'Apple'})
+  RETURN n.name, n.description LIMIT 10
+
+query_parametrized: |
+  CYPHER 25
+  MATCH (n:Organization {name: $name})
+  RETURN n.name, n.description LIMIT 10
+
+parameters:
+  name: "Apple"
 ```
 
-Use `$param` for: WHERE predicates, MERGE keys and property maps, SET values. Enables plan caching; prevents injection. Pass via `.execute_query(query, name="Alice")`.
+When `interactive` is the mode (default), wrap `query_literals` in a ` ```cypher ` block too so it renders properly. When `programmatic` is the mode, highlight `query_parametrized` as the primary output.
+
+---
+
+## MUST VALIDATE: Schema Fidelity
+
+**After generating any Cypher query, before returning, verify every schema element against the provided schema. This is mandatory when a schema context is present in the prompt.**
+
+### Validation checklist
+
+| Element | Check | Action on failure |
+|---|---|---|
+| Node label `(n:Label)` | Label exists in schema's Node Labels | Replace with correct label from schema |
+| Relationship type `-[:TYPE]->` | Type exists in schema's Relationship Types | Replace with nearest match from schema |
+| Property `n.propName` | `propName` listed for that label in Node Properties | Remove or replace with a valid property |
+| Index name in procedure call | Index name exists in schema's Indexes | Use correct index name from schema |
+
+### Vocabulary discipline
+
+Business questions use domain vocabulary that does **not** match schema labels:
+
+| Business term | Do NOT use | MUST use (from schema) |
+|---|---|---|
+| "company", "companies", "firm" | `:Company` | Use the label from the provided schema (e.g., `:Organization`) |
+| "movie", "film" | `:Film` | Use label from schema (e.g., `:Movie`) |
+| "user", "customer" | `:Member` | Use label from schema |
+| ownership, "owns" | `:OWNS` | Use rel type from schema (e.g., `:HAS_SUBSIDIARY`) |
+| "sends money" | `:TRANSFERS` | Use rel type from schema (e.g., `:SENT`) |
+
+**Rule**: Never infer label or relationship type names from the business question wording. Always look them up in the provided schema. If no schema is provided, run the Schema-First Protocol before writing any MATCH clause.
+
+### QPE quantifier compatibility
+
+| Database | `+` quantifier | `{1,}` equivalent |
+|---|---|---|
+| Local Neo4j 2026.x | ✓ supported | ✓ supported |
+| demo.neo4jlabs.com | ✗ NOT supported | ✓ use this |
+
+**Default to `{1,}` form** unless you have confirmed the target DB supports `+`. Same for `*` → use `{0,}`.
+
+---
+
+## Value Normalization and Domain Translation
+
+**When a schema context with sample, enum, or range data is provided, apply these rules before writing any query.**
+
+> **Output format is an internal detail.** When communicating concerns or translated values to the user (comments, ⚠ notices), never mention `$param` placeholders, YAML keys, or dual-format output — those are implementation details of the query output, invisible to the end user.
+
+### 1 — Translate user-supplied values to schema domain values
+
+Users speak in business language; the database stores domain-specific codes or formats. If the schema supplies `values:` (enum) or `sample:` entries for a property, map the user's input to the nearest matching stored value.
+
+| User says | Schema sample / values | Use in query |
+|---|---|---|
+| "Chicago" | Airport codes: `["ORD", "MDW", "CHI"]` | `"ORD"` (primary airport) |
+| "bolt 134" | Transaction IDs: `["BOLT-001-INV", "BOLT-134-INV"]` | `"BOLT-134-INV"` |
+| "active customers" | status values: `["ACTIVE", "INACTIVE", "SUSPENDED"]` | `"ACTIVE"` |
+| "last year" | year range 1990–2024 | `datetime().year - 1` |
+
+**Rule**: When you infer a translation, state it explicitly in a comment above the query:
+```cypher
+-- Translated: user said "Chicago" → using "ORD" (primary IATA code in this dataset)
+CYPHER 25
+MATCH (f:Flight)-[:DEPARTS_FROM]->(a:Airport {code: "ORD"}) RETURN f;
+```
+
+### 2 — Validate numeric values against observed ranges
+
+If the schema provides `min:` / `max:` for a property and the user's value is outside that range by more than an order of magnitude, **surface a concern before writing the query**:
+
+```
+⚠ Value concern: You asked for age = -5. Schema shows Customer.age range 18–95.
+  Negative age is outside the observed domain. Proceeding with age = 5 (assuming typo).
+  If you meant a different field, please clarify.
+```
+
+**Triggers that require explicit elicitation (do not silently guess)**:
+- Negative value where schema `min` ≥ 0 (e.g. negative age, negative amount)
+- Value > 10× schema `max` (e.g. temperature 50,000 K when range is 200–400 K)
+- ID/code format mismatch when `values:` or `sample:` are provided and none match the input
+- Date/year outside the observed range by more than 5 years
+
+### 3 — ID pattern recognition
+
+When schema samples reveal a structured ID format, infer the pattern and apply it:
+
+| Observed samples | Inferred pattern | User input → stored value |
+|---|---|---|
+| `"TXN-00001"`, `"TXN-00234"` | `TXN-{5d}` zero-padded | `"txn 234"` → `"TXN-00234"` |
+| `"ACC-ABC123"`, `"ACC-XYZ789"` | `ACC-{alphanum}` uppercase | `"acc-abc123"` → `"ACC-ABC123"` |
+
+Always state the inferred pattern in a comment and offer the normalized value to the user for confirmation when there is ambiguity.
+
+### 4 — When values are NOT provided in schema
+
+If `values:` and `sample:` are absent for a property, apply common-sense transformations to the user's input (normalise case to match the property type, trim whitespace, expand obvious abbreviations, infer standard formats) and use the result. Elicit clarification only when the information provided is genuinely insufficient to generate a query at all — not as a default.
 
 ---
 
@@ -150,20 +259,26 @@ RETURN n.name,
   ELSE 'Other' END AS category;
 ```
 
-### SEARCH Clause (Vector — Neo4j 2026.01+, Preview)
+### SEARCH Clause (Vector — GA in Neo4j 2026.02.1+)
 
 ```cypher
--- SEARCH clause (vector only in 2026.01)
+-- SEARCH clause (vector only; GA in Neo4j 2026.02.1 on local instances)
+-- NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes() there
 CYPHER 25
 MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news
   WITH QUERY VECTOR $embedding
 WHERE score > 0.8
 RETURN c.text, score LIMIT 10;
 
--- Fulltext always via procedure in 2026.01
+-- Fulltext: always via procedure (all Neo4j versions including demo)
 CYPHER 25
 CALL db.index.fulltext.queryNodes('entity', $query) YIELD node, score
 RETURN node.name, score LIMIT 20;
+
+-- Vector search on demo.neo4jlabs.com (no SEARCH clause):
+CYPHER 25
+CALL db.index.vector.queryNodes('news', 5, $embedding) YIELD node, score
+RETURN node.text, score;
 ```
 
 ---

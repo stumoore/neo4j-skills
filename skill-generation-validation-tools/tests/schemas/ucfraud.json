@@ -1,0 +1,78 @@
+{
+  "labels": [
+    "Transaction", "Account", "Customer",
+    "Email", "Address", "PhoneNumber",
+    "Jurisdiction", "Country",
+    "AlertStatus", "Alert"
+  ],
+  "relationship_types": [
+    "SENT",
+    "RECEIVED",
+    "TRANSACTED_TO",
+    "SHARED_IDENTIFIERS",
+    "HAS_ACCOUNT",
+    "USES_EMAIL",
+    "USES_PHONE",
+    "RESIDES_AT",
+    "LOCATED_IN",
+    "HAS_ALERT",
+    "HAS_STATUS",
+    "ASSOCIATED_WITH"
+  ],
+  "indexes": [
+    {
+      "name": "customerNames",
+      "type": "FULLTEXT",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Customer"],
+      "properties": ["name"]
+    },
+    {
+      "name": "transactionTypes",
+      "type": "FULLTEXT",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Transaction"],
+      "properties": ["type", "status"]
+    }
+  ],
+  "node_properties": {
+    "Transaction": ["amount", "date", "status", "transactionID", "type"],
+    "Account": ["accountID", "accountNumber", "accountType", "balance", "louvainCommunity", "pagerank", "status"],
+    "Customer": ["betweenness", "customerID", "dateOfBirth", "fraudFlag", "louvainCommunity", "name", "pagerank"],
+    "Email": ["email"],
+    "Address": ["address"],
+    "PhoneNumber": ["phoneNumber"],
+    "Jurisdiction": ["name"],
+    "Country": ["name"],
+    "AlertStatus": ["status"],
+    "Alert": ["alertId", "description", "severity"]
+  },
+  "rel_properties": {
+    "SENT": [],
+    "RECEIVED": [],
+    "TRANSACTED_TO": [],
+    "SHARED_IDENTIFIERS": [],
+    "HAS_ACCOUNT": [],
+    "USES_EMAIL": [],
+    "USES_PHONE": [],
+    "RESIDES_AT": [],
+    "LOCATED_IN": [],
+    "HAS_ALERT": [],
+    "HAS_STATUS": [],
+    "ASSOCIATED_WITH": []
+  },
+  "_notes": [
+    "Money flow: (sender:Account)-[:SENT]->(t:Transaction)-[:RECEIVED]->(receiver:Account)",
+    "Direct transfer: (a:Account)-[:TRANSACTED_TO]->(b:Account)",
+    "Customer to account: (c:Customer)-[:HAS_ACCOUNT]->(a:Account)",
+    "Fraud rings: (a:Account)-[:SHARED_IDENTIFIERS]->(b:Account) — shared email/phone/address",
+    "Customer identity: (c:Customer)-[:USES_EMAIL]->(e:Email), -[:USES_PHONE]->(p:PhoneNumber), -[:RESIDES_AT]->(addr:Address)",
+    "Customer.fraudFlag is a boolean — true means the customer is flagged as fraudulent.",
+    "louvainCommunity (int) groups connected accounts into fraud communities.",
+    "pagerank and betweenness are float centrality scores — higher = more influential node.",
+    "SEARCH clause is available on local Neo4j 2026.02.1 (vector only); use for Chunk/embedding indexes.",
+    "Fulltext search: CALL db.index.fulltext.queryNodes('customerNames', $query) YIELD node, score",
+    "SHORTEST N syntax is supported for finding shortest transaction paths.",
+    "QPE {m,n} syntax is supported for bounded fraud ring traversal."
+  ]
+}

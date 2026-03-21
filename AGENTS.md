@@ -3,7 +3,10 @@
 ## Feedback Commands
 
 - Run extraction tests: `cd skill-generation-validation-tools && uv run python3 scripts/test-extract-references.py`
-- Run harness (once built): `uv run --project skill-generation-validation-tools python3 skill-generation-validation-tools/tests/harness/runner.py --cases skill-generation-validation-tools/tests/cases/ --skill neo4j-cypher-authoring-skill`
+- Run harness (all domains, schema injected): `uv run --project skill-generation-validation-tools python3 skill-generation-validation-tools/tests/harness/runner.py --cases skill-generation-validation-tools/tests/cases/ --skill neo4j-cypher-authoring-skill --verbose`
+- Run harness (single domain): `uv run --project skill-generation-validation-tools python3 skill-generation-validation-tools/tests/harness/runner.py --cases skill-generation-validation-tools/tests/cases/companies.yml --skill neo4j-cypher-authoring-skill --neo4j-uri neo4j+s://demo.neo4jlabs.com:7687 --neo4j-username companies --neo4j-password companies --verbose`
+- Run harness (ucfraud, local DB): `uv run --project skill-generation-validation-tools python3 skill-generation-validation-tools/tests/harness/runner.py --cases skill-generation-validation-tools/tests/cases/ucfraud.yml --skill neo4j-cypher-authoring-skill --neo4j-uri bolt://localhost:7687 --neo4j-username neo4j --neo4j-password password --verbose`
+- Schema is auto-injected from `tests/schemas/{domain}.json` when the directory exists. Use `--no-schema` to disable for ablation runs.
 - Lint YAML: `yamllint .github/workflows/`
 
 ## Conventions
@@ -118,7 +121,9 @@ The script generates **first drafts** for L3 reference files (not final output).
 
 - Claude headless invocation: `claude --skill <name>` does NOT exist in claude 2.1.80. Runner uses `--append-system-prompt` with SKILL.md content loaded via `_load_skill_content()`. The `--skill` flag is a fallback for future CLI versions.
 - `_load_skill_content(skill_name)` searches: cwd/skill_name/SKILL.md, repo_root/skill_name/SKILL.md, repo_root/neo4j-{name}-skill/SKILL.md, one level up from _REPO_ROOT (which is the skill-generation-validation-tools dir). `_REPO_ROOT.parent` is the actual git repo root.
-- Cypher extraction: regex ```` ```(?:cypher|CYPHER)\s*\n(.*?)``` ```` with DOTALL — matches both casings.
+- Schema injection: `--schema-dir PATH` loads `{domain}.json` from PATH and injects a compact schema block into every Claude prompt. Auto-detects `tests/schemas/` if it exists. Disable with `--no-schema`. Schema files: `tests/schemas/{domain}.json` with keys: `labels`, `relationship_types`, `indexes`, `node_properties`, `rel_properties`, `_notes`.
+- Schema is formatted by `_format_schema_text()` into a compact `=== DATABASE SCHEMA ===` block and prepended to each prompt so the model uses exact label/rel-type/property names.
+- Cypher extraction: handles two output formats: (1) raw ```` ```cypher ``` ```` block; (2) ```` ```yaml ``` ```` dual-format block with `query_literals` and `query_parametrized` keys. Prefers `query_literals` for harness execution (no parameter injection needed).
 - Dry-run (`--dry-run`): validates YAML structure (required fields, duplicate IDs, valid difficulty) without executing queries or invoking Claude. Exits 0 on valid YAML.
 - Exit codes: 0 = all PASS, 1 = any FAIL, 2 = any WARN (no FAIL).
 - TestCaseResult fields: verdict, failed_gate, warned_gate, generated_cypher, metrics, gate_details, error (runner-level), duration_s.

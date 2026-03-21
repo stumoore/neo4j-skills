@@ -1,26 +1,97 @@
 # recommendations.yml — Test cases for neo4j-cypher-authoring-skill
-# Database: demo.neo4jlabs.com — recommendations / recommendations
-#
-# Schema summary (inspected 2026-03-21):
-#   Nodes:      Movie  (movieId, title, plot, released, imdbRating, url, poster,
-#                        tmdbId, budget, revenue, runtime, imdbId, imdbVotes,
-#                        languages, countries, plotEmbedding <Vector(1536)>)
-#               Person (name, born, bio, url, poster, tmdbId, imdbId)
-#               User   (userId, name)
-#               Genre  (name)
-#   Relations:  (User)-[:RATED {rating, timestamp}]->(Movie)
-#               (Person)-[:ACTED_IN {role}]->(Movie)
-#               (Person)-[:DIRECTED]->(Movie)
-#               (Movie)-[:IN_GENRE]->(Genre)
-#   Indexes:    moviePlots  — vector  on Movie.plotEmbedding (1536 dims, cosine)
-#               movieTitles — fulltext on Movie.title
-#
-# Baseline metrics were captured against demo.neo4jlabs.com on 2026-03-21.
-# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
-#             max_runtime_ms = observed × 5.
-#
 # NOTE: recommendations-generated.yml (generator output) is gitignored.
 # Promote stubs from generated → this file after human review.
+# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
+#             max_runtime_ms = observed × 5.
+
+dataset:
+  name: recommendations
+  database: recommendations
+  connection:
+    uri: neo4j+s://demo.neo4jlabs.com:7687
+    username: recommendations
+    password: recommendations
+  description: |
+    A movie recommendation graph containing films, the people who made them (actors, directors),
+    users who rated them, and genre classifications. Use to explore movie ratings, actor and
+    director filmographies, genre distributions, collaborative filtering recommendations,
+    and semantic similarity between movies based on their plots.
+  schema:
+    nodes:
+      Movie:
+        description: "A film in the catalogue"
+        properties:
+          movieId:      {type: INTEGER}
+          title:        {type: STRING,  sample: ["The Matrix", "Toy Story", "Pulp Fiction"]}
+          plot:         {type: STRING,  description: "Plot summary text"}
+          released:     {type: INTEGER, min: 1900, max: 2024, description: "Release YEAR as integer — NOT a Date object. Use: WHERE m.released > 2000"}
+          imdbRating:   {type: FLOAT,   min: 0.0, max: 10.0, description: "IMDb community rating"}
+          imdbVotes:    {type: INTEGER, min: 0,   description: "Number of IMDb votes"}
+          budget:       {type: INTEGER, description: "Production budget in USD"}
+          revenue:      {type: INTEGER, description: "Box office revenue in USD"}
+          runtime:      {type: INTEGER, description: "Runtime in minutes"}
+          url:          {type: STRING}
+          poster:       {type: STRING}
+          tmdbId:       {type: STRING}
+          imdbId:       {type: STRING}
+          languages:    {type: LIST_STRING, sample: [["English"], ["English", "French"]]}
+          countries:    {type: LIST_STRING}
+          plotEmbedding: {type: VECTOR, dimensions: 1536, similarity: cosine, description: "Vector embedding of plot text for semantic similarity search"}
+      Person:
+        description: "A person who acted in or directed movies"
+        properties:
+          name:   {type: STRING, sample: ["Tom Hanks", "Kevin Bacon", "Carrie-Anne Moss"]}
+          born:   {type: INTEGER, description: "Birth year"}
+          bio:    {type: STRING}
+          url:    {type: STRING}
+          poster: {type: STRING}
+          tmdbId: {type: STRING}
+          imdbId: {type: STRING}
+      User:
+        description: "A platform user who has submitted movie ratings"
+        properties:
+          userId: {type: STRING, description: "CRITICAL: userId is a STRING — match with WHERE u.userId = '1' (quoted), never = 1"}
+          name:   {type: STRING}
+      Genre:
+        description: "A movie genre category"
+        properties:
+          name: {type: STRING, sample: ["Action", "Comedy", "Drama", "Sci-Fi", "Thriller"]}
+    relationships:
+      - type: RATED
+        from: User
+        to: Movie
+        properties:
+          rating:    {type: FLOAT,   min: 0.5, max: 5.0, description: "User rating in half-star increments"}
+          timestamp: {type: INTEGER, description: "Unix timestamp of rating submission"}
+      - type: ACTED_IN
+        from: Person
+        to: Movie
+        properties:
+          role: {type: STRING, description: "Character name played by the actor"}
+      - {type: DIRECTED, from: Person, to: Movie}
+      - {type: IN_GENRE, from: Movie,  to: Genre}
+    indexes:
+      - name: moviePlots
+        type: VECTOR
+        on: Movie(plotEmbedding)
+        dimensions: 1536
+        similarity: cosine
+        call: "CALL db.index.vector.queryNodes('moviePlots', N, $vec) YIELD node, score"
+        description: "Semantic similarity search on movie plot embeddings"
+      - name: movieTitles
+        type: FULLTEXT
+        on: Movie(title)
+        call: "CALL db.index.fulltext.queryNodes('movieTitles', $q) YIELD node, score"
+        description: "Full-text search on movie titles"
+  notes:
+    - "CRITICAL: Movie.released is an INTEGER year (e.g. 1994), NOT a Date — use WHERE m.released > 2000"
+    - "CRITICAL: User.userId is a STRING — always match with WHERE u.userId = '1' (quoted), not = 1"
+    - "QPE '+' quantifier NOT supported on demo.neo4jlabs.com — always use {1,} instead"
+    - "Demo DB is read-only — write queries will fail"
+    - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes()"
+    - "No :WROTE or :REVIEWED relationship — only RATED, ACTED_IN, DIRECTED, IN_GENRE exist"
+    - "Tom Hanks and Kevin Bacon are both in the database (Kevin Bacon shortest-path problem is valid)"
+    - "Collaborative filtering: find users who rated the same movies as User X → find movies those users rated that X has not"
 
 cases:
 
@@ -268,7 +339,7 @@ cases:
     question: "Show all movies alongside their average user rating. Movies that haven't been rated yet should still appear. Sort by IMDb score, showing the top 10."
     database: recommendations
     difficulty: advanced
-    tags: [optional-match, aggregation, avg, null, order-by, limit]
+    tags: [optional-match, aggregation, avg, "null", order-by, limit]
     domain: recommendations
     min_results: 10
     max_db_hits: 300000

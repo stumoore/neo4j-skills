@@ -1,0 +1,52 @@
+{
+  "labels": ["Movie", "Person", "User", "Genre"],
+  "relationship_types": [
+    "RATED",
+    "ACTED_IN",
+    "DIRECTED",
+    "IN_GENRE",
+    "SIMILAR"
+  ],
+  "indexes": [
+    {
+      "name": "moviePlots",
+      "type": "VECTOR",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Movie"],
+      "properties": ["plotEmbedding"]
+    },
+    {
+      "name": "movieTitles",
+      "type": "FULLTEXT",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Movie"],
+      "properties": ["title"]
+    }
+  ],
+  "node_properties": {
+    "Movie": [
+      "title", "released", "tagline", "plot", "imdbId", "tmdbId",
+      "plotEmbedding", "url", "poster", "year", "countries", "languages",
+      "budget", "revenue", "runtime", "imdbRating", "imdbVotes"
+    ],
+    "Person": ["name", "born", "tmdbId", "bornIn", "bio", "poster", "url", "imdbId"],
+    "User": ["userId", "name"],
+    "Genre": ["name"]
+  },
+  "rel_properties": {
+    "RATED": ["rating", "timestamp"],
+    "ACTED_IN": ["role"],
+    "DIRECTED": [],
+    "IN_GENRE": [],
+    "SIMILAR": ["score"]
+  },
+  "_notes": [
+    "User.userId is a STRING, not integer — match with WHERE u.userId = '1' or {userId: $userId}.",
+    "Movie.released is an INTEGER year (e.g., 1994), not a date object.",
+    "Ratings: (u:User)-[:RATED {rating, timestamp}]->(m:Movie). Rating is a float 0.5–5.0.",
+    "QPE quantifier '+' is NOT supported on demo.neo4jlabs.com — use {1,} instead.",
+    "Use fulltext index 'movieTitles' via db.index.fulltext.queryNodes('movieTitles', $query) for title search.",
+    "Use vector index 'moviePlots' via db.index.vector.queryNodes('moviePlots', N, $embedding) for semantic search.",
+    "Collaborative filtering: find users who rated movies User X rated, then find movies those users rated that X hasn't."
+  ]
+}

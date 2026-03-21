@@ -1,0 +1,52 @@
+{
+  "labels": ["Organization", "Article", "Chunk", "IndustryCategory"],
+  "relationship_types": [
+    "HAS_SUBSIDIARY",
+    "HAS_SUPPLIER",
+    "HAS_BOARD_MEMBER",
+    "HAS_CATEGORY",
+    "MENTIONS",
+    "HAS_CHUNK",
+    "IN_INDUSTRY"
+  ],
+  "indexes": [
+    {
+      "name": "entity",
+      "type": "FULLTEXT",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Organization"],
+      "properties": ["name"]
+    },
+    {
+      "name": "news",
+      "type": "VECTOR",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Chunk"],
+      "properties": ["embedding"]
+    }
+  ],
+  "node_properties": {
+    "Organization": ["description", "name", "nbrEmployees", "revenue", "summary", "wikipediaUrl"],
+    "Article": ["date", "sentiment", "summary", "text", "title", "url"],
+    "Chunk": ["embedding", "text"],
+    "IndustryCategory": ["name"]
+  },
+  "rel_properties": {
+    "HAS_SUBSIDIARY": [],
+    "HAS_SUPPLIER": [],
+    "HAS_BOARD_MEMBER": [],
+    "HAS_CATEGORY": [],
+    "MENTIONS": [],
+    "HAS_CHUNK": [],
+    "IN_INDUSTRY": []
+  },
+  "_notes": [
+    "Companies are stored as :Organization nodes — NOT :Company.",
+    "Use fulltext index 'entity' via db.index.fulltext.queryNodes('entity', $query) for Organization name search.",
+    "Use vector index 'news' via db.index.vector.queryNodes('news', 5, $embedding) for semantic Chunk search.",
+    "QPE quantifier '+' is NOT supported on demo.neo4jlabs.com — use {1,} instead.",
+    "Ownership: (parent:Organization)-[:HAS_SUBSIDIARY]->(child:Organization)",
+    "Independent companies: NOT EXISTS { (o)<-[:HAS_SUBSIDIARY]-() }",
+    "Sentiment: Article.sentiment is a float in [-1, 1]. Positive > 0, negative < 0."
+  ]
+}

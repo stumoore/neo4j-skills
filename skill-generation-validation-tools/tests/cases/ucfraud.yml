@@ -1,3 +1,109 @@
+# ucfraud.yml — Test cases for neo4j-cypher-authoring-skill
+# NOTE: ucfraud-generated.yml (generator output) is gitignored.
+# Promote stubs from generated → this file after human review.
+# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
+#             max_runtime_ms = observed × 5.
+
+dataset:
+  name: ucfraud
+  database: neo4j
+  connection:
+    uri: bolt://localhost:7687
+    username: neo4j
+    password: password
+  description: |
+    A financial transaction fraud detection graph modelling bank customers, their accounts,
+    the transactions between accounts, and shared personal details (email, phone, address)
+    that indicate potential fraud rings. Use to detect suspicious transaction patterns, identify
+    fraud network clusters, trace money flows between accounts, and flag at-risk customers.
+  schema:
+    nodes:
+      Transaction:
+        description: "A financial transaction between two accounts"
+        properties:
+          transactionID: {type: STRING,  description: "Unique transaction identifier"}
+          amount:        {type: FLOAT,   min: 0.01, description: "Transaction amount in currency units"}
+          date:          {type: DATE,    sample: ["2025-01-15", "2025-06-30"]}
+          type:          {type: STRING,  values: [transfer, payment, withdrawal, deposit]}
+          status:        {type: STRING,  values: [completed, pending, failed, flagged]}
+      Account:
+        description: "A bank account belonging to a customer"
+        properties:
+          accountID:        {type: STRING}
+          accountNumber:    {type: STRING}
+          accountType:      {type: STRING,  values: [savings, checking, business, credit]}
+          balance:          {type: FLOAT,   description: "Current account balance"}
+          status:           {type: STRING,  values: [active, closed, frozen, suspended]}
+          louvainCommunity: {type: INTEGER, description: "Fraud ring cluster ID from Louvain community detection — same value = same suspected fraud cluster"}
+          pagerank:         {type: FLOAT,   description: "Network influence score (PageRank)"}
+      Customer:
+        description: "A bank customer who holds one or more accounts"
+        properties:
+          customerID:       {type: STRING}
+          name:             {type: STRING,  sample: ["John Smith", "Maria Garcia"], description: "Full name — searchable via fulltext index 'customerNames'"}
+          dateOfBirth:      {type: DATE}
+          fraudFlag:        {type: BOOLEAN, description: "true = customer is flagged as fraudulent"}
+          louvainCommunity: {type: INTEGER, description: "Fraud ring cluster ID — matches Account.louvainCommunity for linked accounts"}
+          betweenness:      {type: FLOAT,   description: "Betweenness centrality — high value = bridge node in fraud network"}
+          pagerank:         {type: FLOAT,   description: "Network influence score"}
+      Email:
+        properties:
+          email: {type: STRING}
+      Address:
+        properties:
+          address: {type: STRING}
+      PhoneNumber:
+        properties:
+          phoneNumber: {type: STRING}
+      Alert:
+        properties:
+          alertId:     {type: STRING}
+          description: {type: STRING}
+          severity:    {type: STRING, values: [low, medium, high, critical]}
+      AlertStatus:
+        properties:
+          status: {type: STRING, values: [open, investigating, closed, false_positive]}
+      Jurisdiction:
+        properties:
+          name: {type: STRING}
+      Country:
+        properties:
+          name: {type: STRING}
+    relationships:
+      - {type: SENT,               from: Account,    to: Transaction,  description: "Account that originated/sent the transaction"}
+      - {type: RECEIVED,           from: Transaction, to: Account,      description: "Account that received the transaction funds"}
+      - {type: TRANSACTED_TO,      from: Account,    to: Account,      description: "Direct transfer link between accounts (derived convenience relationship)"}
+      - {type: SHARED_IDENTIFIERS, from: Account,    to: Account,      description: "Accounts sharing email, phone, or address — key fraud ring signal"}
+      - {type: HAS_ACCOUNT,        from: Customer,   to: Account}
+      - {type: USES_EMAIL,         from: Customer,   to: Email}
+      - {type: USES_PHONE,         from: Customer,   to: PhoneNumber}
+      - {type: RESIDES_AT,         from: Customer,   to: Address}
+      - {type: LOCATED_IN,         from: Address,    to: Country}
+      - {type: HAS_ALERT,          from: Account,    to: Alert}
+      - {type: HAS_STATUS,         from: Alert,      to: AlertStatus}
+      - {type: ASSOCIATED_WITH,    from: Transaction, to: Jurisdiction}
+    indexes:
+      - name: customerNames
+        type: FULLTEXT
+        on: Customer(name)
+        call: "CALL db.index.fulltext.queryNodes('customerNames', $q) YIELD node, score"
+        description: "Full-text search on customer names"
+      - name: transactionTypes
+        type: FULLTEXT
+        on: "Transaction(type, status)"
+        call: "CALL db.index.fulltext.queryNodes('transactionTypes', $q) YIELD node, score"
+        description: "Full-text search on transaction type and status"
+  notes:
+    - "Money flow pattern: (sender:Account)-[:SENT]->(t:Transaction)-[:RECEIVED]->(receiver:Account)"
+    - "Direct transfer link: (a:Account)-[:TRANSACTED_TO]->(b:Account)"
+    - "Fraud rings: (a:Account)-[:SHARED_IDENTIFIERS]->{2,4}(b:Account)"
+    - "SEARCH clause IS AVAILABLE on this local Neo4j 2026.02.1 instance (vector only)"
+    - "Write queries ARE ALLOWED on this local database (MERGE, SET, CALL IN TRANSACTIONS)"
+    - "QPE {m,n} syntax is fully supported here — use for bounded fraud chain traversal"
+    - "SHORTEST N syntax is supported for shortest path queries"
+    - "Customer.fraudFlag = true means the customer has been flagged as fraudulent"
+    - "louvainCommunity groups accounts into suspected fraud clusters — same integer = same cluster"
+
 cases:
   # ---------------------------------------------------------------------------
   # BASIC (6 cases) — simple lookups, counts, property filters

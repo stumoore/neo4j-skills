@@ -207,6 +207,266 @@ def load_cases(
 
 
 # ---------------------------------------------------------------------------
+# Schema loading and formatting
+# ---------------------------------------------------------------------------
+
+
+def _format_schema_text(schema: dict[str, Any]) -> str:
+    """
+    Format a schema JSON dict as a compact, prompt-injectable text block.
+
+    The formatted block is injected into the Claude prompt so the model can
+    use exact label, relationship-type, property, and index names.
+    """
+    lines = ["=== DATABASE SCHEMA ==="]
+
+    labels = schema.get("labels", [])
+    rel_types = schema.get("relationship_types", [])
+    indexes = schema.get("indexes", [])
+    node_props = schema.get("node_properties", {})
+    rel_props = schema.get("rel_properties", {})
+    notes = schema.get("_notes", [])
+
+    if labels:
+        lines.append(f"Node Labels: {', '.join(labels)}")
+    if rel_types:
+        lines.append(f"Relationship Types: {', '.join(rel_types)}")
+
+    online_indexes = [i for i in indexes if i.get("state") == "ONLINE"]
+    if online_indexes:
+        lines.append("Indexes (ONLINE):")
+        for idx in online_indexes:
+            lots = ", ".join(idx.get("labelsOrTypes") or [])
+            props = ", ".join(idx.get("properties") or [])
+            lines.append(f"  {idx['name']} — {idx['type']} on {lots}({props})")
+
+    if node_props:
+        lines.append("Node Properties:")
+        for label, props in node_props.items():
+            if props:
+                lines.append(f"  {label}: {', '.join(props)}")
+
+    rel_with_props = {rt: ps for rt, ps in rel_props.items() if ps}
+    if rel_with_props:
+        lines.append("Relationship Properties:")
+        for rt, ps in rel_with_props.items():
+            lines.append(f"  {rt}: {', '.join(ps)}")
+
+    if notes:
+        lines.append("Notes:")
+        for note in notes:
+            lines.append(f"  - {note}")
+
+    lines.append("=========================")
+    return "\n".join(lines)
+
+
+def _load_domain_schema(domain: str, schema_dir: Path) -> Optional[str]:
+    """
+    Load a schema JSON file for a domain and return formatted schema text.
+
+    Looks for {schema_dir}/{domain}.json or {schema_dir}/{domain}-schema.json.
+    Returns None if no file is found.
+    """
+    candidates = [
+        schema_dir / f"{domain}.json",
+        schema_dir / f"{domain}-schema.json",
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                with open(p) as f:
+                    schema = json.load(f)
+                return _format_schema_text(schema)
+            except Exception as exc:
+                print(
+                    f"WARNING: could not load schema {p}: {exc}",
+                    file=sys.stderr,
+                )
+    return None
+
+
+def load_dataset_schemas(path: Path) -> dict[str, dict[str, Any]]:
+    """
+    Load dataset schema sections from YAML test case files.
+
+    Reads the `dataset:` top-level key from each YAML file in the given path.
+    Returns a dict mapping domain name → dataset dict.
+
+    This is the primary mechanism for schema injection — schema is co-located
+    with test cases in the same YAML file, not a separate schema directory.
+    """
+    files: list[Path] = []
+    if path.is_dir():
+        files = sorted(path.glob("*.yml")) + sorted(path.glob("*.yaml"))
+    elif path.is_file():
+        files = [path]
+    else:
+        return {}
+
+    schemas: dict[str, dict[str, Any]] = {}
+    for f in files:
+        if f.name.endswith("-generated.yml"):
+            continue  # Skip generator output stubs
+        try:
+            data = _load_yaml(f)
+        except Exception:
+            continue
+        dataset = data.get("dataset")
+        if dataset and isinstance(dataset, dict):
+            domain = str(dataset.get("name") or f.stem)
+            schemas[domain] = dataset
+    return schemas
+
+
+def _format_dataset_schema(dataset: dict[str, Any]) -> str:
+    """
+    Format a structured `dataset:` dict into a compact, prompt-injectable text block.
+
+    The formatted block tells the model exactly which labels, relationship types,
+    properties (with types, ranges, sample values), and indexes exist — so it
+    uses correct names and avoids hallucinating schema elements.
+    """
+    lines: list[str] = []
+
+    name = dataset.get("name", "unknown")
+    database = dataset.get("database", name)
+    description = str(dataset.get("description", "")).strip()
+    connection = dataset.get("connection", {})
+    schema = dataset.get("schema", {})
+    notes = dataset.get("notes", [])
+
+    lines.append(f"=== DATASET SCHEMA: {name} (database: {database}) ===")
+
+    if description:
+        lines.append(description)
+
+    if connection:
+        uri = connection.get("uri", "")
+        user = connection.get("username", "")
+        lines.append(f"Connection: {uri} | user: {user}")
+
+    # ── Nodes ──────────────────────────────────────────────────────────────────
+    nodes = schema.get("nodes", {})
+    if nodes:
+        lines.append("")
+        lines.append("NODES:")
+        for label, node_info in nodes.items():
+            if not isinstance(node_info, dict):
+                lines.append(f"  :{label}")
+                continue
+            node_desc = node_info.get("description", "")
+            node_note = node_info.get("note", "")
+            header = f"  :{label}"
+            if node_desc:
+                header += f"  — {node_desc}"
+            if node_note:
+                header += f"  [{node_note}]"
+            lines.append(header)
+
+            props = node_info.get("properties", {})
+            for prop, prop_info in props.items():
+                if not isinstance(prop_info, dict):
+                    lines.append(f"    {prop}")
+                    continue
+                ptype = prop_info.get("type", "")
+                parts = [f"    {prop}: {ptype}"]
+
+                # Dimensions for VECTOR
+                if "dimensions" in prop_info:
+                    parts.append(f"({prop_info['dimensions']} dims)")
+                # Numeric range
+                if "min" in prop_info and "max" in prop_info:
+                    parts.append(f"  range: {prop_info['min']}–{prop_info['max']}")
+                elif "min" in prop_info:
+                    parts.append(f"  min: {prop_info['min']}")
+                # Enum values
+                if "values" in prop_info:
+                    vals = ", ".join(f'"{v}"' for v in prop_info["values"])
+                    parts.append(f"  values: [{vals}]")
+                # Sample values
+                if "sample" in prop_info:
+                    samples = prop_info["sample"]
+                    if isinstance(samples, list) and samples:
+                        # Skip nested lists (e.g. LIST_STRING sample lists)
+                        flat = [s for s in samples if not isinstance(s, list)]
+                        if flat:
+                            sample_str = ", ".join(f'"{s}"' for s in flat[:3])
+                            parts.append(f"  e.g. {sample_str}")
+                # Description / note
+                if "description" in prop_info:
+                    parts.append(f"  — {prop_info['description']}")
+                if "note" in prop_info:
+                    parts.append(f"  [{prop_info['note']}]")
+
+                lines.append("".join(parts))
+
+    # ── Relationships ──────────────────────────────────────────────────────────
+    relationships = schema.get("relationships", [])
+    if relationships:
+        lines.append("")
+        lines.append("RELATIONSHIPS:")
+        for rel in relationships:
+            if not isinstance(rel, dict):
+                continue
+            rtype = rel.get("type", "?")
+            rfrom = rel.get("from", "?")
+            rto = rel.get("to", "?")
+            rdesc = rel.get("description", "")
+            rel_props = rel.get("properties", {})
+
+            line = f"  (:{rfrom})-[:{rtype}]->(:{rto})"
+            if rdesc:
+                line += f"  — {rdesc}"
+            lines.append(line)
+
+            if isinstance(rel_props, dict):
+                for prop, pinfo in rel_props.items():
+                    if isinstance(pinfo, dict):
+                        ptype = pinfo.get("type", "")
+                        pdesc = pinfo.get("description", "")
+                        pline = f"    .{prop}: {ptype}"
+                        if pdesc:
+                            pline += f" — {pdesc}"
+                        lines.append(pline)
+
+    # ── Indexes ────────────────────────────────────────────────────────────────
+    indexes = schema.get("indexes", [])
+    if indexes:
+        lines.append("")
+        lines.append("INDEXES:")
+        for idx in indexes:
+            if not isinstance(idx, dict):
+                continue
+            iname = idx.get("name", "?")
+            itype = idx.get("type", "?")
+            ion = idx.get("on", "?")
+            icall = idx.get("call", "")
+            idesc = idx.get("description", "")
+            idims = idx.get("dimensions")
+
+            line = f"  {iname} — {itype} on {ion}"
+            if idims:
+                line += f" [{idims} dims]"
+            if idesc:
+                line += f"  ({idesc})"
+            lines.append(line)
+            if icall:
+                lines.append(f"    Usage: {icall}")
+
+    # ── Notes ──────────────────────────────────────────────────────────────────
+    if notes:
+        lines.append("")
+        lines.append("IMPORTANT NOTES:")
+        for note in notes:
+            lines.append(f"  - {note}")
+
+    lines.append("")
+    lines.append("=========================")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Cypher extraction from model response
 # ---------------------------------------------------------------------------
 
@@ -215,13 +475,40 @@ _CYPHER_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
+_YAML_BLOCK_RE = re.compile(
+    r"```(?:yaml|YAML)\s*\n(.*?)```",
+    re.DOTALL,
+)
+
 
 def extract_cypher(response_text: str) -> Optional[str]:
     """
-    Extract the first ```cypher ... ``` code block from the model response.
+    Extract Cypher from a model response.
 
-    Returns the Cypher source string (stripped), or None if no block found.
+    Handles two output formats:
+    1. Dual YAML format (preferred): ```yaml block with query_literals key
+    2. Raw cypher block: ```cypher ... ``` (legacy / fallback)
+
+    For the harness we prefer query_literals (uses literal values, executable
+    without parameter injection). Falls back to query_parametrized if literals
+    absent. Finally falls back to raw ```cypher block.
+
+    Returns the Cypher source string (stripped), or None if not found.
     """
+    # Try YAML dual-format block first
+    yaml_m = _YAML_BLOCK_RE.search(response_text)
+    if yaml_m and _YAML_AVAILABLE:
+        try:
+            data = yaml.safe_load(yaml_m.group(1))
+            if isinstance(data, dict):
+                # Prefer literals for harness execution (no parameter injection needed)
+                for key in ("query_literals", "query_parametrized"):
+                    if key in data and data[key]:
+                        return str(data[key]).strip()
+        except Exception:
+            pass  # Fall through to raw cypher block
+
+    # Fallback: raw ```cypher block
     m = _CYPHER_BLOCK_RE.search(response_text)
     if m:
         return m.group(1).strip()
@@ -233,22 +520,110 @@ def extract_cypher(response_text: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-def _build_claude_prompt(tc: TestCase) -> str:
+def _collect_value_hints(dataset: dict[str, Any]) -> Optional[str]:
+    """
+    Collect sample/enum/range data from the dataset schema into a compact hint block.
+
+    Returns a formatted string of representative property values that Claude can use
+    to write executable queries (real IDs, names, codes, etc.) rather than placeholder
+    values.  Returns None when no schema value information is available.
+
+    This is supplementary context — all fields (values, sample, min, max) are optional.
+    """
+    schema = dataset.get("schema", {})
+    nodes = schema.get("nodes", {})
+    if not nodes:
+        return None
+
+    hint_lines: list[str] = []
+
+    for label, node_info in nodes.items():
+        if not isinstance(node_info, dict):
+            continue
+        props = node_info.get("properties", {})
+        label_hints: list[str] = []
+
+        for prop, pinfo in props.items():
+            if not isinstance(pinfo, dict):
+                continue
+            parts: list[str] = []
+
+            # Enum / allowed values
+            vals = pinfo.get("values")
+            if vals and isinstance(vals, list):
+                parts.append(f"values: {vals[:6]}")
+
+            # Sample instances
+            samples = pinfo.get("sample")
+            if samples and isinstance(samples, list):
+                flat = [s for s in samples if not isinstance(s, list)]
+                if flat:
+                    parts.append(f"e.g. {flat[:3]}")
+
+            # Numeric range
+            mn, mx = pinfo.get("min"), pinfo.get("max")
+            if mn is not None and mx is not None:
+                parts.append(f"range {mn}–{mx}")
+            elif mn is not None:
+                parts.append(f"min {mn}")
+            elif mx is not None:
+                parts.append(f"max {mx}")
+
+            if parts:
+                label_hints.append(f"  .{prop}: {'; '.join(parts)}")
+
+        if label_hints:
+            hint_lines.append(f":{label}")
+            hint_lines.extend(label_hints)
+
+    if not hint_lines:
+        return None
+
+    return (
+        "REPRESENTATIVE DATA VALUES (use these for concrete parameters):\n"
+        + "\n".join(hint_lines)
+    )
+
+
+def _build_claude_prompt(
+    tc: TestCase,
+    schema_text: Optional[str] = None,
+    value_hints: Optional[str] = None,
+) -> str:
     """
     Build the prompt sent to Claude Code for a test case.
 
-    Includes database context so the model can write targeted Cypher.
+    When schema_text is provided it is injected at the top of the prompt so
+    the model can use exact label, relationship-type, property, and index names.
+
+    When value_hints is provided (derived from schema sample/values/range data),
+    it is appended after the schema block so the model can use realistic concrete
+    values rather than placeholders — improving the executability of generated queries.
     """
-    lines = [
-        f"Database: {tc.database}",
-        f"Difficulty: {tc.difficulty}",
-    ]
+    lines: list[str] = []
+
+    # Schema context — injected first so the model sees it before the question
+    if schema_text:
+        lines.append(schema_text)
+        lines.append("")
+
+    # Value hints — real IDs, names, codes for concrete parameters
+    if value_hints:
+        lines.append(value_hints)
+        lines.append("")
+
+    lines.append(f"Database: {tc.database}")
+    lines.append(f"Difficulty: {tc.difficulty}")
     if tc.tags:
-        lines.append(f"Tags: {', '.join(tc.tags)}")
+        lines.append(f"Tags: {', '.join(str(t) for t in tc.tags)}")
     lines.append("")
     lines.append(
-        "Write a Cypher query to answer the following question. "
-        "Output ONLY a single ```cypher ... ``` code block — no explanation."
+        "Write a Cypher 25 query to answer the following question.\n"
+        "Return your answer as a ```yaml block with keys:\n"
+        "  query_literals:      (query with literal values, directly executable)\n"
+        "  query_parametrized:  (same query with $param placeholders)\n"
+        "  parameters:          (map of param name → value)\n"
+        "Also include a ```cypher block containing the literal query for quick reference."
     )
     lines.append("")
     lines.append(tc.question)
@@ -385,6 +760,8 @@ def run_case(
     *,
     dry_run: bool = False,
     claude_timeout_s: int = 120,
+    schema_text: Optional[str] = None,
+    value_hints: Optional[str] = None,
 ) -> TestCaseResult:
     """
     Run a single test case end-to-end.
@@ -414,7 +791,7 @@ def run_case(
         )
 
     # Step 1: invoke Claude Code headless
-    prompt = _build_claude_prompt(tc)
+    prompt = _build_claude_prompt(tc, schema_text=schema_text, value_hints=value_hints)
     response_text, invoke_error = invoke_claude(
         prompt, skill_name, timeout_s=claude_timeout_s
     )
@@ -543,12 +920,58 @@ def run_all(
     dry_run: bool = False,
     claude_timeout_s: int = 120,
     verbose: bool = False,
+    cases_path: Optional[Path] = None,
+    schema_dir: Optional[Path] = None,
 ) -> RunReport:
     """
     Run all test cases and return an aggregate RunReport.
+
+    Schema injection priority:
+    1. Primary: dataset: sections in YAML case files (co-located schema)
+    2. Override: external JSON/YAML files in schema_dir (for shared/externalized schema)
     """
     started_at = datetime.now(timezone.utc).isoformat()
     run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+
+    # Pre-load schema texts per domain (avoid reloading on every case)
+    # Primary source: dataset: sections in YAML case files (co-located schema)
+    # Override source: external JSON/YAML files in schema_dir (for shared/externalized schema)
+    schema_cache: dict[str, Optional[str]] = {}
+
+    # Value hints cache: domain → formatted sample/enum/range data for prompt injection
+    value_hints_cache: dict[str, Optional[str]] = {}
+
+    if cases_path:
+        dataset_schemas = load_dataset_schemas(cases_path)
+        for domain, dataset in dataset_schemas.items():
+            schema_cache[domain] = _format_dataset_schema(dataset)
+            value_hints_cache[domain] = _collect_value_hints(dataset)
+            if verbose:
+                hint_note = " (with value hints)" if value_hints_cache[domain] else ""
+                print(f"[schema] Loaded dataset schema for '{domain}' from YAML{hint_note}", flush=True)
+
+    if schema_dir:
+        unique_domains = {tc.domain for tc in cases}
+        for domain in unique_domains:
+            schema_text = _load_domain_schema(domain, schema_dir)
+            if schema_text:
+                schema_cache[domain] = schema_text  # Override with external schema
+                if verbose:
+                    print(f"[schema] Override schema for '{domain}' from {schema_dir}", flush=True)
+
+    # Warn about domains with no schema
+    warned_domains: set[str] = set()
+    for tc in cases:
+        if tc.domain not in warned_domains and (
+            tc.domain not in schema_cache or not schema_cache.get(tc.domain)
+        ):
+            print(
+                f"WARNING: No schema found for domain '{tc.domain}' — "
+                "add a dataset: section to the YAML file or use --schema-dir.",
+                file=sys.stderr,
+                flush=True,
+            )
+            warned_domains.add(tc.domain)
 
     results: list[TestCaseResult] = []
     passed = warned = failed = 0
@@ -560,10 +983,15 @@ def run_all(
                 flush=True,
             )
 
+        schema_text = schema_cache.get(tc.domain)
+        value_hints = value_hints_cache.get(tc.domain)
+
         result = run_case(
             tc, skill_name, driver,
             dry_run=dry_run,
             claude_timeout_s=claude_timeout_s,
+            schema_text=schema_text,
+            value_hints=value_hints,
         )
         results.append(result)
 
@@ -747,6 +1175,15 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Timeout in seconds for each Claude invocation (default: 120)",
     )
     parser.add_argument(
+        "--schema-dir",
+        default=None,
+        help=(
+            "Optional path to a directory of external schema JSON/YAML files ({domain}.json or {domain}-schema.json). "
+            "Overrides the dataset: section in YAML files. "
+            "Use when schema needs to be shared across multiple test files."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Print per-case progress to stdout",
@@ -800,6 +1237,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Set up Neo4j driver
     driver = _get_driver(args.neo4j_uri, args.neo4j_username, args.neo4j_password)
 
+    # External schema override directory (optional — schema lives in YAML files by default)
+    schema_dir: Optional[Path] = None
+    if getattr(args, "schema_dir", None):
+        schema_dir = Path(args.schema_dir)
+
     # Determine report output path
     if args.report:
         report_path = Path(args.report)
@@ -815,6 +1257,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         dry_run=False,
         claude_timeout_s=args.timeout,
         verbose=args.verbose,
+        cases_path=cases_path,
+        schema_dir=schema_dir,
     )
 
     # Print summary
