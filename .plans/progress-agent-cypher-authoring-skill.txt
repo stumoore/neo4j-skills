@@ -1118,3 +1118,27 @@ Key Decisions:
 - All acceptance criteria met; expert tier at 50% is acknowledged (ucfraud data sparsity + edge cases documented in task-035)
 
 Next Task: task-034 (parallel workers flag) or task-029 (SEARCH clause GA update) — both pending
+
+================================================================================
+TASK-034: Add parallel test case execution to runner (--workers flag)
+Date: 2026-03-21T23:30:00Z
+================================================================================
+
+Summary:
+The --workers N flag and full parallel execution implementation were already present
+in runner.py from a previous session. Verified all acceptance criteria against the
+existing code: --workers N flag (default 1), ThreadPoolExecutor concurrency,
+_print_lock for atomic output, results sorted by submission index, and dry-run
+exiting before run_all() so workers is ignored. No code changes were needed.
+All smoke tests (extraction, validator, reporter) pass.
+
+Files Changed:
+- .plans/tasks-agent-cypher-authoring-skill.yml (status: pending → completed)
+
+Key Decisions:
+- Implementation was already complete in runner.py (lines 22-35, 1119-1191, 1371-1380)
+- concurrent.futures.ThreadPoolExecutor used (not asyncio) — correct for subprocess-based parallelism
+- _print_lock threading.Lock at module level prevents output interleaving across workers
+- Results ordered by original submission index (not completion order) for deterministic reports
+
+Next Task: task-029 (SEARCH clause GA update in SKILL.md) or task-035 (critical skill review)

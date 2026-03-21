@@ -661,7 +661,7 @@ tasks:
       prevent garbled output. Database connections must be created per-worker (or pooled).
       Default remains 1 (serial). Worker count capped at min(N, len(cases)).
       Progress line format: "[completed/total] id (difficulty) — question[:60]"
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -670,7 +670,7 @@ tasks:
       - "Output lines are not interleaved — each case's output appears atomically"
       - "Results are identical to serial run (same verdicts per case)"
       - "Dry-run mode ignores --workers (no concurrency needed)"
-    completed_at: null
+    completed_at: "2026-03-21T23:30:00Z"
 
   - id: task-035
     title: "Critical skill review and improvement pass based on harness failures"
