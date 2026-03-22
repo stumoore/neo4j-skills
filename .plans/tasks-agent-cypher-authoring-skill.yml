@@ -699,13 +699,17 @@ tasks:
   - id: task-036
     title: "Expand test coverage to 10 database domains"
     description: |
-      Add 7 new database domains to reach 10 total, starting with available demo.neo4jlabs.com
-      databases: northwind (retail ERP), stackoverflow (Q&A tag network), movies (cast/crew),
-      airports (transportation). Confirm available databases and credentials by connecting to
-      demo.neo4jlabs.com. For each new domain: (1) inspect schema and add a dataset: section
-      to a new YAML case file; (2) author ≥ 25 test cases across all 5 difficulty tiers; (3)
-      run the harness to validate. Each domain must demonstrate a distinct graph shape not
-      already covered. Document all 10 domains in the PRD domain catalogue.
+      Add new database domains beyond the existing 4 (companies, recommendations, ucfraud,
+      stackoverflow). stackoverflow.yml is already done — pick from the remaining confirmed
+      demo.neo4jlabs.com databases (credentials = db_name/db_name):
+        arxiv (citations/authors), goodreads (books/reviews), legalcontracts (contract graph),
+        patientjourney (healthcare), retail (H&M Kaggle dataset), twitter (social graph),
+        ucsupplychainpharma (pharma supply chain), ucnetwork (network management), northwind
+        (retail ERP — well-known, fine to include). airports does NOT exist on demo server.
+      For each new domain: (1) connect and inspect schema; (2) add a YAML case file with
+      dataset: section; (3) author ≥ 25 test cases across all 5 difficulty tiers; (4) run
+      harness to validate. Each domain should demonstrate a structurally distinct graph shape.
+      Do NOT use the movies database — recommendations already covers movies.
     status: pending
     dependencies:
       - task-030

@@ -1,0 +1,444 @@
+# stackoverflow.yml — Test cases for neo4j-cypher-authoring-skill
+# NOTE: stackoverflow-generated.yml (generator output) is gitignored.
+# Promote stubs from generated → this file after human review.
+# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
+#             max_runtime_ms = observed × 5.
+
+database:
+  uri: neo4j+s://demo.neo4jlabs.com:7687
+  username: stackoverflow
+  database: stackoverflow
+  neo4j_version: "2026.01"
+  cypher_version: "25"
+  read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
+
+dataset:
+  name: stackoverflow
+  description: |
+    A Q&A knowledge graph containing Stack Overflow questions, answers, users, and programming
+    language tags. A large dataset with ~41M posts, ~8.9M users, and ~52K tags. Use to explore
+    expert knowledge networks, popular programming topics, answer quality, user reputation
+    patterns, and tag co-occurrence relationships.
+  schema:
+    nodes:
+      Question:
+        description: "A question post on Stack Overflow — also has the Post label"
+        note: "Questions also have the Post label: (:Post:Question). Always use :Question for specificity."
+        properties:
+          id:        {type: INTEGER, description: "Unique post identifier"}
+          title:     {type: STRING,  sample: ["How do I calculate someone's age in C#?", "Convert Decimal to Double?"]}
+          score:     {type: INTEGER, description: "Net upvotes minus downvotes — can be negative"}
+          views:     {type: INTEGER, description: "Total view count"}
+          answers:   {type: INTEGER, description: "Number of answers"}
+          comments:  {type: INTEGER, description: "Number of comments"}
+          favorites: {type: INTEGER, description: "Number of times bookmarked"}
+          createdAt: {type: DATETIME, sample: ["2008-07-31T21:42:52Z"], description: "DateTime of post creation"}
+          updatedAt: {type: DATETIME, description: "DateTime of last edit"}
+      Answer:
+        description: "An answer post — also has the Post label: (:Post:Answer)"
+        note: "Answers also have the Post label. Use :Answer for specificity."
+        properties:
+          id:    {type: INTEGER}
+          score: {type: INTEGER, description: "Net upvote score of the answer"}
+      User:
+        description: "A Stack Overflow user account"
+        properties:
+          id:         {type: INTEGER}
+          name:       {type: STRING, description: "Display name"}
+          reputation: {type: INTEGER, min: 1, description: "Reputation score — higher = more trusted"}
+          views:      {type: INTEGER, description: "Number of profile views"}
+          upvotes:    {type: INTEGER}
+          age:        {type: INTEGER, description: "User-reported age (sparse)"}
+          location:   {type: STRING, description: "User-reported location (sparse)"}
+          accountId:  {type: INTEGER}
+          createdAt:  {type: DATETIME, description: "Account creation date"}
+      Tag:
+        description: "A programming topic tag"
+        properties:
+          name:  {type: STRING, sample: ["javascript", "python", "java", "c#", "php", "html", "css"]}
+          count: {type: INTEGER, description: "Total number of questions using this tag"}
+    relationships:
+      - type: POSTED
+        from: User
+        to: Question
+        description: "User posted this question"
+      - type: ANSWERED
+        from: Answer
+        to: Question
+        description: "This answer responds to the question"
+      - type: ACCEPTED
+        from: Question
+        to: Answer
+        description: "This answer was accepted as the best answer by the question author"
+      - type: TAGGED
+        from: Question
+        to: Tag
+        description: "Question is tagged with this topic"
+      - type: SIMILAR
+        from: Tag
+        to: Tag
+        description: "Two tags frequently co-occur on the same questions"
+    indexes:
+      - name: constraint_8a34654d
+        type: RANGE
+        on: Post(id)
+      - name: constraint_47e7f15d
+        type: RANGE
+        on: User(id)
+      - name: constraint_64b1b1cf
+        type: RANGE
+        on: Tag(name)
+      - name: index_628c515a
+        type: RANGE
+        on: Question(score)
+      - name: index_d3930a6c
+        type: RANGE
+        on: Question(views)
+      - name: index_4cda2ad1
+        type: RANGE
+        on: User(reputation)
+  notes:
+    - "Very large DB: ~41M posts, ~8.9M users — always use indexed properties in WHERE and add LIMIT"
+    - "Questions have dual label (:Post:Question) — use :Question for matching questions specifically"
+    - "Answers have dual label (:Post:Answer) — use :Answer for specificity"
+    - "Tag.count is denormalized (pre-computed) — faster than counting via TAGGED relationships"
+    - "Demo DB is read-only — write cases SKIP"
+    - "QPE '+' quantifier NOT supported on demo server — use {1,} instead"
+    - "No vector or fulltext index in this database"
+    - "LIMIT is mandatory for most queries on this DB to avoid full scans on 41M nodes"
+
+cases:
+
+  # ─── BASIC (6 cases) ─────────────────────────────────────────────────────────
+
+  - id: stackoverflow-basic-001
+    question: "How many questions are in the database?"
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, aggregation, count]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: stackoverflow-basic-002
+    question: "What are the 10 most popular programming tags by total question count?"
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, order-by, limit, tag, count]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: stackoverflow-basic-003
+    question: "Show the 10 highest-scoring questions on Stack Overflow."
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, order-by, limit, score]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: stackoverflow-basic-004
+    question: "Who are the 10 users with the highest reputation on Stack Overflow?"
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, order-by, limit, user, reputation]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: stackoverflow-basic-005
+    question: "How many questions about JavaScript are in the database?"
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, filter, aggregation, count, tag]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+
+  - id: stackoverflow-basic-006
+    question: "What is the average score of all questions in the database?"
+    database: stackoverflow
+    difficulty: basic
+    tags: [match, aggregation, avg, score]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+
+  # ─── INTERMEDIATE (6 cases) ──────────────────────────────────────────────────
+
+  - id: stackoverflow-intermediate-001
+    question: "Which users have asked the most questions? Show the top 10 questioners by question count."
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, aggregation, count, order-by, limit, user]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  - id: stackoverflow-intermediate-002
+    question: "What percentage of questions on JavaScript have an accepted answer?"
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, aggregation, filter, tag, accepted, percentage]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  - id: stackoverflow-intermediate-003
+    question: "What are the tags most similar to 'javascript' — what tags are most frequently tagged alongside it on the same questions? Show the top 10 co-occurring tags."
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, similar, tag, co-occurrence, order-by, limit]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: stackoverflow-intermediate-004
+    question: "Which questions have both the 'python' and 'machine-learning' tags? Show the top 10 by score."
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, filter, multi-tag, order-by, limit]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  - id: stackoverflow-intermediate-005
+    question: "For users with over 10,000 reputation, what is the average number of questions they have posted?"
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, filter, aggregation, avg, reputation, user]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  - id: stackoverflow-intermediate-006
+    question: "Which questions asked in 2012 have the most answers? Show the top 10 by answer count."
+    database: stackoverflow
+    difficulty: intermediate
+    tags: [match, filter, order-by, limit, answers, date]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  # ─── ADVANCED (6 cases) ──────────────────────────────────────────────────────
+
+  - id: stackoverflow-advanced-001
+    question: "Which programming tags are most closely connected in the tag similarity network — tags that are within 2 similarity hops of each other? Starting from the 'python' tag, show all tags reachable within 2 hops."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [qpe, match, tag, similar, traversal]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+
+  - id: stackoverflow-advanced-002
+    question: "Find the questions that are so highly viewed but still have no accepted answer — questions with more than 10,000 views and no accepted answer. Show the top 20 by views."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [match, filter, not-exists, order-by, limit, views, accepted]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-advanced-003
+    question: "Who are the expert users for the 'java' tag — users who have posted questions tagged with 'java' that received accepted answers? Show the top 10 by total accepted-answer score across their java questions."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [match, filter, aggregation, accepted, tag, user, score]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-advanced-004
+    question: "Which tags have seen the biggest growth in question volume between 2010 and 2015? Show the top 10 tags by total questions posted during that period."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [match, filter, aggregation, tag, date-range, count]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-advanced-005
+    question: "For the top 5 most-used tags, show the distribution of question scores — the percentage of questions in each score bucket: negative, 0, 1-5, 6-20, 21+."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [match, aggregation, case-when, tag, score, distribution]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-advanced-006
+    question: "Find users who are active across multiple programming ecosystems — users who have posted questions tagged with both a frontend tag ('javascript' or 'html' or 'css') and a backend tag ('python' or 'java' or 'c#'). Show the top 10 by total question count."
+    database: stackoverflow
+    difficulty: advanced
+    tags: [match, filter, collect, user, multi-tag, intersection]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 20000000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 120000
+    is_write_query: false
+
+  # ─── COMPLEX (4 cases) ───────────────────────────────────────────────────────
+
+  - id: stackoverflow-complex-001
+    question: "What is the tag similarity cluster for 'machine-learning'? Find all tags reachable from 'machine-learning' through the SIMILAR relationship within 3 hops, and for each tag show its question count and how many hops away it is."
+    database: stackoverflow
+    difficulty: complex
+    tags: [qpe, bounded-quantifier, similar, tag, traversal, shortest]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-complex-002
+    question: "Build a leaderboard of the most valuable contributors to the Python ecosystem — users whose Python-tagged questions have collectively received the most views. Include their reputation tier (expert if >50k, senior if >10k, regular if >1k, new otherwise)."
+    database: stackoverflow
+    difficulty: complex
+    tags: [match, aggregation, case-when, reputation, tag, views, order-by]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 10000000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 120000
+    is_write_query: false
+
+  - id: stackoverflow-complex-003
+    question: "Find the most 'viral' questions — questions that have both a very high view count (over 100,000 views) and a very low question score (under 10 points). These are questions that went viral but were considered low quality. Show the top 20 with their tags."
+    database: stackoverflow
+    difficulty: complex
+    tags: [match, filter, collect, tag, views, score, viral]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 20000000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 120000
+    is_write_query: false
+
+  - id: stackoverflow-complex-004
+    question: "For each year from 2009 to 2015, what were the top 3 most-used tags? Show year, tag name, and question count in that year."
+    database: stackoverflow
+    difficulty: complex
+    tags: [match, aggregation, collect, tag, date, ranking, union]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 20000000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 120000
+    is_write_query: false
+
+  # ─── EXPERT (5 cases) ────────────────────────────────────────────────────────
+
+  - id: stackoverflow-expert-001
+    question: "Find the shortest path in the tag similarity network between 'python' and 'javascript'. Show all tags on the path."
+    database: stackoverflow
+    difficulty: expert
+    tags: [shortest-path, qpe, tag, similar]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-expert-002
+    question: "Find all cycles of exactly 3 tags in the SIMILAR tag network — groups of 3 tags where tag A is similar to B, B to C, and C to A. Show the first 10 such triangles."
+    database: stackoverflow
+    difficulty: expert
+    tags: [match, cycle, triangle, tag, similar, qpe]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 2000000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 120000
+    is_write_query: false
+
+  - id: stackoverflow-expert-003
+    question: "Which tags form the 'backbone' of the tag similarity network — find the 10 tags with the highest number of SIMILAR connections (degree centrality in the tag graph)?"
+    database: stackoverflow
+    difficulty: expert
+    tags: [match, aggregation, count, order-by, tag, centrality]
+    domain: stackoverflow
+    min_results: 10
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+
+  - id: stackoverflow-expert-004
+    question: "Find the questions that have been answered by users with more than 100,000 reputation AND the answer was accepted AND the question has more than 50,000 views. These are the 'landmark' questions answered by true experts. Show the top 20 by views."
+    database: stackoverflow
+    difficulty: expert
+    tags: [match, filter, accepted, reputation, views, order-by, limit]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 50000000
+    max_allocated_memory_bytes: 209715200
+    max_runtime_ms: 180000
+    is_write_query: false
+
+  - id: stackoverflow-expert-005
+    question: "Find user clusters: groups of 3 or more users who have all asked questions with the same set of at least 3 common tags. Show up to 10 such user clusters with their shared tags."
+    database: stackoverflow
+    difficulty: expert
+    tags: [match, aggregation, collect, filter, intersection, user, tag, cluster]
+    domain: stackoverflow
+    min_results: 1
+    max_db_hits: 50000000
+    max_allocated_memory_bytes: 209715200
+    max_runtime_ms: 180000
+    is_write_query: false

@@ -1,0 +1,37 @@
+{
+  "labels": ["Post", "Question", "Answer", "User", "Tag"],
+  "relationship_types": ["POSTED", "ANSWERED", "ACCEPTED", "TAGGED", "SIMILAR"],
+  "indexes": [
+    {"name": "constraint_8a34654d", "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["Post"],     "properties": ["id"]},
+    {"name": "constraint_47e7f15d", "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["User"],     "properties": ["id"]},
+    {"name": "constraint_64b1b1cf", "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["Tag"],      "properties": ["name"]},
+    {"name": "index_628c515a",      "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["Question"], "properties": ["score"]},
+    {"name": "index_d3930a6c",      "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["Question"], "properties": ["views"]},
+    {"name": "index_4cda2ad1",      "type": "RANGE", "state": "ONLINE", "labelsOrTypes": ["User"],     "properties": ["reputation"]}
+  ],
+  "node_properties": {
+    "Question": ["id", "title", "score", "views", "answers", "comments", "favorites", "createdAt", "updatedAt"],
+    "Answer":   ["id", "score"],
+    "User":     ["id", "name", "reputation", "views", "upvotes", "age", "location", "accountId", "createdAt"],
+    "Tag":      ["name", "count"]
+  },
+  "rel_properties": {
+    "POSTED":   [],
+    "ANSWERED": [],
+    "ACCEPTED": [],
+    "TAGGED":   [],
+    "SIMILAR":  []
+  },
+  "_notes": [
+    "Very large DB: ~41M posts, ~8.9M users, ~52K tags — ALWAYS add LIMIT to avoid full scans.",
+    "Questions have dual label (:Post:Question) — use :Question for matching questions specifically.",
+    "Answers have dual label (:Post:Answer) — use :Answer for specificity.",
+    "Tag.count is denormalized pre-computed total — faster than counting TAGGED relationships.",
+    "ACCEPTED relationship direction: (:Question)-[:ACCEPTED]->(:Answer).",
+    "ANSWERED relationship direction: (:Answer)-[:ANSWERED]->(:Question).",
+    "SIMILAR is between Tag nodes — co-occurrence network.",
+    "QPE quantifier '+' is NOT supported on demo.neo4jlabs.com — use {1,} instead.",
+    "No vector or fulltext index in this database.",
+    "Question.createdAt is a DateTime object — use datetime() for comparisons."
+  ]
+}
