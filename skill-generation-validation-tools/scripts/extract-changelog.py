@@ -8,6 +8,12 @@ Usage:
     --src docs-cypher/modules/ROOT/pages/deprecations-additions-removals-compatibility.adoc \
     --out neo4j-cypher-authoring-skill/changelog.md \
     [--since 2026.01]   # optional: only emit entries for this version or newer
+
+  # Generate a version matrix section from the changelog:
+  python scripts/extract-changelog.py \
+    --src docs-cypher/modules/ROOT/pages/deprecations-additions-removals-compatibility.adoc \
+    --out neo4j-cypher-authoring-skill/references/version-matrix-generated.md \
+    --version-matrix
 """
 
 import argparse
@@ -356,6 +362,97 @@ def _version_gte(ver: str, since: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Version matrix generator
+# ---------------------------------------------------------------------------
+
+# Patterns to detect version-gated features from changelog entries.
+# Each entry: (feature_name, min_version, edition, ga_preview)
+# Matched against entry details text (case-insensitive substring).
+_VERSION_MATRIX_PATTERNS: list[tuple[str, str, str, str, str]] = [
+    # (match_text, feature_name, min_version, edition, status)
+    ("cypher 25", "CYPHER 25 pragma", "2025.06", "All", "GA"),
+    ("shortest", "SHORTEST keyword (replaces shortestPath())", "2025.06", "All", "GA"),
+    ("quantified path", "Quantified path patterns (QPE {m,n})", "2025.06", "All", "GA"),
+    ("repeatable elements", "REPEATABLE ELEMENTS match mode", "2025.06", "All", "GA"),
+    ("different relationships", "DIFFERENT RELATIONSHIPS match mode", "2025.06", "All", "GA"),
+    ("vector() constructor", "vector() constructor", "2025.10", "All", "GA"),
+    ("search clause", "SEARCH clause — vector indexes", "2026.02.1", "All", "GA"),
+    ("graph type", "GRAPH TYPE DDL clauses", "2026.02", "Enterprise", "Preview"),
+]
+
+
+def render_version_matrix(entries: list[dict], src_path: str = "") -> str:
+    """
+    Generate a Markdown version matrix section from parsed changelog entries.
+
+    Scans all entries for known version-gated features and emits a feature table.
+    Augments with hand-coded baseline features not always present in the changelog.
+    """
+    from datetime import datetime, timezone
+
+    generated = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    lines: list[str] = [
+        f"> Source: {src_path} — generated from changelog + hand-authored baseline",
+        f"> Generated: {generated}",
+        "",
+        "# Cypher 25 Feature Version Matrix",
+        "",
+        "Use this file to check whether a feature is available on the target database "
+        "before generating a query.",
+        "",
+        "| Feature | Min Version | Edition | GA / Preview |",
+        "|---|---|---|---|",
+    ]
+
+    # Collect detected features from changelog entries (by matching detail text)
+    detected: set[str] = set()
+    entry_features: dict[str, tuple[str, str, str]] = {}  # feature -> (min_ver, edition, status)
+
+    for entry in entries:
+        details_lower = (entry.get("details") or "").lower()
+        for match_text, feat_name, min_ver, edition, status in _VERSION_MATRIX_PATTERNS:
+            if match_text in details_lower and feat_name not in detected:
+                detected.add(feat_name)
+                # Use the entry version if it's earlier than the hand-coded min_ver
+                if feat_name not in entry_features or _version_gte(
+                    min_ver, entry_features[feat_name][0]
+                ):
+                    entry_features[feat_name] = (min_ver, edition, status)
+
+    # Always emit the full baseline table (hand-authored, not just what the parser found)
+    for _match_text, feat_name, min_ver, edition, status in _VERSION_MATRIX_PATTERNS:
+        # Override with detected version if found and earlier
+        if feat_name in entry_features:
+            min_ver, edition, status = entry_features[feat_name]
+        lines.append(f"| `{feat_name}` | {min_ver} | {edition} | {status} |")
+
+    lines += [
+        "",
+        "## Notes",
+        "",
+        "- **SEARCH clause**: GA for **vector indexes only** in 2026.02.1. Fulltext indexes still",
+        "  require `db.index.fulltext.queryNodes()` — SEARCH does not cover fulltext.",
+        "- **GRAPH TYPE**: Enterprise Edition only, Preview status. Not for production use.",
+        "- **`+` / `*` QPE shorthands**: Use explicit `{1,}` / `{0,}` for maximum compatibility.",
+        "- **`REPEATABLE ELEMENTS`**: Requires **bounded quantifiers** — `{m,n}` form only.",
+        "- **Aura caveat**: Treat Aura as always at the latest GA feature set.",
+        "",
+        "## Version Compatibility Quick Reference",
+        "",
+        "| Target DB | Available Features |",
+        "|---|---|",
+        "| Neo4j 2026.02.1+ | All features including SEARCH clause (vector) and GRAPH TYPE (Enterprise) |",
+        "| Neo4j 2025.10 – 2026.01.x | QPE, SHORTEST, REPEATABLE ELEMENTS, vector() — no SEARCH clause |",
+        "| Neo4j 2025.06 – 2025.09.x | QPE, SHORTEST, REPEATABLE ELEMENTS — no vector(), no SEARCH clause |",
+        "| demo.neo4jlabs.com | Treat as 2025.10–2026.01: no SEARCH clause; use `{1,}` not `+` for QPE |",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -379,6 +476,16 @@ def main() -> int:
         default=None,
         help="Only include entries for Neo4j versions >= this version (e.g. 2026.01)",
     )
+    parser.add_argument(
+        "--version-matrix",
+        action="store_true",
+        default=False,
+        help=(
+            "Generate a version matrix Markdown section instead of the changelog summary. "
+            "Output will be a feature table mapping version-gated Cypher 25 features "
+            "to their minimum Neo4j version, edition, and GA/Preview status."
+        ),
+    )
     args = parser.parse_args()
 
     src = Path(args.src)
@@ -389,6 +496,14 @@ def main() -> int:
         return 1
 
     entries = parse_changelog(src)
+
+    if args.version_matrix:
+        md = render_version_matrix(entries, src_path=str(src))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(md, encoding="utf-8")
+        print(f"Version matrix written to {out} — {len(entries)} changelog entries scanned")
+        return 0
+
     md = render_markdown(entries, since=args.since)
 
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -279,6 +279,35 @@ Index usage can be enforced when Cypher uses a suboptimal index, or when more th
 
 ---
 
+# SEARCH clause (vector index query)
+
+> **Available: Neo4j 2026.02.1+** — GA for vector indexes only. Not available on older versions.
+> For pre-2026.02 databases, use `db.index.vector.queryNodes()` instead.
+> Fulltext indexes do NOT support SEARCH clause — always use `db.index.fulltext.queryNodes()`.
+
+Vector query procedure (works on all versions):
+
+```cypher
+CYPHER 25
+CALL db.index.vector.queryNodes('moviePlotsEmbedding', 10, $embedding)
+YIELD node, score
+RETURN node.title, score
+ORDER BY score DESC
+```
+
+Fulltext query procedure (all versions — SEARCH clause never covers fulltext):
+
+```cypher
+CYPHER 25
+CALL db.index.fulltext.queryNodes('entityIndex', $searchTerm)
+YIELD node, score
+RETURN node.name, score
+ORDER BY score DESC
+LIMIT 10
+```
+
+---
+
 # Syntax
 ## CREATE INDEX
 

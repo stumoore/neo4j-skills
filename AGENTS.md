@@ -116,6 +116,7 @@ The script generates **first drafts** for L3 reference files (not final output).
 - Only `[source, cypher]` and `[source, role=noheader]` blocks are extracted; `[source, csv]`, `[source, javascript]` etc. are skipped but still consumed.
 - `--since VERSION` filters rendered output AND the summary count. Useful in GH Actions to report only what changed in the new submodule pin.
 - Empty sections correctly render `_No entries._` (not missing or crash).
+- `--version-matrix` flag generates a Markdown version matrix from parsed entries (8 baseline features, hand-coded; changelog scan augments but doesn't override). Run: `python3 scripts/extract-changelog.py --src ... --out ... --version-matrix`
 
 ## Version-Conditional Test Cases (min_version field)
 

@@ -159,4 +159,36 @@ Similarly, to extract the `departs` and `arrives` properties of each `Stop`, var
 In this example of matching services between `Denmark Hill` and `Clapham Junction`, the variables `l` and `m` are declared to match the `Stops` and `r` is declared to match the relationships.
 The variable origin only matches the first `Stop` in the path:
 
+---
+
+# Match Modes
+
+> **Available: Neo4j 2025.06+** — `REPEATABLE ELEMENTS` and `DIFFERENT RELATIONSHIPS` require Cypher 25.
+
+Match modes control how QPE traversal handles repeated elements. They appear between `MATCH` and the pattern:
+
+```cypher
+CYPHER 25
+MATCH REPEATABLE ELEMENTS (a:Station) (()-[:NEXT]-(){1,3}) (b:Station)
+RETURN a.name, b.name
+```
+
+| Match Mode | Semantics |
+|---|---|
+| `DIFFERENT RELATIONSHIPS` (default) | No relationship is traversed more than once per path |
+| `REPEATABLE ELEMENTS` | Nodes and relationships may be revisited; requires **bounded quantifiers** (`{m,n}` only — not `+`, `*`, `{1,}`) |
+| `ANY` | Deprecated alias; use `REPEATABLE ELEMENTS` |
+| `ALL` | Deprecated alias; use `DIFFERENT RELATIONSHIPS` |
+
+**Critical**: `REPEATABLE ELEMENTS` REQUIRES bounded quantifiers. The following will fail:
+
+```cypher
+-- DON'T: unbounded quantifier with REPEATABLE ELEMENTS
+MATCH REPEATABLE ELEMENTS (a) (()-[:REL]-(){1,}) (b)  -- {1,} is unbounded — SYNTAX ERROR
+
+-- DO: bounded quantifier only
+MATCH REPEATABLE ELEMENTS (a:Person) (()-[:KNOWS]-(){1,5}) (b:Person)
+RETURN a.name, b.name
+```
+
 > **Note**: Content truncated to token budget.

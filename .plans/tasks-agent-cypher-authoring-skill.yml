@@ -972,7 +972,7 @@ tasks:
       deprecations-additions-removals-compatibility.adoc. Add inline version callouts
       to cypher25-indexes.md (SEARCH), cypher25-patterns.md (REPEATABLE ELEMENTS),
       and the new cypher25-graph-types.md (GRAPH TYPE).
-    status: pending
+    status: completed
     dependencies:
       - task-011
       - task-004
@@ -984,7 +984,7 @@ tasks:
       - "cypher25-indexes.md SEARCH section has '> Available: Neo4j 2026.02.1+' callout"
       - "cypher25-patterns.md REPEATABLE ELEMENTS section has '> Available: Neo4j 2025.06+' callout"
       - "version-matrix.md is ≤ 2,000 tokens and has a Source: header"
-    completed_at: null
+    completed_at: "2026-03-22T13:00:00Z"
 
   - id: task-047
     title: "Add version-aware query generation protocol to SKILL.md and Autonomous Operation Protocol"

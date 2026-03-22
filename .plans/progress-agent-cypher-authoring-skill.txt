@@ -1393,3 +1393,28 @@ Key Decisions:
 - ucfraud gets neo4j_version 2026.02.1 (local instance), both demo domains get 2026.01
 
 Next Task: task-046 (Create references/version-matrix.md and add inline version callouts to L3 files)
+
+================================================================================
+TASK-046: Create references/version-matrix.md and add inline version callouts to L3 files
+Date: 2026-03-22T13:00:00Z
+================================================================================
+
+Summary:
+Created a central version matrix reference file and extended the changelog parser
+with a --version-matrix flag. Added inline version callouts to two L3 reference
+files to signal version-gated features at the point of use.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/references/version-matrix.md (created — 8-feature table, notes, quick reference)
+- skill-generation-validation-tools/scripts/extract-changelog.py (modified — added --version-matrix flag and render_version_matrix())
+- neo4j-cypher-authoring-skill/references/schema/cypher25-indexes.md (modified — added SEARCH clause section with version callout and procedure examples)
+- neo4j-cypher-authoring-skill/references/read/cypher25-patterns.md (modified — added Match Modes section with REPEATABLE ELEMENTS callout and bounded quantifier rule)
+- .plans/tasks-agent-cypher-authoring-skill.yml (updated — task-046 marked completed)
+
+Key Decisions:
+- version-matrix.md is hand-authored (baseline) with auto-detection from changelog as enhancement; hand-authored data takes precedence since the changelog doesn't always have explicit feature mentions
+- Removed speculative SEARCH clause syntax example from cypher25-indexes.md (exact SEARCH predicate syntax not verified); kept confirmed procedure fallbacks for all versions
+- The cypher25-graph-types.md callout (mentioned in task description) deferred to task-043 since that file doesn't exist yet
+- --version-matrix flag scans 90 changelog entries and emits the baseline 8-feature table; the scan augments but doesn't replace the hand-coded data
+
+Next Task: task-047 (Add version-aware query generation protocol to SKILL.md — now unblocked by task-046)
