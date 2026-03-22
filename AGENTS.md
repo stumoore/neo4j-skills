@@ -40,7 +40,8 @@
 - Submodule SHA detection: `docs-cypher/modules/ROOT/pages` is 3 parents up from the submodule root (`pages` → `ROOT` → `modules` → `docs-cypher`).
 - Token budget: reserve ~20 tokens headroom for the truncation notice itself.
 - L3 reference files for docs-cypher are better authored manually, not auto-extracted: source docs are verbose (setup graphs, narrative prose) and hit the token budget before covering all required content. The extraction script is better suited for docs-cheat-sheet which is already concise.
-- DIFFERENT RELATIONSHIPS and REPEATABLE ELEMENTS match modes only available since Neo4j 2025.06 / Cypher 25. REPEATABLE ELEMENTS requires bounded quantifiers (no +, *, {1,}).
+- DIFFERENT RELATIONSHIPS and REPEATABLE ELEMENTS match modes only available since Neo4j 2025.06 / Cypher 25. REPEATABLE ELEMENTS requires bounded quantifiers (no +, *, {1,}). Use REPEATABLE ELEMENTS when counting all walks (including cyclic); use DIFFERENT RELATIONSHIPS (default) for acyclic path finding.
+- `+` / `*` QPE shorthands: supported on local Neo4j 2026.02.x but NOT on demo.neo4jlabs.com (2026.02) — always use `{1,}` / `{0,}` for demo/unknown targets.
 - `SHORTEST` keyword replaces deprecated `shortestPath()` / `allShortestPaths()` functions in Cypher 25.
 - `id()` is deprecated — prefer `elementId()` which returns a `STRING` stable only within a single transaction.
 - `vector()` constructor is new in Neo4j 2025.10; `vector.similarity.cosine()` and `vector.similarity.euclidean()` existed before.

@@ -109,12 +109,12 @@ Business questions use domain vocabulary that does **not** match schema labels:
 
 ### QPE quantifier compatibility
 
-| Database | `+` quantifier | `{1,}` equivalent |
-|---|---|---|
-| Local Neo4j 2026.x | ✓ supported | ✓ supported |
-| demo.neo4jlabs.com | ✗ NOT supported | ✓ use this |
+| Database | `+`/`*` shorthands | `{m,n}` / `{1,}` / `{0,}` | `REPEATABLE ELEMENTS` |
+|---|---|---|---|
+| Local Neo4j 2026.02.x | ✓ supported | ✓ | ✓ bounded `{m,n}` only |
+| All other / unknown | ✗ use `{1,}` / `{0,}` | ✓ | ✓ bounded `{m,n}` only |
 
-**Default to `{1,}` form** unless you have confirmed the target DB supports `+`. Same for `*` → use `{0,}`.
+**Default to `{1,}` / `{0,}`.** Use `+`/`*` only after confirming support. `REPEATABLE ELEMENTS` always requires bounded `{m,n}` — never `+`, `*`, or `{1,}`.
 
 ---
 
@@ -160,9 +160,7 @@ Quantifier goes **outside** the group: `(pattern){N,M}` ✓ — never `(pattern{
 // DON'T: (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  // bare quantifier — SYNTAX ERROR
 ```
 
-**NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗.
-
-**REPEATABLE ELEMENTS** requires bounded quantifier — no `+` or `*`.
+**NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗. `REPEATABLE ELEMENTS` requires bounded `{m,n}` — never `+` or `*`.
 
 ### WITH Cardinality Reset
 
@@ -280,13 +278,9 @@ Do **not** load all files — select only what the current query type requires.
 ## Failure Recovery Patterns
 
 **0-Result Queries:** (1) verify params non-null and correctly typed; (2) remove `WHERE` predicates one at a time to isolate; (3) check label/rel-type spelling against schema; (4) EXPLAIN to confirm index used.
-
 **TypeErrors:** prefer `toIntegerOrNull`/`toFloatOrNull` over base casting; guard with `IS NOT NULL` before coercion.
-
 **No `least()`/`greatest()`** — these SQL functions do not exist in Cypher. Use `CASE WHEN a < b THEN a ELSE b END`.
-
 **DateTime vs date() mismatch** — `DateTime >= date('2025-01-01')` returns 0 rows: use `.year` accessor (`t.date.year = 2025`) or `datetime()` literals for DateTime-typed properties.
-
 **Timeouts:** EXPLAIN → fix AllNodesScan/CartesianProduct → add LIMIT → switch to `CALL IN TRANSACTIONS OF 1000 ROWS`.
 
 ---

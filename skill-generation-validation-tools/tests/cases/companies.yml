@@ -667,3 +667,50 @@ cases:
     is_write_query: false
     min_version: "2026.02"
     notes: "SEARCH clause with WHERE score > 0.75 filter: MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.75 RETURN c.text, score LIMIT 8. The SEARCH clause supports inline score filtering."
+
+  # ─── QPP MATCH MODES (REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS) ─────────
+  # min_version: "2025.06" — REPEATABLE ELEMENTS and DIFFERENT RELATIONSHIPS
+  # are available from Neo4j 2025.06 / Cypher 25.
+  # REPEATABLE ELEMENTS requires bounded {m,n} quantifiers — not +, *, or {1,}.
+
+  - id: companies-qpp-001
+    question: "How many distinct ownership walk paths of exactly 2 steps exist from Blackstone into its portfolio? Count all 2-hop walks through HAS_SUBSIDIARY, allowing paths that revisit companies."
+    database: companies
+    difficulty: expert
+    tags: [qpe, repeatable-elements, match-mode, subsidiary, walk-counting]
+    domain: companies
+    min_results: 1
+    max_db_hits: 2000000
+    max_allocated_memory_bytes: 100000000
+    max_runtime_ms: 60000
+    is_write_query: false
+    min_version: "2025.06"
+    notes: "REPEATABLE ELEMENTS with bounded {2,2}: MATCH REPEATABLE ELEMENTS (root:Organization) (()-[:HAS_SUBSIDIARY]->()){2,2} (leaf:Organization) WHERE root.name CONTAINS 'Blackstone' RETURN count(*) AS walkCount. REPEATABLE ELEMENTS allows revisiting nodes/rels unlike default DIFFERENT RELATIONSHIPS."
+
+  - id: companies-qpp-002
+    question: "In the ownership graph, find company pairs where ownership connections of exactly 3 steps exist, counting walks that may pass through the same companies more than once. Return the start and end company names with the total count of such walks. Limit to 10 results."
+    database: companies
+    difficulty: expert
+    tags: [qpe, repeatable-elements, match-mode, subsidiary, walk-counting, path]
+    domain: companies
+    min_results: 1
+    max_db_hits: 5000000
+    max_allocated_memory_bytes: 200000000
+    max_runtime_ms: 120000
+    is_write_query: false
+    min_version: "2025.06"
+    notes: "REPEATABLE ELEMENTS with {3,3}: MATCH REPEATABLE ELEMENTS (a:Organization) (()-[:HAS_SUBSIDIARY]->()){3,3} (b:Organization) WHERE a.name <> b.name RETURN a.name, b.name, COUNT(*) AS walkCount ORDER BY walkCount DESC LIMIT 10. Shows all walks including those revisiting intermediate nodes."
+
+  - id: companies-qpp-003
+    question: "Find company pairs connected by exactly 2 ownership steps where each relationship in the path is used only once — ensuring no single ownership link is counted twice in the same path. Return the start company, end company, and number of such paths. Limit to 15 results."
+    database: companies
+    difficulty: advanced
+    tags: [qpe, different-relationships, match-mode, subsidiary, path-counting]
+    domain: companies
+    min_results: 1
+    max_db_hits: 2000000
+    max_allocated_memory_bytes: 100000000
+    max_runtime_ms: 60000
+    is_write_query: false
+    min_version: "2025.06"
+    notes: "DIFFERENT RELATIONSHIPS match mode (explicit default): MATCH DIFFERENT RELATIONSHIPS (a:Organization) (()-[:HAS_SUBSIDIARY]->()){2,2} (b:Organization) WHERE a.name <> b.name RETURN a.name, b.name, COUNT(*) AS pathCount ORDER BY pathCount DESC LIMIT 15. DIFFERENT RELATIONSHIPS is the default mode but explicitly stating it is valid Cypher 25."

@@ -41,4 +41,4 @@ Cross-reference with the `database.neo4j_version` in the injected schema context
 | Neo4j 2026.02.1+ (local/cloud) | All features above including SEARCH clause (vector) and GRAPH TYPE (Enterprise) |
 | Neo4j 2025.10 – 2026.01.x | QPE, SHORTEST, REPEATABLE ELEMENTS, vector() — no SEARCH clause, no GRAPH TYPE |
 | Neo4j 2025.06 – 2025.09.x | QPE, SHORTEST, REPEATABLE ELEMENTS — no vector(), no SEARCH clause |
-| demo.neo4jlabs.com (companies/recommendations) | Treat as 2025.10–2026.01 range: no SEARCH clause; use `{1,}` not `+` for QPE |
+| demo.neo4jlabs.com (companies/recommendations) — Neo4j 2026.02.x | SEARCH clause (vector), REPEATABLE ELEMENTS (`{m,n}` only); `+`/`*` QPE shorthands NOT supported — use `{1,}` |

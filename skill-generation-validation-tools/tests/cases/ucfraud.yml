@@ -763,3 +763,76 @@ cases:
     is_write_query: true
     min_version: "2026.02"
     notes: "EXTEND GRAPH TYPE WITH ::Transaction (transactionID :: STRING NOT NULL, amount :: FLOAT NOT NULL) and [::SENT] relationship element type; is_write_query:true; expects EXTEND GRAPH TYPE WITH syntax"
+
+  # ---------------------------------------------------------------------------
+  # QPP MATCH MODES (REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS)
+  # min_version: "2025.06" — available from Neo4j 2025.06 / Cypher 25
+  # REPEATABLE ELEMENTS requires bounded {m,n} quantifiers only.
+  # ---------------------------------------------------------------------------
+  - id: "ucf-qpp-001"
+    question: "Count all possible 3-hop shared-identity walks between flagged customers in our fraud network, allowing paths that revisit the same customers. This helps estimate network density even when customers belong to cycles."
+    difficulty: expert
+    tags: [qpe, repeatable-elements, match-mode, fraud-ring, walk-counting]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 60000
+    is_write_query: false
+    min_version: "2025.06"
+    cypher: |
+      CYPHER 25
+      MATCH REPEATABLE ELEMENTS (a:Customer) (()-[:SHARED_IDENTIFIERS]-()){3,3} (b:Customer)
+      WHERE a.fraudFlag = 'True' AND b.fraudFlag = 'True'
+        AND a.customerID < b.customerID
+      RETURN a.name AS startCustomer,
+             b.name AS endCustomer,
+             COUNT(*) AS walkCount
+      ORDER BY walkCount DESC
+      LIMIT 20
+
+  - id: "ucf-qpp-002"
+    question: "Find customers with exactly 2 shared-identity links between them, where each shared-identity relationship is used at most once per path — giving a clean count of distinct 2-hop identity chains between customer pairs."
+    difficulty: advanced
+    tags: [qpe, different-relationships, match-mode, fraud-ring, path-counting]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 200000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 30000
+    is_write_query: false
+    min_version: "2025.06"
+    cypher: |
+      CYPHER 25
+      MATCH DIFFERENT RELATIONSHIPS (c1:Customer) (()-[:SHARED_IDENTIFIERS]-()){2,2} (c2:Customer)
+      WHERE c1.customerID < c2.customerID
+      RETURN c1.name AS customer1,
+             c2.name AS customer2,
+             COUNT(*) AS distinctPaths
+      ORDER BY distinctPaths DESC
+      LIMIT 20
+
+  - id: "ucf-qpp-003"
+    question: "In our transaction network, how many 2-hop money transfer walks exist where transactions flow from one active account through an intermediate account to a destination — counting all walks including those that pass through the same intermediate account more than once?"
+    difficulty: expert
+    tags: [qpe, repeatable-elements, match-mode, money-flow, walk-counting, transaction]
+    database: neo4j
+    domain: ucfraud
+    min_results: 1
+    max_db_hits: 500000
+    max_allocated_memory_bytes: 104857600
+    max_runtime_ms: 60000
+    is_write_query: false
+    min_version: "2025.06"
+    cypher: |
+      CYPHER 25
+      MATCH REPEATABLE ELEMENTS (start:Account) (()-[:TRANSACTED_TO]->()){2,2} (end:Account)
+      WHERE start.status = 'Active'
+        AND start.accountNumber <> end.accountNumber
+      RETURN start.accountNumber AS startAccount,
+             end.accountNumber AS endAccount,
+             COUNT(*) AS totalWalks
+      ORDER BY totalWalks DESC
+      LIMIT 20

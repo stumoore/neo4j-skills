@@ -1508,3 +1508,32 @@ Key Decisions:
 - SKILL.md still correctly says "use procedure fallback for pre-2026.02 databases" — only removed the demo-specific caveat
 
 Next Task: task-044 (Expand QPP/QPE coverage: REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS) or task-036 (Expand test coverage to 10 database domains)
+================================================================================
+TASK-044: Expand QPP/QPE coverage: REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS, + shorthand validation
+Date: 2026-03-23T00:00:00Z
+================================================================================
+
+Summary:
+Added REPEATABLE ELEMENTS and DIFFERENT RELATIONSHIPS match mode test cases to
+companies.yml and ucfraud.yml. Updated cypher25-patterns.md to fully document
+both match modes with semantic guidance and bounded-quantifier restriction.
+Updated the SKILL.md QPE quantifier compatibility table to include a REPEATABLE
+ELEMENTS column and confirmed that +/* shorthands remain unsupported on
+demo.neo4jlabs.com (2026.02). Updated version-matrix.md to reflect the demo
+server's current 2026.02.x version and updated feature availability accordingly.
+
+Files Changed:
+- skill-generation-validation-tools/tests/cases/companies.yml (added 3 QPP cases: companies-qpp-001/002/003)
+- skill-generation-validation-tools/tests/cases/ucfraud.yml (added 3 QPP cases: ucf-qpp-001/002/003)
+- neo4j-cypher-authoring-skill/references/read/cypher25-patterns.md (expanded REPEATABLE ELEMENTS/DIFFERENT RELATIONSHIPS sections; removed dead narrative prose)
+- neo4j-cypher-authoring-skill/SKILL.md (updated QPE quantifier compatibility table with REPEATABLE ELEMENTS column; compressed Failure Recovery section to stay at 300 lines)
+- neo4j-cypher-authoring-skill/references/version-matrix.md (updated demo.neo4jlabs.com row to reflect Neo4j 2026.02.x)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-044 → completed)
+
+Key Decisions:
+- Confirmed +/* shorthands still NOT supported on demo.neo4jlabs.com (2026.02) based on existing test case notes; no live DB test available but kept conservative assumption consistent with prior task work
+- REPEATABLE ELEMENTS test cases use business-language questions (walk counting, network density analysis) that naturally require allowing cyclic traversals
+- Removed dead narrative prose from cypher25-patterns.md (train station example with no code blocks) to reclaim token budget for the new REPEATABLE ELEMENTS documentation
+- SKILL.md QPE table simplified from 3-row to 2-row by merging "All other / unknown" case to stay within 300-line budget
+
+Next Task: task-036 (Expand test coverage to 10 database domains) or end of queue

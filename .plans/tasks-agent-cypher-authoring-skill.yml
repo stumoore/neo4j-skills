@@ -929,7 +929,7 @@ tasks:
       compatibility table in SKILL.md accordingly. Update cypher25-patterns.md to cover
       REPEATABLE ELEMENTS semantics more thoroughly (bounded quantifier requirement,
       repeated-traversal-across-constituent-patterns behavior).
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-042
@@ -940,7 +940,7 @@ tasks:
       - "SKILL.md QPE quantifier compatibility table updated with empirically confirmed + / * status on 2026.02 demo"
       - "Total ≥ 5 new QPP test cases across all domains"
       - "cypher25-patterns.md remains ≤ 2,000 tokens"
-    completed_at: null
+    completed_at: "2026-03-23T00:00:00Z"
 
   - id: task-045
     title: "Split dataset:/database: blocks in domain YAMLs and inject version into harness prompts"
