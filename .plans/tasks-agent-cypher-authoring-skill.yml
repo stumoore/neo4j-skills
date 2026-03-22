@@ -814,7 +814,7 @@ tasks:
       update the test case expectation if the query is actually correct; and if it is a skill
       gap, add the root cause as a new observation in the improvement report and integrate
       a corresponding SKILL.md fix or negative example.
-    status: pending
+    status: completed
     dependencies:
       - task-035
     acceptance_criteria:
@@ -823,7 +823,7 @@ tasks:
       - "Root causes that are skill gaps produce at least one SKILL.md edit or negative example"
       - "Updated improvement report records the disposition of each previously unclassified case"
       - "Harness pass rate improves by ≥ 5 percentage points after expectation corrections"
-    completed_at: null
+    completed_at: "2026-03-22T00:30:00Z"
 
   - id: task-040
     title: "Enforce MERGE safety rules in SKILL.md Core Pattern Cheat Sheet"

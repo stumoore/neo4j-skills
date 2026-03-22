@@ -46,10 +46,10 @@ Every query begins with `CYPHER 25` (enables QPEs, SEARCH, CALL scope clauses, t
 CYPHER 25 CALL db.schema.visualization() YIELD nodes, relationships RETURN nodes, relationships;
 CYPHER 25 SHOW INDEXES YIELD name, type, labelsOrTypes, properties, options, state WHERE state = 'ONLINE' RETURN name, type, labelsOrTypes, properties, options;
 CYPHER 25 SHOW CONSTRAINTS YIELD name, type, labelsOrTypes, properties RETURN name, type, labelsOrTypes, properties;
--- Detect APOC:
+// Detect APOC:
 CYPHER 25 SHOW PROCEDURES WHERE name = 'apoc.meta.schema' YIELD name RETURN count(name) > 0 AS apocAvailable;
--- If APOC available: CYPHER 25 CALL apoc.meta.schema() YIELD value RETURN value;
--- Otherwise: CYPHER 25 CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName, propertyTypes, mandatory RETURN nodeLabels, propertyName, propertyTypes, mandatory;
+// If APOC: CYPHER 25 CALL apoc.meta.schema() YIELD value RETURN value;
+// Else:    CYPHER 25 CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName, propertyTypes, mandatory RETURN nodeLabels, propertyName, propertyTypes, mandatory;
 ```
 
 **Vector index dimensions**: always read from the provided schema context (the `dimensions` field on the index or property). Never introspect `options.vector.dimensions` at runtime — this requires a separate schema query the agent may not be able to execute. If dimensions are absent from the provided schema, state the assumption explicitly in a comment.
@@ -141,9 +141,9 @@ Business questions use domain vocabulary that does **not** match schema labels:
 3. **Both sub-clauses** — every MERGE must have `ON CREATE SET` and `ON MATCH SET`
 
 ```cypher
--- DO: CYPHER 25 MATCH (a:Person {id:$a}) MATCH (b:Person {id:$b}) MERGE (a)-[r:KNOWS]->(b) ON CREATE SET r.since=date() ON MATCH SET r.lastSeen=date();
--- DON'T: MERGE (p:Person {id:$id, name:$name}) -- multi-property = duplicates
--- DON'T: MERGE (:Person {id:$a})-[:KNOWS]->(:Person {id:$b}) -- unbound = ghost nodes
+// DO:     CYPHER 25 MATCH (a:Person {id:$a}) MATCH (b:Person {id:$b}) MERGE (a)-[r:KNOWS]->(b) ON CREATE SET r.since=date() ON MATCH SET r.lastSeen=date();
+// DON'T: MERGE (p:Person {id:$id, name:$name})             // multi-property = duplicates
+// DON'T: MERGE (:Person {id:$a})-[:KNOWS]->(:Person {id:$b}) // unbound = ghost nodes
 ```
 
 ### Quantified Path Expressions (QPEs)
@@ -151,14 +151,10 @@ Business questions use domain vocabulary that does **not** match schema labels:
 **ALWAYS prefer `{1,}` over `+` and `{0,}` over `*`** — `+`/`*` shorthands fail on some servers (e.g. demo.neo4jlabs.com). Use `+`/`*` only after confirming server support.
 
 ```cypher
--- DO: quantified relationship (single rel pattern, no group vars needed)
-CYPHER 25 MATCH (a:Person)-[:KNOWS]-{1,3}(b:Person {name: $name}) RETURN a.name;
--- DO: full QPE with group variable — parentheses REQUIRED around the hop pattern
-CYPHER 25 MATCH (root:Category) (()-[:HAS_SUBCATEGORY]->(){1,}) (leaf:Category) RETURN root.name, leaf.name;
--- DON'T: bare quantifier without node groups — SYNTAX ERROR
--- CYPHER 25 MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  -- WRONG
--- DO: wrap in group variables
-CYPHER 25 MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-(){2,4}) (b:Account) RETURN a, b;
+// DO:     CYPHER 25 MATCH (a:Person)-[:KNOWS]-{1,3}(b:Person {name: $name}) RETURN a.name;
+// DO:     CYPHER 25 MATCH (root:Category) (()-[:HAS_SUBCATEGORY]->(){1,}) (leaf:Category) RETURN root.name, leaf.name;
+// DON'T: CYPHER 25 MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  // WRONG: bare quantifier
+// DO:     CYPHER 25 MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-(){2,4}) (b:Account) RETURN a, b;
 ```
 
 **NEVER write `SHORTEST 1 (a)-[:REL]+`** — wrap in group: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.
@@ -185,7 +181,7 @@ RETURN n.name,
 ### CALL IN TRANSACTIONS
 
 ```cypher
--- CORRECT: CYPHER 25 MATCH (c:Customer) CALL (c) { SET c.flag = 'done' } IN TRANSACTIONS OF 100 ROWS RETURN count(c);
+// CORRECT: CYPHER 25 MATCH (c:Customer) CALL (c) { SET c.flag = 'done' } IN TRANSACTIONS OF 100 ROWS RETURN count(c);
 ```
 **NEVER write** `CALL (x) IN TRANSACTIONS { }` — `IN TRANSACTIONS` comes AFTER the `{ }` block.
 
@@ -196,16 +192,16 @@ RETURN n.name,
 > **SEARCH is vector-only** — fulltext always uses `db.index.fulltext.queryNodes()`. **Version check required**: SEARCH clause is GA in Neo4j **2026.02.1+**; use the procedure fallback for older versions (including demo.neo4jlabs.com which pre-dates 2026.02).
 
 ```cypher
--- Vector 2026.02.1+: CYPHER 25 MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.8 RETURN c.text, score LIMIT 10;
--- Vector <2026.02 (procedure fallback): CYPHER 25 CALL db.index.vector.queryNodes('news', 5, $embedding) YIELD node, score RETURN node.text, score;
--- Fulltext (all versions): CYPHER 25 CALL db.index.fulltext.queryNodes('entity', $query) YIELD node, score RETURN node.name, score LIMIT 20;
+// Vector 2026.02.1+: CYPHER 25 MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.8 RETURN c.text, score LIMIT 10;
+// Vector <2026.02:   CYPHER 25 CALL db.index.vector.queryNodes('news', 5, $embedding) YIELD node, score RETURN node.text, score;
+// Fulltext (all):    CYPHER 25 CALL db.index.fulltext.queryNodes('entity', $query) YIELD node, score RETURN node.name, score LIMIT 20;
 ```
 
 ---
 
 ## Deprecated Syntax → Cypher 25 Preferred
 
-| Deprecated | Cypher 25 |
+| Deprecated / Invalid | Cypher 25 |
 |---|---|
 | `[:REL*1..5]` | `-[:REL]-{1,5}` |
 | `[:REL*]` | `-[:REL]*` |
@@ -214,6 +210,8 @@ RETURN n.name,
 | `CALL { WITH x ... }` | `CALL (x) { ... }` |
 | `id(n)` | `elementId(n)` |
 | `collect()[..N]` | `COLLECT { MATCH ... RETURN ... LIMIT N }` |
+| `-- SQL comment` | `// Cypher comment` |
+| `ACYCLIC / TRAIL / WALK` path modes | Not supported in Neo4j 2026.x — omit; use `WHERE` guards |
 
 ---
 

@@ -9,18 +9,32 @@
   ],
   "indexes": [
     {
-      "name": "moviePlots",
+      "name": "moviePlotsEmbedding",
       "type": "VECTOR",
       "state": "ONLINE",
       "labelsOrTypes": ["Movie"],
       "properties": ["plotEmbedding"]
     },
     {
-      "name": "movieTitles",
+      "name": "moviePostersEmbedding",
+      "type": "VECTOR",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Movie"],
+      "properties": ["posterEmbedding"]
+    },
+    {
+      "name": "movieFulltext",
       "type": "FULLTEXT",
       "state": "ONLINE",
       "labelsOrTypes": ["Movie"],
-      "properties": ["title"]
+      "properties": ["title", "plot"]
+    },
+    {
+      "name": "personFulltext",
+      "type": "FULLTEXT",
+      "state": "ONLINE",
+      "labelsOrTypes": ["Person"],
+      "properties": ["name", "bio"]
     }
   ],
   "node_properties": {
@@ -45,8 +59,8 @@
     "Movie.released is an INTEGER year (e.g., 1994), not a date object.",
     "Ratings: (u:User)-[:RATED {rating, timestamp}]->(m:Movie). Rating is a float 0.5–5.0.",
     "QPE quantifier '+' is NOT supported on demo.neo4jlabs.com — use {1,} instead.",
-    "Use fulltext index 'movieTitles' via db.index.fulltext.queryNodes('movieTitles', $query) for title search.",
-    "Use vector index 'moviePlots' via db.index.vector.queryNodes('moviePlots', N, $embedding) for semantic search.",
+    "Use fulltext index 'movieFulltext' via db.index.fulltext.queryNodes('movieFulltext', $query) for title/plot search (covers both title and plot fields).",
+    "Use vector index 'moviePlotsEmbedding' via db.index.vector.queryNodes('moviePlotsEmbedding', N, $embedding) for semantic plot similarity search.",
     "Collaborative filtering: find users who rated movies User X rated, then find movies those users rated that X hasn't."
   ]
 }

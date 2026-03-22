@@ -7,7 +7,11 @@
     "HAS_CATEGORY",
     "MENTIONS",
     "HAS_CHUNK",
-    "IN_INDUSTRY"
+    "HAS_CEO",
+    "HAS_INVESTOR",
+    "HAS_COMPETITOR",
+    "IN_CITY",
+    "IN_COUNTRY"
   ],
   "indexes": [
     {
@@ -38,10 +42,15 @@
     "HAS_CATEGORY": [],
     "MENTIONS": [],
     "HAS_CHUNK": [],
-    "IN_INDUSTRY": []
+    "HAS_CEO": [],
+    "HAS_INVESTOR": [],
+    "HAS_COMPETITOR": [],
+    "IN_CITY": [],
+    "IN_COUNTRY": []
   },
   "_notes": [
     "Companies are stored as :Organization nodes — NOT :Company.",
+    "CRITICAL: Industry category relationship is HAS_CATEGORY (NOT IN_INDUSTRY — that rel type does not exist in this database).",
     "Use fulltext index 'entity' via db.index.fulltext.queryNodes('entity', $query) for Organization name search.",
     "Use vector index 'news' via db.index.vector.queryNodes('news', 5, $embedding) for semantic Chunk search.",
     "QPE quantifier '+' is NOT supported on demo.neo4jlabs.com — use {1,} instead.",

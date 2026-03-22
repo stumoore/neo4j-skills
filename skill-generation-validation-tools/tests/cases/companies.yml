@@ -50,10 +50,9 @@ dataset:
       - {type: HAS_SUBSIDIARY,   from: Organization, to: Organization, description: "Parent company directly owns the subsidiary"}
       - {type: MENTIONS,         from: Article,      to: Organization}
       - {type: HAS_CHUNK,        from: Article,      to: Chunk}
-      - {type: IN_INDUSTRY,      from: Organization, to: IndustryCategory}
+      - {type: HAS_CATEGORY,     from: Organization, to: IndustryCategory, description: "CRITICAL: use HAS_CATEGORY not IN_INDUSTRY — IN_INDUSTRY does not exist"}
       - {type: HAS_SUPPLIER,     from: Organization, to: Organization}
       - {type: HAS_BOARD_MEMBER, from: Organization, to: Organization}
-      - {type: HAS_CATEGORY,     from: Organization, to: IndustryCategory}
     indexes:
       - name: entity
         type: FULLTEXT
@@ -431,6 +430,18 @@ cases:
     max_allocated_memory_bytes: 50000000
     max_runtime_ms: 30000
     is_write_query: false
+    notes: "CRITICAL: use HAS_CATEGORY (not IN_INDUSTRY — that rel type does not exist in this DB)"
+    cypher: |
+      CYPHER 25
+      MATCH (a:Organization)-[:HAS_CATEGORY]->(cat:IndustryCategory)<-[:HAS_CATEGORY]-(b:Organization)
+      WHERE elementId(a) < elementId(b)
+      MATCH (art:Article)-[:MENTIONS]->(a), (art)-[:MENTIONS]->(b)
+      RETURN cat.name AS category,
+             a.name AS companyA,
+             b.name AS companyB,
+             count(art) AS coOccurrences
+      ORDER BY coOccurrences DESC
+      LIMIT 20
 
   - id: companies-advanced-010
     question: "For companies that have at least one subsidiary, list each company's name alongside all the subsidiaries it directly owns and the industry categories it belongs to. Return up to 20 companies, ordered alphabetically."

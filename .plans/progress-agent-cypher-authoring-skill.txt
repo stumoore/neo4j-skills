@@ -1332,3 +1332,35 @@ Key Decisions:
 
 Next Task: task-042 (Update SEARCH test cases for upgraded demo.neo4jlabs.com) — depends on
 task-041 (now completed) and task-029 (completed)
+
+================================================================================
+TASK-039: Validate unclassified failures: run generated queries against live DBs
+Date: 2026-03-22T00:30:00Z
+================================================================================
+
+Summary:
+Investigated all 16 FAIL cases from the 3-domain harness run against live databases.
+Root causes were categorized and all actionable fixes were applied. The primary finding
+was that schema JSON injection files contained several systematic errors that caused
+Claude to generate queries with wrong index names and relationship types. These schema
+errors accounted for 5 of the 16 failures.
+
+Files Changed:
+- skill-generation-validation-tools/tests/schemas/recommendations.json (fixed index names: moviePlotsEmbedding, movieFulltext; added posterEmbedding, personFulltext)
+- skill-generation-validation-tools/tests/schemas/ucfraud.json (fixed SHARED_IDENTIFIERS note: Customer→Customer not Account→Account; added fraudFlag STRING note, DateTime note)
+- skill-generation-validation-tools/tests/schemas/companies.json (removed IN_INDUSTRY, added actual rel types, added CRITICAL note)
+- skill-generation-validation-tools/tests/cases/recommendations.yml (fixed index names in dataset section and canonical Cypher for rec-advanced-006, rec-expert-003)
+- skill-generation-validation-tools/tests/cases/companies.yml (removed IN_INDUSTRY from schema, added canonical Cypher to companies-advanced-009)
+- neo4j-cypher-authoring-skill/SKILL.md (added SQL comment→// row, ACYCLIC/TRAIL/WALK row to deprecated table; converted all -- to // in code blocks)
+- AGENTS.md (corrected recommendations DB index names, ucfraud details; added Schema Data Quality section)
+- skill-generation-validation-tools/tests/results/unclassified-failures-disposition-20260322.md (created: full case-by-case disposition report)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-039 status → completed)
+
+Key Decisions:
+- Schema JSON files are the highest-leverage target: wrong data in those files causes systematic failures across all test cases for that domain (model trusts injected schema over training knowledge)
+- SKILL.md changes kept minimal (2 new rows in deprecated table) to preserve 300-line budget — already at 297 lines
+- ucf-intermediate-005 (customers with multiple emails) is a skill gap, not a bad expectation — data only has 1 email per customer but the model over-filtered
+- ucf-expert-004 (CALL IN TRANSACTIONS inside explicit tx) is a harness limitation, not a skill gap
+- ACYCLIC/TRAIL/WALK path modes are not supported in Neo4j 2026.02.1 — model learned them from GQL training data
+
+Next Task: task-036 (Expand test coverage to 10 database domains) or task-045 (Split dataset:/database: blocks)

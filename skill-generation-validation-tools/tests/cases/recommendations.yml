@@ -71,25 +71,39 @@ dataset:
       - {type: DIRECTED, from: Person, to: Movie}
       - {type: IN_GENRE, from: Movie,  to: Genre}
     indexes:
-      - name: moviePlots
+      - name: moviePlotsEmbedding
         type: VECTOR
         on: Movie(plotEmbedding)
         dimensions: 1536
         similarity: cosine
-        call: "CALL db.index.vector.queryNodes('moviePlots', N, $vec) YIELD node, score"
+        call: "CALL db.index.vector.queryNodes('moviePlotsEmbedding', N, $vec) YIELD node, score"
         description: "Semantic similarity search on movie plot embeddings"
-      - name: movieTitles
+      - name: moviePostersEmbedding
+        type: VECTOR
+        on: Movie(posterEmbedding)
+        similarity: cosine
+        call: "CALL db.index.vector.queryNodes('moviePostersEmbedding', N, $vec) YIELD node, score"
+        description: "Visual similarity search on movie poster embeddings"
+      - name: movieFulltext
         type: FULLTEXT
-        on: Movie(title)
-        call: "CALL db.index.fulltext.queryNodes('movieTitles', $q) YIELD node, score"
-        description: "Full-text search on movie titles"
+        on: Movie(title, plot)
+        call: "CALL db.index.fulltext.queryNodes('movieFulltext', $q) YIELD node, score"
+        description: "Full-text search on movie titles AND plot text"
+      - name: personFulltext
+        type: FULLTEXT
+        on: Person(name, bio)
+        call: "CALL db.index.fulltext.queryNodes('personFulltext', $q) YIELD node, score"
+        description: "Full-text search on person names and bios"
   notes:
     - "CRITICAL: Movie.released is an INTEGER year (e.g. 1994), NOT a Date — use WHERE m.released > 2000"
     - "CRITICAL: User.userId is a STRING — always match with WHERE u.userId = '1' (quoted), not = 1"
+    - "CRITICAL: Vector index name is 'moviePlotsEmbedding' (NOT 'moviePlots'). Using wrong name causes ProcedureCallFailed."
+    - "CRITICAL: Fulltext index name is 'movieFulltext' (NOT 'movieTitles'). It covers both title AND plot fields."
     - "QPE '+' quantifier NOT supported on demo.neo4jlabs.com — always use {1,} instead"
     - "Demo DB is read-only — write queries will fail"
     - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes()"
     - "No :WROTE or :REVIEWED relationship — only RATED, ACTED_IN, DIRECTED, IN_GENRE exist"
+    - "Movie title stored as 'Matrix, The' (article-inversion format) — use CONTAINS or fulltext for natural language titles"
     - "Tom Hanks and Kevin Bacon are both in the database (Kevin Bacon shortest-path problem is valid)"
     - "Collaborative filtering: find users who rated the same movies as User X → find movies those users rated that X has not"
 
@@ -438,7 +452,7 @@ cases:
     is_write_query: false
     cypher: |
       CYPHER 25
-      CALL db.index.fulltext.queryNodes('movieTitles', 'star wars') YIELD node AS m, score
+      CALL db.index.fulltext.queryNodes('movieFulltext', 'star wars') YIELD node AS m, score
       RETURN m.title AS title, m.released AS released, m.imdbRating AS imdbRating, score
       ORDER BY score DESC
       LIMIT 10
@@ -592,10 +606,10 @@ cases:
     is_write_query: false
     cypher: |
       CYPHER 25
-      -- User said "The Matrix" — stored as "Matrix, The" (article-inversion format)
+      // "The Matrix" is stored as "Matrix, The" in this database
       MATCH (ref:Movie {title: 'Matrix, The'})
       WHERE ref.plotEmbedding IS NOT NULL
-      CALL db.index.vector.queryNodes('moviePlots', 6, ref.plotEmbedding) YIELD node AS m, score
+      CALL db.index.vector.queryNodes('moviePlotsEmbedding', 6, ref.plotEmbedding) YIELD node AS m, score
       WHERE m <> ref
       RETURN m.title AS title, round(score, 4) AS similarity
       ORDER BY score DESC
