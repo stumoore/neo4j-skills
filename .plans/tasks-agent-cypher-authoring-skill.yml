@@ -794,7 +794,7 @@ tasks:
       or L3 reference files. Author prioritised bad→good rewrite examples and measure
       impact by re-running the harness against the same cases. This task also quantifies
       how much negative example injection reduces per-category failure rates.
-    status: pending
+    status: completed
     dependencies:
       - task-035
     acceptance_criteria:
@@ -802,7 +802,7 @@ tasks:
       - "Each identified category gets a DO-NOT / DO block with annotated explanation added to SKILL.md or an L3 file"
       - "Harness re-run shows reduction in targeted failure category counts vs baseline"
       - "SKILL.md remains within 300-line token budget after additions"
-    completed_at: null
+    completed_at: "2026-03-21T23:59:00Z"
 
   - id: task-039
     title: "Validate unclassified failures: run generated queries against live DBs and integrate learnings"

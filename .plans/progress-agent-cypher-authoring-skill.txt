@@ -1258,3 +1258,44 @@ Key Decisions:
   recommendations had Tom Hanks, The Matrix, Kevin Bacon; ucfraud had Hoffman, Poole, Michael
 
 Next Task: task-036 (Expand test coverage to 10 database domains) or task-038 (Negative examples in SKILL.md)
+
+================================================================================
+TASK-038: Evaluate and add negative examples to SKILL.md for stale training patterns
+Date: 2026-03-21T23:59:00Z
+================================================================================
+
+Summary:
+Analyzed harness failure logs across all 3 domains (companies, recommendations, ucfraud)
+to identify persistent patterns the model generates despite SKILL.md guidance. Identified
+3 high-impact failure categories and added explicit DO-NOT / DO blocks.
+
+Failure patterns identified (from 16 total FAIL cases):
+1. QPE bare quantifier without group variable parentheses (3 gate-1 failures):
+   Model generates `(a:Account)-[:REL]-{2,4}-(b:Account)` instead of the correct
+   `(a:Account) (()-[:REL]-(){2,4}) (b:Account)`. This is a SYNTAX ERROR every time.
+   Also: SHORTEST 1 (a)-[:REL]+(b) without group wrapping.
+2. CALL IN TRANSACTIONS syntax order (2 gate-1 failures):
+   Model generates `CALL (o) IN TRANSACTIONS OF 5 ROWS { }` (wrong order).
+   Correct: `CALL (o) { } IN TRANSACTIONS OF 5 ROWS`.
+3. CASE WHEN without CASE keyword (1 gate-1 failure):
+   Already documented in SKILL.md; reinforced by DO-NOT examples in other sections.
+4. Data/schema issues (not skill gaps): 7 gate-2 failures from date() vs DateTime
+   mismatch, wrong rel direction (SHARED_IDENTIFIERS Customer→Customer not Account→Account),
+   and missing indexes on demo.neo4jlabs.com.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/SKILL.md (modified: QPE code block now has explicit DO/DON'T comments; 299 lines)
+- neo4j-cypher-authoring-skill/references/read/cypher25-patterns.md (added: DO-NOT section at top)
+- neo4j-cypher-authoring-skill/references/write/cypher25-call-in-transactions.md (added: DO-NOT section)
+- .plans/tasks-agent-cypher-authoring-skill.yml (status: completed)
+
+Key Decisions:
+- SKILL.md was already at 299/300 lines — used surgical replacement to add DO-NOT inline
+  comment without adding net lines. Full examples went into L3 files (no line budget there).
+- Added DO-NOT block at top of cypher25-patterns.md covering 3 QPE wrong forms with
+  ACYCLIC, SHORTEST, and bare quantifier variants.
+- Added DO-NOT block in cypher25-call-in-transactions.md showing {} before IN TRANSACTIONS.
+- Gate-2 failures from bad test expectations (wrong rel type, date type mismatch) are
+  addressed by the existing Failure Recovery section in SKILL.md, not new DO-NOT examples.
+
+Next Task: task-039 (Validate unclassified failures) or task-036 (10 domains) or task-041 (version-conditional runner)

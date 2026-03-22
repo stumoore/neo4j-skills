@@ -258,6 +258,15 @@ PASS if the output format is implied naturally ("show", "list", "how many", "ran
 - DateTime vs date() mismatch: `Transaction.date` stored as DateTime; `t.date >= date('2025-01-01')` returns 0 rows; use `t.date.year = 2025` or `datetime()` comparisons.
 - `SHORTEST 1 (a)-[:REL]+` fails — wrap: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.
 
+## Negative Example Patterns (Stale Training Data)
+
+Three QPE/subquery patterns the model persistently generates wrong despite guidance:
+1. **QPE bare quantifier**: `(a)-[:REL]-{2,4}-(b)` is a SYNTAX ERROR — must use group: `(a) (()-[:REL]-(){2,4}) (b)`
+2. **CALL IN TRANSACTIONS order**: `CALL (o) IN TRANSACTIONS OF 5 ROWS { }` is SYNTAX ERROR — `{}` always comes BEFORE `IN TRANSACTIONS`
+3. **SHORTEST with bare rel**: `SHORTEST 1 (a)-[:REL]+(b)` fails — wrap: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`
+
+DO-NOT blocks for all three are now in: SKILL.md (QPE section), cypher25-patterns.md (top), cypher25-call-in-transactions.md (top).
+
 ## SKILL.md Authoring Notes
 
 - SKILL.md line budget is 300 lines (not 300 non-blank lines). Inline `CYPHER 25` on the same line as each query to save ~10 lines in the Schema-First Protocol section.

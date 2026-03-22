@@ -18,6 +18,24 @@ CALL (vars) {
   [REPORT STATUS AS statusVar]
 ```
 
+## DO-NOT: CALL IN TRANSACTIONS Syntax Traps
+
+```cypher
+-- DON'T: IN TRANSACTIONS before the {} block — SYNTAX ERROR
+CALL (o) IN TRANSACTIONS OF 5 ROWS {     -- WRONG ORDER
+  MATCH (a:Article)-[:MENTIONS]->(o)
+  RETURN count(a)
+}
+
+-- DO: {} block ALWAYS comes before IN TRANSACTIONS
+MATCH (o:Organization) WITH o LIMIT 100
+CALL (o) {
+  MATCH (a:Article)-[:MENTIONS]->(o)
+  RETURN count(a) AS cnt
+} IN TRANSACTIONS OF 5 ROWS
+RETURN o.name, cnt;
+```
+
 ## Key constraints
 
 - Only allowed in **implicit transactions** — not in explicit `BEGIN`/`COMMIT` blocks.

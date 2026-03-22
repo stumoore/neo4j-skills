@@ -151,14 +151,14 @@ Business questions use domain vocabulary that does **not** match schema labels:
 **ALWAYS prefer `{1,}` over `+` and `{0,}` over `*`** — `+`/`*` shorthands fail on some servers (e.g. demo.neo4jlabs.com). Use `+`/`*` only after confirming server support.
 
 ```cypher
--- {m,n} fixed range — universal, works everywhere
+-- DO: quantified relationship (single rel pattern, no group vars needed)
 CYPHER 25 MATCH (a:Person)-[:KNOWS]-{1,3}(b:Person {name: $name}) RETURN a.name;
-
--- {1,} one-or-more (prefer over +); {0,} zero-or-more (prefer over *)
+-- DO: full QPE with group variable — parentheses REQUIRED around the hop pattern
 CYPHER 25 MATCH (root:Category) (()-[:HAS_SUBCATEGORY]->(){1,}) (leaf:Category) RETURN root.name, leaf.name;
-
--- Full QPE with group variable (parentheses required around the hop pattern)
-CYPHER 25 MATCH ((a:Stop)-[r:NEXT]->(b:Stop)){1,5} RETURN a, b, r;
+-- DON'T: bare quantifier without node groups — SYNTAX ERROR
+-- CYPHER 25 MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  -- WRONG
+-- DO: wrap in group variables
+CYPHER 25 MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-(){2,4}) (b:Account) RETURN a, b;
 ```
 
 **NEVER write `SHORTEST 1 (a)-[:REL]+`** — wrap in group: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.

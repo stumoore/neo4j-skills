@@ -2,6 +2,30 @@
 > Generated: 2026-03-20T00:11:34Z
 > Files: quantified-path-patterns.adoc (cheat), patterns/variable-length-patterns.adoc (cypher), patterns/shortest-paths.adoc (cypher), patterns/non-linear-patterns.adoc (cypher), patterns/match-modes.adoc (cypher), patterns/variable-length-patterns.adoc (cypher)
 
+## DO-NOT: Common QPE Syntax Errors
+
+```cypher
+-- DON'T: bare quantifier on relationship without enclosing node groups — SYNTAX ERROR
+MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)   -- WRONG
+
+-- DO: enclose the hop pattern in group parentheses
+MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-(){2,4}) (b:Account) RETURN a, b;
+
+-- DON'T: SHORTEST with bare + or {1,} outside group — SYNTAX ERROR
+MATCH path = SHORTEST 1 (a)-[:KNOWS]+(b)                    -- WRONG
+
+-- DO: wrap hop in group
+MATCH path = SHORTEST 1 (a)(()-[:KNOWS]->()){1,}(b) RETURN path;
+
+-- DON'T: ACYCLIC / SHORTEST with bare quantified relationship — SYNTAX ERROR
+MATCH (a:Account)-[:TRANSACTED_TO]-{3,5}->(b:Account)       -- WRONG (no ACYCLIC keyword in Cypher 25)
+
+-- DO: use QPE group syntax
+MATCH (a:Account) (()-[:TRANSACTED_TO]->(){3,5}) (b:Account) RETURN a, b;
+```
+
+**Rule**: Every quantifier (`{m,n}`, `{1,}`, `{0,}`, `+`, `*`) must attach to a node-pair group `(pattern){q}` or a single relationship in a quantified relationship. Naked `(a)-[:REL]-{m,n}-(b)` without an enclosing node group is always a syntax error.
+
 # Quantified path patterns^
 
 ```cypher
