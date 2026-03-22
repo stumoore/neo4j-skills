@@ -8,7 +8,7 @@ database:
   uri: neo4j+s://demo.neo4jlabs.com:7687
   username: recommendations
   database: recommendations
-  neo4j_version: "2026.01"
+  neo4j_version: "2026.02"
   cypher_version: "25"
   read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
@@ -104,7 +104,7 @@ dataset:
     - "CRITICAL: Fulltext index name is 'movieFulltext' (NOT 'movieTitles'). It covers both title AND plot fields."
     - "QPE '+' quantifier NOT supported on demo.neo4jlabs.com — always use {1,} instead"
     - "Demo DB is read-only — write queries will fail"
-    - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes()"
+    - "SEARCH clause is GA on demo.neo4jlabs.com 2026.02.x — use SEARCH syntax for vector queries (SEARCH is vector-only; fulltext still requires db.index.fulltext.queryNodes())"
     - "No :WROTE or :REVIEWED relationship — only RATED, ACTED_IN, DIRECTED, IN_GENRE exist"
     - "Movie title stored as 'Matrix, The' (article-inversion format) — use CONTAINS or fulltext for natural language titles"
     - "Tom Hanks and Kevin Bacon are both in the database (Kevin Bacon shortest-path problem is valid)"
@@ -723,3 +723,33 @@ cases:
     max_runtime_ms: 5000
     is_write_query: false
     notes: "casual 'sci-fi' → Genre.name = 'Sci-Fi' (exact enum value with hyphen, not 'Science Fiction'); schema shows Genre.name sample: ['Action','Comedy','Drama','Sci-Fi','Thriller']"
+
+  # ─── SEARCH CLAUSE VECTOR CASES (min_version: 2026.02) ───────────────────────
+
+  - id: rec-search-001
+    question: "Find the 5 movies whose storylines are most similar to a story about 'a hero's journey to save the world against impossible odds'. Use the plot embedding index. Return each movie title and its similarity score."
+    database: recommendations
+    difficulty: advanced
+    tags: [vector, search-clause, index, similarity, plot-embedding]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+    min_version: "2026.02"
+    notes: "SEARCH clause vector on Movie(plotEmbedding) using index 'moviePlotsEmbedding': MATCH (m:Movie) SEARCH (m) USING VECTOR INDEX moviePlotsEmbedding WITH QUERY VECTOR $embedding RETURN m.title, score LIMIT 5. Index is 'moviePlotsEmbedding' (NOT 'moviePlots')."
+
+  - id: rec-search-002
+    question: "Which movies have plots most semantically similar to romantic comedies about mistaken identity? Return the top 10 closest matches with their similarity scores, and include each movie's IMDb rating. Only show results with a similarity score above 0.7."
+    database: recommendations
+    difficulty: advanced
+    tags: [vector, search-clause, index, similarity, filter, plot-embedding]
+    domain: recommendations
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+    min_version: "2026.02"
+    notes: "SEARCH clause with WHERE score > 0.7 and extra property return: MATCH (m:Movie) SEARCH (m) USING VECTOR INDEX moviePlotsEmbedding WITH QUERY VECTOR $embedding WHERE score > 0.7 RETURN m.title, m.imdbRating, score LIMIT 10. Index: 'moviePlotsEmbedding'."

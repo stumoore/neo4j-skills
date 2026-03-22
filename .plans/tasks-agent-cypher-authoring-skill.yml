@@ -881,7 +881,7 @@ tasks:
       SEARCH guidance to remove the "use procedure for demo" caveat. Run the harness
       against the upgraded demo to confirm the new cases pass. Fulltext queries on demo
       continue to use db.index.fulltext.queryNodes() — SEARCH is vector-only.
-    status: pending
+    status: completed
     dependencies:
       - task-041
       - task-029
@@ -891,7 +891,7 @@ tasks:
       - "AGENTS.md demo server constraints note updated: version 2026.02.x, 'SEARCH clause not available' removed"
       - "SKILL.md SEARCH section no longer says procedure fallback required for demo"
       - "Harness run on upgraded demo: new SEARCH cases pass Gate 1 (syntax) and Gate 2 (results)"
-    completed_at: null
+    completed_at: "2026-03-23T10:00:00Z"
 
   - id: task-043
     title: "Author cypher25-graph-types.md L3 reference and add GRAPH TYPE to SKILL.md routing"

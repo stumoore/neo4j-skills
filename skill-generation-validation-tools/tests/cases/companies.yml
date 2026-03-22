@@ -8,7 +8,7 @@ database:
   uri: neo4j+s://demo.neo4jlabs.com:7687
   username: companies
   database: companies
-  neo4j_version: "2026.01"
+  neo4j_version: "2026.02"
   cypher_version: "25"
   read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
@@ -72,7 +72,7 @@ dataset:
     - "CRITICAL: Companies are :Organization nodes — NEVER use :Company"
     - "QPE '+' quantifier NOT supported on demo.neo4jlabs.com — always use {1,} instead"
     - "Demo DB is read-only — write queries (MERGE/CREATE/SET/DELETE) will fail with Security.Forbidden"
-    - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes() for vectors"
+    - "SEARCH clause is GA on demo.neo4jlabs.com 2026.02.x — use SEARCH syntax for vector queries (SEARCH is vector-only; fulltext still requires db.index.fulltext.queryNodes())"
     - "Independent companies (no parent): NOT EXISTS { (o)<-[:HAS_SUBSIDIARY]-() }"
     - "Largest subsidiary owner: Blackstone (~1037 direct subsidiaries)"
     - "Company names include legal suffixes ('Corporation', 'Inc.', 'Ltd.') — use CONTAINS or fulltext index 'entity' for name matching, avoid exact match"
@@ -637,3 +637,33 @@ cases:
     max_runtime_ms: 5000
     is_write_query: false
     notes: "casual 'energy or utilities' → c.name IN ['Energy', 'Utilities'] (or OR clause); user did not supply exact category value — requires schema-driven translation"
+
+  # ─── SEARCH CLAUSE VECTOR CASES (min_version: 2026.02) ───────────────────────
+
+  - id: companies-search-001
+    question: "Find the 5 article segments most semantically similar to the concept of 'corporate mergers and acquisitions'. Use the news vector index. Return the text excerpt and its similarity score."
+    database: companies
+    difficulty: advanced
+    tags: [vector, search-clause, index, similarity]
+    domain: companies
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+    min_version: "2026.02"
+    notes: "SEARCH clause vector: MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding LIMIT 5 RETURN c.text, score. Embedding dimension 1536 — use a query vector for 'corporate mergers and acquisitions'."
+
+  - id: companies-search-002
+    question: "Which article segments are most relevant to topics about climate change and environmental policy? Use semantic similarity to find the top 8 most relevant chunks and return each chunk's text with its relevance score. Filter to only include results with a score above 0.75."
+    database: companies
+    difficulty: advanced
+    tags: [vector, search-clause, index, similarity, filter]
+    domain: companies
+    min_results: 1
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 15000
+    is_write_query: false
+    min_version: "2026.02"
+    notes: "SEARCH clause with WHERE score > 0.75 filter: MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.75 RETURN c.text, score LIMIT 8. The SEARCH clause supports inline score filtering."

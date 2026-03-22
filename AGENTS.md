@@ -304,4 +304,4 @@ DO-NOT blocks for all three are now in: SKILL.md (QPE section), cypher25-pattern
 - Autonomous Operation Protocol: Version step (step 3) uses 3-tier resolution: injected schema → dbms.components() → conservative defaults. Aura caveat and inline comment instruction must both appear in the same step to stay within budget.
 - Verified with: `wc -l SKILL.md` (lines) + `python3 -c "words=len(text.split()); print(int(words*1.3))"` (token estimate).
 - task-020 (WebFetch proactive framing) was folded into task-010's SKILL.md — the proactive framing is already present. task-020 can be marked as superseded or trivially completed.
-- SEARCH clause (Neo4j 2026.01 Preview) is **vector-only** — always document the fulltext procedure fallback alongside it.
+- SEARCH clause: **GA in Neo4j 2026.02.1+** (was Preview in 2026.01). Vector-only — fulltext still uses `db.index.fulltext.queryNodes()`. demo.neo4jlabs.com upgraded to 2026.02.x — SEARCH clause is available there.

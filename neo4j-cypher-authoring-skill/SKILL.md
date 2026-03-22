@@ -194,7 +194,7 @@ RETURN n.name,
 
 ### SEARCH Clause (Vector — GA in Neo4j 2026.02.1+)
 
-> **SEARCH is vector-only** — fulltext always uses `db.index.fulltext.queryNodes()`. **Version check required**: SEARCH clause is GA in Neo4j **2026.02.1+**; use the procedure fallback for older versions (including demo.neo4jlabs.com which pre-dates 2026.02).
+> **SEARCH is vector-only** — fulltext always uses `db.index.fulltext.queryNodes()`. **Version check required**: SEARCH clause is GA in Neo4j **2026.02.1+**; use the procedure fallback for older versions (pre-2026.02 databases).
 
 ```cypher
 // Vector 2026.02.1+: CYPHER 25 MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.8 RETURN c.text, score LIMIT 10;
