@@ -45,10 +45,7 @@
 - `id()` is deprecated — prefer `elementId()` which returns a `STRING` stable only within a single transaction.
 - `vector()` constructor is new in Neo4j 2025.10; `vector.similarity.cosine()` and `vector.similarity.euclidean()` existed before.
 - Aggregating functions: `collect(null)` → `[]` (empty list), `count(null)` → `0`, `sum(null)` → `0`; all others → `null` when all inputs are null.
-- `SEARCH` clause: **GA in Neo4j 2026.02.1** (was Preview in 2026.01). Vector-only — fulltext indexes still use `db.index.fulltext.queryNodes()` procedure. SEARCH clause does not cover fulltext indexes. Use SEARCH only against `bolt://localhost` (2026.02.1); demo.neo4jlabs.com is an older version without it.
-- demo.neo4jlabs.com/companies DB constraints: (1) read-only — write queries (MERGE/CREATE/SET) fail with `Security.Forbidden`; (2) QPE `+` syntax not supported (use `{1,}` instead); (3) SEARCH clause not available (older version); (4) zero-vector invalid for similarity search (use non-zero values like 0.1). Relationship types available: HAS_SUBSIDIARY, HAS_SUPPLIER, HAS_BOARD_MEMBER, HAS_PARENT, HAS_CHILD, HAS_CATEGORY, HAS_CEO, HAS_INVESTOR, HAS_COMPETITOR, IN_CITY, IN_COUNTRY, MENTIONS, HAS_CHUNK. **`IN_INDUSTRY` does NOT exist — use `HAS_CATEGORY` for industry sector links**. Organizations with most subsidiaries: Blackstone (1037), Comcast (908), Viacom (531).
-- bolt://localhost (neo4j/password, database=neo4j): ucfraud dataset, writeable, Neo4j 2026.02.1. Supports: write queries, CALL IN TRANSACTIONS, SEARCH clause (GA). Fulltext indexes: `customerNames` (Customer.name), `transactionTypes` (Transaction.type, Transaction.status). **SHARED_IDENTIFIERS connects Customer→Customer (NOT Account→Account)** — verified: 0 Account-to-Account edges exist. Transaction.date is DateTime type — compare with `.year` accessor not `date()` literals. Customer.fraudFlag is a STRING ('True'/'False'), NOT a boolean. Each Customer has at most 1 USES_EMAIL link (no customer has multiple emails in current data). ACYCLIC/TRAIL/WALK path mode keywords are not supported in Neo4j 2026.02.1.
-- demo.neo4jlabs.com/recommendations DB schema: Nodes: `Movie` (movieId, title, plot, released, imdbRating, url, poster, tmdbId, budget, revenue, runtime, imdbId, imdbVotes, languages, countries, `plotEmbedding` <Vector 1536>), `Person` (name, born, bio, url, poster, tmdbId, imdbId), `User` (userId, name), `Genre` (name). Relationships: `(User)-[:RATED {rating, timestamp}]->(Movie)`, `(Person)-[:ACTED_IN {role}]->(Movie)`, `(Person)-[:DIRECTED]->(Movie)`, `(Movie)-[:IN_GENRE]->(Genre)`. Indexes: `moviePlotsEmbedding` (vector on Movie.plotEmbedding, cosine), `moviePostersEmbedding` (vector on Movie.posterEmbedding), `movieFulltext` (fulltext on Movie.title AND Movie.plot), `personFulltext` (fulltext on Person.name, Person.bio). No WROTE/REVIEWED rel types — only RATED/ACTED_IN/DIRECTED/IN_GENRE. userId values are strings in queries. Tom Hanks and Kevin Bacon are both in the DB (Kevin Bacon connection problem is valid). 'The Matrix' title is stored as 'Matrix, The' — use CONTAINS or fulltext search. Movie.released is an INTEGER year (e.g. 1999), not a date. **CRITICAL: Vector index name is `moviePlotsEmbedding` (NOT `moviePlots`). Fulltext index name is `movieFulltext` (NOT `movieTitles`). Using wrong names causes ProcedureCallFailed errors.**
+- `SEARCH` clause: **GA in Neo4j 2026.02+**. Vector-only — fulltext indexes still use `db.index.fulltext.queryNodes()` procedure. SEARCH clause does not cover fulltext indexes.
 - Test case authoring rule: never use `$param` parameters in test questions for the harness — the harness does not inject runtime parameters. Use literal values or ask the model to use literals.
 - Vector index `OPTIONS` map is **mandatory** — `vector.dimensions` and `vector.similarity_function` are required at creation time.
 - `USING INDEX SEEK` forces index seek (not scan); `USING SCAN` forces label scan with no index — opposite of intent, so use `USING SCAN` only to deliberately avoid indexes.
@@ -60,6 +57,7 @@
 - Closed Dynamic Unions: `val IS :: INTEGER | FLOAT` tests multiple types; all inner types must have same nullability (all nullable or all `NOT NULL`).
 - Casting: base functions (`toFloat`, `toInteger`, etc.) throw on unconvertible input; `OrNull` variants (`toFloatOrNull`, etc.) return `null` instead — prefer OrNull in agent-authored queries to avoid runtime errors.
 - `null = null` → `null` (not `true`); `null <> null` → `null`. Always use `IS NULL` / `IS NOT NULL`.
+- `least()` / `greatest()` do NOT exist in Cypher — use `CASE WHEN a < b THEN a ELSE b END` instead.
 - Style guide keyword list (keywords.adoc) is 400 items — useless for agents. What agents need: UPPERCASE for clauses/operators, camelCase for functions, lowercase for `null`/`true`/`false`. Document this as a casing rules table, not a keyword enumeration.
 
 ## Python / uv
@@ -132,12 +130,13 @@ The script generates **first drafts** for L3 reference files (not final output).
 ## Domain YAML Structure (task-045: dataset: + database: split)
 
 Domain YAML files now have two top-level keys:
-- `database:` — connection info and version: `uri`, `username`, `database`, `neo4j_version` (YYYY.MM.PATCH), `cypher_version`
+- `database:` — connection info and version: `uri`, `username`, `database`, `neo4j_version` (YYYY.MM.PATCH), `cypher_version`, `read_only` (bool, optional)
 - `dataset:` — schema for prompt injection: `name`, `description`, `schema` (nodes/relationships/indexes), `notes`
 
 `load_dataset_schemas()` returns a `(schemas_dict, db_blocks_dict)` tuple — not a single dict.
 `_format_dataset_schema(dataset, db_block=...)` injects `Database version: Neo4j X.Y / Cypher 25` when db_block provided.
 Version resolution order in `run_all()`: CLI `--neo4j-version` → `database.neo4j_version` in YAML → `dbms.components()` auto-detect.
+`read_only: true` in `database:` block → all `is_write_query: true` cases for that domain SKIP (verdict=SKIPPED, skip_reason="write query on read-only database"). Currently set on `companies` and `recommendations` (demo.neo4jlabs.com). Does not apply to `ucfraud` (localhost, writeable).
 Backwards compatibility: old `dataset.connection` format still works as fallback in `_build_domain_drivers()`.
 
 ## Runner Notes (tests/harness/runner.py)
@@ -264,7 +263,7 @@ PASS if the output format is implied naturally ("show", "list", "how many", "ran
 | expert | Deep network, similarity, path-finding | QPE, SHORTEST, ALL SHORTEST, vector index, CALL IN TRANSACTIONS |
 
 - Expert tier was already accepted in `_VALID_DIFFICULTIES` (runner.py) and `DIFFICULTY_ORDER` (reporter.py) from the start. Only data (test cases) needed adding.
-- Expert write cases (CALL IN TRANSACTIONS) on read-only demo DBs will always FAIL Gate 2 with Security.Forbidden — this is expected; the test validates syntax (Gate 1) not execution (Gate 2+).
+- Expert write cases (CALL IN TRANSACTIONS) on `read_only: true` domains are automatically SKIPPED — not FAIL.
 - Avoid the word "batch" in question text — use "groups of N at a time" instead.
 - "Full-text search" as a concept (not index name) is acceptable business language; "db.index.fulltext.queryNodes()" is not.
 
@@ -272,13 +271,13 @@ PASS if the output format is implied naturally ("show", "list", "how many", "ran
 
 - Use a `notes:` field on casual-language cases to document the expected value translation (e.g. `"casual 'bad press' → a.sentiment < -0.3"`). This helps human reviewers verify the case without running the harness.
 - Watch out for temporal questions that reference relative periods ("last year", "this month") when the dataset has a fixed date range. If the dataset only covers 2025, "last year" in 2026 → 0 rows. Either drop the temporal constraint or use a fixed year.
-- Casual-language enum cases: always verify the exact case of enum values against the schema (ucfraud uses Title case: 'Active', 'Frozen', 'Failed'; alert severity is lowercase: 'critical', 'open').
+- Casual-language enum cases: always verify the exact case of enum values against the `values:` field in the domain YAML schema.
 
 ## SKILL.md Critical Syntax Notes (verified on Neo4j 2026.02.1)
 
 - `CASE WHEN ... THEN ... ELSE ... END` is correct; standalone `WHEN ... THEN ... END` (without CASE) is NOT supported in Neo4j 2026.02.1 — syntax error.
 - `CALL IN TRANSACTIONS` syntax: `MATCH ... CALL (x) { ... } IN TRANSACTIONS OF N ROWS` — `IN TRANSACTIONS` comes AFTER the `{ }` block. Never `CALL (x) IN TRANSACTIONS { }`.
-- DateTime vs date() mismatch: `Transaction.date` stored as DateTime; `t.date >= date('2025-01-01')` returns 0 rows; use `t.date.year = 2025` or `datetime()` comparisons.
+- `CALL IN TRANSACTIONS` is for **write batching only** — never use for read queries; Neo4j rejects it in the implicit transaction context the harness uses for reads.
 - `SHORTEST 1 (a)-[:REL]+` fails — wrap: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.
 
 ## Schema Data Quality (Injected Schema Accuracy)
@@ -289,10 +288,6 @@ When schema JSON files (`tests/schemas/{domain}.json`) contain wrong data, Claud
 - Relationship type existence — verify with `CALL db.relationshipTypes()`
 - Property types (String vs DateTime vs Boolean vs Integer) — critical for WHERE predicate generation
 
-Known issues found and fixed (2026-03-22):
-- recommendations: vector=`moviePlotsEmbedding` (not `moviePlots`), fulltext=`movieFulltext` (not `movieTitles`)
-- companies: `IN_INDUSTRY` does not exist → use `HAS_CATEGORY`
-- ucfraud: `SHARED_IDENTIFIERS` is Customer→Customer (not Account→Account); `fraudFlag` is STRING not boolean
 
 ## Negative Example Patterns (Stale Training Data)
 

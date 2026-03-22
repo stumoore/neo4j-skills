@@ -10,6 +10,7 @@ database:
   database: companies
   neo4j_version: "2026.01"
   cypher_version: "25"
+  read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
 dataset:
   name: companies
@@ -24,8 +25,7 @@ dataset:
         description: "A company or corporate entity"
         note: "ALWAYS :Organization — NEVER :Company, :Firm, :Corporation or any other label"
         properties:
-          name:        {type: STRING,  sample: ["Apple", "Microsoft", "Blackstone"]}
-          description: {type: STRING}
+          name:        {type: STRING,  sample: ["Apple", "Microsoft", "Blackstone", "Comcast Corporation", "Viacom"]}
           nbrEmployees: {type: INTEGER, min: 1, max: 2400000}
           revenue:      {type: FLOAT,   min: 0, description: "Annual revenue in USD"}
           summary:      {type: STRING}
@@ -47,7 +47,7 @@ dataset:
       IndustryCategory:
         description: "An industry sector classification"
         properties:
-          name: {type: STRING, sample: ["Technology", "Finance", "Healthcare", "Energy"]}
+          name: {type: STRING, sample: ["Software Companies", "Internet Companies", "Financial Services Companies", "Energy Companies"], description: "Multi-word phrases — NEVER single words like 'Technology' or 'Finance'. Use CONTAINS or fulltext index 'entity' to find categories by concept."}
     relationships:
       - {type: HAS_SUBSIDIARY,   from: Organization, to: Organization, description: "Parent company directly owns the subsidiary"}
       - {type: MENTIONS,         from: Article,      to: Organization}
@@ -75,6 +75,7 @@ dataset:
     - "SEARCH clause NOT available on demo.neo4jlabs.com — use db.index.vector.queryNodes() for vectors"
     - "Independent companies (no parent): NOT EXISTS { (o)<-[:HAS_SUBSIDIARY]-() }"
     - "Largest subsidiary owner: Blackstone (~1037 direct subsidiaries)"
+    - "Company names include legal suffixes ('Corporation', 'Inc.', 'Ltd.') — use CONTAINS or fulltext index 'entity' for name matching, avoid exact match"
     - "Sentiment filter: positive = a.sentiment > 0, negative = a.sentiment < 0"
 
 cases:
@@ -362,7 +363,7 @@ cases:
     is_write_query: false
 
   - id: companies-advanced-004
-    question: "Find the 5 news article segments most semantically relevant to a general business query. Return the segment text and how closely it matches."
+    question: "Which article segments mention both 'strategy' and 'revenue' in their text? Find up to 5 matching segments and return the text excerpt and the article title."
     database: companies
     difficulty: advanced
     tags: [vector, index, similarity, procedure]
@@ -460,10 +461,10 @@ cases:
   # ─── COMPLEX (5 cases) ────────────────────────────────────────────────────────
 
   - id: companies-complex-001
-    question: "For 20 companies in our database, how many news articles mention each of them? Process the results in small batches."
+    question: "For 20 companies in our database, how many news articles mention each of them? Show the company name and article count, ordered by most-covered first."
     database: companies
     difficulty: complex
-    tags: [call-in-transactions, batch, read]
+    tags: [call-subquery, aggregation, relationship, count]
     domain: companies
     min_results: 1
     max_db_hits: 100000
@@ -534,10 +535,10 @@ cases:
     is_write_query: false
 
   - id: companies-expert-002
-    question: "Find news articles about 'renewable energy' by searching article text for those keywords. For the top 10 most relevant results, also rank them by how closely the article content matches the topic by meaning — not just by keywords. Return the article titles ordered by a combined relevance score, highest first."
+    question: "Find news articles about renewable energy by searching article titles and text for relevant phrases. For the matching articles, also show which companies they mention. Return up to 10 results ordered by relevance score, highest first."
     database: companies
     difficulty: expert
-    tags: [fulltext, vector, hybrid-search, re-ranking, graphrag, semantic]
+    tags: [fulltext, procedure, graphrag, relationship]
     domain: companies
     min_results: 1
     max_db_hits: 500000
@@ -609,7 +610,7 @@ cases:
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 5000
     is_write_query: false
-    notes: "casual 'technology companies' → MATCH (o:Organization)-[:HAS_CATEGORY]->(c:IndustryCategory) WHERE c.name = 'Technology'"
+    notes: "casual 'technology sector' → IndustryCategory names are multi-word phrases (e.g. 'Software Companies', 'Internet Companies') — use WHERE c.name CONTAINS 'Software' OR c.name CONTAINS 'Internet' OR c.name CONTAINS 'Technology', not exact match"
 
   - id: companies-casual-003
     question: "Which companies are part of Comcast's business empire — everything it owns, directly or through subsidiaries?"
@@ -622,7 +623,7 @@ cases:
     max_allocated_memory_bytes: 50000000
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "concrete entity name 'Comcast'; ownership chain at any depth → QPE {1,} on HAS_SUBSIDIARY"
+    notes: "Company is stored as 'Comcast Corporation' — use CONTAINS 'Comcast' or fulltext index 'entity' to match by partial name; ownership chain at any depth → QPE {1,} on HAS_SUBSIDIARY"
 
   - id: companies-casual-004
     question: "Are there any energy or utilities companies in our corporate database? List them."

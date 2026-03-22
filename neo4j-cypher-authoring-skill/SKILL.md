@@ -151,14 +151,16 @@ Business questions use domain vocabulary that does **not** match schema labels:
 
 **ALWAYS prefer `{1,}` over `+` and `{0,}` over `*`** — `+`/`*` shorthands fail on some servers (e.g. demo.neo4jlabs.com). Use `+`/`*` only after confirming server support.
 
+Quantifier goes **outside** the group: `(pattern){N,M}` ✓ — never `(pattern{N,M})` ✗
+
 ```cypher
-// DO:     CYPHER 25 MATCH (a:Person)-[:KNOWS]-{1,3}(b:Person {name: $name}) RETURN a.name;
-// DO:     CYPHER 25 MATCH (root:Category) (()-[:HAS_SUBCATEGORY]->(){1,}) (leaf:Category) RETURN root.name, leaf.name;
-// DON'T: CYPHER 25 MATCH (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  // WRONG: bare quantifier
-// DO:     CYPHER 25 MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-(){2,4}) (b:Account) RETURN a, b;
+// DO:     CYPHER 25 MATCH (root:Category) (()-[:HAS_SUBCATEGORY]->()){1,} (leaf:Category) RETURN root.name, leaf.name;
+// DO:     CYPHER 25 MATCH (a:Account) (()-[:SHARED_IDENTIFIERS]-()){2,4} (b:Account) RETURN a, b;
+// DON'T: (()-[:HAS_SUBCATEGORY]->(){1,})  // {1,} INSIDE group — SYNTAX ERROR
+// DON'T: (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  // bare quantifier — SYNTAX ERROR
 ```
 
-**NEVER write `SHORTEST 1 (a)-[:REL]+`** — wrap in group: `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.
+**NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗.
 
 **REPEATABLE ELEMENTS** requires bounded quantifier — no `+` or `*`.
 
@@ -185,6 +187,8 @@ RETURN n.name,
 // CORRECT: CYPHER 25 MATCH (c:Customer) CALL (c) { SET c.flag = 'done' } IN TRANSACTIONS OF 100 ROWS RETURN count(c);
 ```
 **NEVER write** `CALL (x) IN TRANSACTIONS { }` — `IN TRANSACTIONS` comes AFTER the `{ }` block.
+
+**CALL IN TRANSACTIONS is for write batching only** — never use it for read queries; it requires an implicit (auto-commit) transaction and will fail with `TransactionStartFailed` if the driver uses an explicit transaction.
 
 ---
 
@@ -278,6 +282,8 @@ Do **not** load all files — select only what the current query type requires.
 **0-Result Queries:** (1) verify params non-null and correctly typed; (2) remove `WHERE` predicates one at a time to isolate; (3) check label/rel-type spelling against schema; (4) EXPLAIN to confirm index used.
 
 **TypeErrors:** prefer `toIntegerOrNull`/`toFloatOrNull` over base casting; guard with `IS NOT NULL` before coercion.
+
+**No `least()`/`greatest()`** — these SQL functions do not exist in Cypher. Use `CASE WHEN a < b THEN a ELSE b END`.
 
 **DateTime vs date() mismatch** — `DateTime >= date('2025-01-01')` returns 0 rows: use `.year` accessor (`t.date.year = 2025`) or `datetime()` literals for DateTime-typed properties.
 

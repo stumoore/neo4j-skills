@@ -989,6 +989,7 @@ def run_case(
     schema_text: Optional[str] = None,
     value_hints: Optional[str] = None,
     server_version: Optional[str] = None,
+    domain_read_only: bool = False,
 ) -> TestCaseResult:
     """
     Run a single test case end-to-end.
@@ -998,6 +999,10 @@ def run_case(
 
     When server_version is provided (or auto-detected), cases with min_version
     greater than the detected version are recorded as SKIPPED rather than executed.
+
+    When domain_read_only is True and tc.is_write_query is True, the case is
+    SKIPPED rather than executed (write queries against read-only DBs always fail
+    with Security.Forbidden — not a skill quality signal).
     """
     t0 = time.monotonic()
     error: Optional[str] = None
@@ -1041,6 +1046,24 @@ def run_case(
                 duration_s=round(time.monotonic() - t0, 3),
                 skip_reason=skip_reason,
             )
+
+    # Read-only gate: skip write cases against read-only databases
+    if tc.is_write_query and domain_read_only:
+        return TestCaseResult(
+            case_id=tc.id,
+            question=tc.question,
+            difficulty=tc.difficulty,
+            tags=tc.tags,
+            verdict=SKIPPED,
+            failed_gate=None,
+            warned_gate=None,
+            generated_cypher="",
+            metrics={},
+            gate_details=[],
+            error=None,
+            duration_s=round(time.monotonic() - t0, 3),
+            skip_reason="write query on read-only database",
+        )
 
     # Step 1: invoke Claude Code headless
     prompt = _build_claude_prompt(tc, schema_text=schema_text, value_hints=value_hints)
@@ -1177,6 +1200,7 @@ def _run_case_buffered(
     value_hints: Optional[str],
     verbose: bool,
     server_version: Optional[str] = None,
+    domain_read_only: bool = False,
 ) -> tuple["TestCaseResult", list[str]]:
     """Run a single case and return (result, log_lines) for atomic printing."""
     log_lines: list[str] = []
@@ -1191,6 +1215,7 @@ def _run_case_buffered(
         schema_text=schema_text,
         value_hints=value_hints,
         server_version=server_version,
+        domain_read_only=domain_read_only,
     )
     if verbose:
         gate_info = ""
@@ -1335,6 +1360,15 @@ def run_all(
                         flush=True,
                     )
 
+    # Build set of domains marked read_only: true in their database: block
+    read_only_domains: set[str] = {
+        domain
+        for domain, db in db_blocks.items()
+        if db.get("read_only") is True
+    }
+    if verbose and read_only_domains:
+        print(f"[read-only] Domains with read_only: {sorted(read_only_domains)} — write cases will SKIP", flush=True)
+
     results: list[TestCaseResult] = []
     passed = warned = failed = skipped = 0
     n_workers = max(1, min(workers, len(cases)))
@@ -1354,6 +1388,7 @@ def run_all(
                 value_hints=value_hints,
                 verbose=verbose,
                 server_version=server_version,
+                domain_read_only=tc.domain in read_only_domains,
             )
             for line in log_lines:
                 print(line, flush=True)
@@ -1389,6 +1424,7 @@ def run_all(
                     value_hints=value_hints,
                     verbose=verbose,
                     server_version=server_version,
+                    domain_read_only=tc.domain in read_only_domains,
                 )
                 future_to_idx[future] = i
 

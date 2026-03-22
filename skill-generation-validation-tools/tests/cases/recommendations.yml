@@ -10,6 +10,7 @@ database:
   database: recommendations
   neo4j_version: "2026.01"
   cypher_version: "25"
+  read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
 dataset:
   name: recommendations
@@ -97,7 +98,7 @@ dataset:
         call: "CALL db.index.fulltext.queryNodes('personFulltext', $q) YIELD node, score"
         description: "Full-text search on person names and bios"
   notes:
-    - "CRITICAL: Movie.released is an INTEGER year (e.g. 1994), NOT a Date — use WHERE m.released > 2000"
+    - "CRITICAL: Movie.released is a STRING in 'YYYY-MM-DD' format (e.g. '1994-09-23') — use string comparison: WHERE m.released > '2000-01-01', NOT integer comparison"
     - "CRITICAL: User.userId is a STRING — always match with WHERE u.userId = '1' (quoted), not = 1"
     - "CRITICAL: Vector index name is 'moviePlotsEmbedding' (NOT 'moviePlots'). Using wrong name causes ProcedureCallFailed."
     - "CRITICAL: Fulltext index name is 'movieFulltext' (NOT 'movieTitles'). It covers both title AND plot fields."
