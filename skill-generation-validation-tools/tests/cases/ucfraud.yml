@@ -725,7 +725,7 @@ cases:
     max_runtime_ms: 5000
     is_write_query: false
     min_version: "2026.02"
-    notes: "SHOW GRAPH TYPES — read-only schema inspection; min_results: 0 acceptable since no graph type may be declared yet"
+    notes: "Correct syntax: SHOW GRAPH TYPES (not 'SHOW CURRENT GRAPH TYPE ELEMENTS' — that's invalid). min_results: 0 is acceptable since no graph type may be declared yet."
 
   - id: "ucf-graphtype-002"
     question: "Declare a schema element type for the Customer entity that enforces a mandatory customerID string and mandatory name string, to improve data quality on new customer records."
@@ -739,7 +739,7 @@ cases:
     max_runtime_ms: 10000
     is_write_query: true
     min_version: "2026.02"
-    notes: "ALTER CURRENT GRAPH TYPE SET with ::Customer element type — mandatory STRING NOT NULL for customerID and name; is_write_query:true because DDL modifies schema"
+    notes: "Exact syntax: ALTER CURRENT GRAPH TYPE SET (::Customer { customerID :: STRING NOT NULL, name :: STRING NOT NULL }) — node element type goes directly after SET, no outer braces around the whole statement."
 
   - id: "ucf-graphtype-003"
     question: "Extend the database schema to add an element type for transactions that enforces a mandatory transactionID string and mandatory amount float, and add a schema constraint for the SENT relationship type."

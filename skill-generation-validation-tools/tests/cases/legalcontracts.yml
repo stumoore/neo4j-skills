@@ -8,7 +8,7 @@ database:
   uri: neo4j+s://demo.neo4jlabs.com:7687
   username: legalcontracts
   database: legalcontracts
-  neo4j_version: "2026.02"
+  neo4j_version: "2026.01"
   cypher_version: "25"
   read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
@@ -84,7 +84,7 @@ dataset:
     - "Party names are typically in UPPER CASE — use CONTAINS or toLower() for flexible matching"
     - "Contract types are exact strings — use full values from the values list above"
     - "Clause types: exactly 5 distinct values as listed in the type values list"
-    - "SEARCH clause is GA on demo.neo4jlabs.com 2026.02.x — use SEARCH syntax for vector queries"
+    - "Vector search: use CALL db.index.vector.queryNodes('contractSummary', N, $vec) YIELD node AS c, score — SEARCH clause is NOT available (server is 2026.01.x)"
 
 cases:
 
@@ -385,7 +385,7 @@ cases:
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 15000
     is_write_query: false
-    notes: "Requires an embedding vector for the query text — model should show the query structure using a parameter placeholder."
+    notes: "Use CALL db.index.vector.queryNodes('contractSummary', 5, $vec) YIELD node AS c, score — NOT SEARCH clause (server 2026.01.x). $vec is a parameter placeholder for the 1536-dim embedding."
 
   - id: legalcontracts-expert-003
     question: "Find the shortest contract relationship path between 'HONEYWELL INTERNATIONAL INC.' and any party that has signed a Joint Venture agreement. Show the path including party names and contract types."

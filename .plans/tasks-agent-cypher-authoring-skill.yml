@@ -1013,3 +1013,28 @@ tasks:
       - "SKILL.md states: when auto-fallback applied, add inline comment explaining substitution"
       - "SKILL.md body remains ≤ 300 lines after the addition"
     completed_at: "2026-03-22T15:00:00Z"
+
+  - id: task-048
+    title: "Add GDS (Graph Data Science) library support as optional capability in skill"
+    description: |
+      The Neo4j Graph Data Science (GDS) library provides `gds.*` procedures for
+      graph algorithms (betweenness centrality, PageRank, community detection, etc.).
+      GDS is NOT installed by default but CAN be installed on local and cloud instances.
+      This task adds:
+      1. A `gds` flag to the YAML `database:` block (e.g., `gds: true`) so test cases
+         can signal GDS availability to the harness/model
+      2. A new L3 reference file `references/write/cypher25-gds.md` with common GDS
+         procedure patterns (graph projection, streaming algorithms, write-back)
+      3. A SKILL.md section explaining when GDS is available vs. when to use native Cypher
+         approximations (already partially added — extend with L3 pointer and examples)
+      4. Update SKILL.md category table to route `gds.*` calls to the new L3 file
+      5. Add twitter GDS test case once GDS is installed locally
+    status: pending
+    dependencies:
+      - task-047
+    acceptance_criteria:
+      - "YAML database: block supports optional gds: true/false flag"
+      - "references/write/cypher25-gds.md exists with graph projection + 5 algorithm patterns"
+      - "SKILL.md routes to cypher25-gds.md for gds.* queries"
+      - "SKILL.md clearly states: do NOT use gds.* unless schema context has gds: true"
+      - "Native Cypher fallbacks documented for degree/betweenness/PageRank approximations"

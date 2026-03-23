@@ -8,7 +8,7 @@ database:
   uri: neo4j+s://demo.neo4jlabs.com:7687
   username: retail
   database: retail
-  neo4j_version: "2026.02"
+  neo4j_version: "2026.01"
   cypher_version: "25"
   read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
@@ -104,7 +104,7 @@ dataset:
     - "Customer age may be null (NaN stored as null in graph) — use IS NOT NULL guards"
     - "clubMemberStatus values: 'ACTIVE' or 'PRE-CREATE'"
     - "article_graph_embeddings uses 128 dimensions (not 1536) — do not mix with product vector index"
-    - "SEARCH clause is GA on demo.neo4jlabs.com 2026.02.x — use SEARCH syntax for vector queries"
+    - "Vector search: use CALL db.index.vector.queryNodes('article_graph_embeddings', N, $vec) YIELD node AS a, score — SEARCH clause is NOT available (server is 2026.01.x)"
 
 cases:
 

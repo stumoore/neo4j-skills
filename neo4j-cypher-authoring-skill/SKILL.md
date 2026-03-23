@@ -160,7 +160,17 @@ Quantifier goes **outside** the group: `(pattern){N,M}` ✓ — never `(pattern{
 // DON'T: (a:Account)-[:SHARED_IDENTIFIERS]-{2,4}-(b:Account)  // bare quantifier — SYNTAX ERROR
 ```
 
-**NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗. `REPEATABLE ELEMENTS` requires bounded `{m,n}` — never `+` or `*`.
+**NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗.
+
+**REPEATABLE ELEMENTS** is a **MATCH-level mode**, placed at the END of the full MATCH pattern — NEVER inside a QPE group:
+```cypher
+// DO:     MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->()){3}(b:Customer) REPEATABLE ELEMENTS
+// DON'T: MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->() REPEATABLE ELEMENTS){3}(b:Customer)
+// DON'T: MATCH ... (()-[:REL]->() REPEATABLE ELEMENTS){2,4} ...  // inside group — SYNTAX ERROR
+```
+`REPEATABLE ELEMENTS` always requires bounded `{m,n}` — never `+`, `*`, or `{1,}`.
+
+**QPE groups must always start AND end with a node**: `((:A)-[:REL]->(:B)){1,3}` ✓ — never `((:A)-[:REL]->){1,3}` ✗ (dangling relationship at end).
 
 ### WITH Cardinality Reset
 
@@ -187,6 +197,20 @@ RETURN n.name,
 **NEVER write** `CALL (x) IN TRANSACTIONS { }` — `IN TRANSACTIONS` comes AFTER the `{ }` block.
 
 **CALL IN TRANSACTIONS is for write batching only** — never use it for read queries; it requires an implicit (auto-commit) transaction and will fail with `TransactionStartFailed` if the driver uses an explicit transaction.
+
+---
+
+### Graph Data Science (GDS) Library
+
+> **GDS is NOT available by default** — only use GDS procedures (`gds.*`) when the schema context explicitly states `gds: true` or lists GDS procedures. On demo databases and most cloud instances, GDS is not installed.
+
+**When GDS is NOT available:** Use native Cypher equivalents:
+- Betweenness / degree centrality → `count()` aggregation on relationships
+- PageRank approximation → count in-neighbors weighted by their in-degree
+- Community detection → not expressible in pure Cypher; use `COLLECT` for local neighborhoods
+- Shortest path → `SHORTEST` keyword (Cypher 25) or `shortestPath()`
+
+**When GDS IS available** (schema block has `gds: true`): Use `CALL gds.*` procedures normally with `YIELD`.
 
 ---
 
@@ -253,6 +277,13 @@ LIMIT 20
 | `UNWIND list AS x` | Need to inspect, filter, or return list items |
 
 `FOREACH` cannot be followed by `RETURN`. When in doubt, use `UNWIND`.
+
+**`WHERE` after `UNWIND` is invalid** — `WHERE` requires a preceding `WITH` or `MATCH`:
+```cypher
+// DON'T: UNWIND list AS x WHERE x > 5 RETURN x       // SyntaxError
+// DO:    UNWIND list AS x WITH x WHERE x > 5 RETURN x
+// ALSO DO: UNWIND list AS x MATCH (n) WHERE n.val = x RETURN n
+```
 
 ---
 
