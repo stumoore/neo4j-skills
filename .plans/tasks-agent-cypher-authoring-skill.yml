@@ -1,7 +1,7 @@
 feature: agent-cypher-authoring-skill
 prd: ./prd-agent-cypher-authoring-skill.md
 created_at: 2026-03-19T00:00:00Z
-updated_at: 2026-03-23T14:30:00Z
+updated_at: 2026-03-23T15:00:00Z
 
 tasks:
   - id: task-001
@@ -1450,3 +1450,127 @@ tasks:
       - "New cases avoid unbounded traversal patterns that cause timeouts"
       - "New cases cover ≥ 6 of the 8 pattern categories"
       - "Harness validation: ≥ 90% pass rate on ucnetwork domain"
+
+  - id: task-067
+    title: "Build dataset registration CLI: make register-dataset (REQ-F-048)"
+    description: |
+      Create skill-generation-validation-tools/scripts/register_dataset.py and
+      wire it to a Makefile target `register-dataset`.
+
+      The script accepts CLI args (or env vars): --uri, --username, --password,
+      --database, --domain (default: database name), --model (default: sonnet),
+      --output-dir (default: tests/cases/).
+
+      Discovery steps (in order):
+      1. Neo4j version: CALL dbms.components() YIELD name, versions
+      2. Capabilities: SHOW PROCEDURES YIELD name WHERE name STARTS WITH 'gds.'
+         (repeat for 'apoc.', 'ai.') → build capabilities: [] list
+      3. Schema: CALL apoc.meta.schema() if apoc available, else
+         CALL db.schema.visualization() — extract labels, rel-types, properties
+      4. Property value sampling: for each label×property pair, run
+         COLLECT { MATCH (n:Label) RETURN DISTINCT n.prop LIMIT 20 }
+         to populate sample: / values: fields
+      5. Indexes: SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state
+         WHERE state = 'ONLINE'
+      6. Constraints: SHOW CONSTRAINTS YIELD name, type, labelsOrTypes, properties
+
+      After discovery, call Claude (claude --print --model <model_id>) with all
+      discovered data to generate:
+      - description: (2-3 sentence business-language summary)
+      - Per-label notes (key business entities, common query patterns)
+
+      Write output as a dataset: YAML block to tests/cases/<domain>.yml.
+      If file exists: update only the dataset: block, preserve existing cases.
+      If file is new: write dataset: block only (no cases yet).
+
+      Makefile target:
+        register-dataset:
+          uv run --project skill-generation-validation-tools python3 \
+            skill-generation-validation-tools/scripts/register_dataset.py \
+            --uri $(DB_URI) --username $(DB_USER) --password $(DB_PASS) \
+            --database $(DB_NAME) --domain $(DOMAIN) --model $(MODEL)
+    status: pending
+    dependencies: [task-056]
+    acceptance_criteria:
+      - "register_dataset.py exists and runs without errors against a live DB"
+      - "Output YAML contains: name, database, connection, description, schema (nodes+rels+indexes+constraints), capabilities, notes"
+      - "Property value sampling uses COLLECT DISTINCT LIMIT 20 form"
+      - "APOC meta.schema() used when available; db.schema.visualization() as fallback"
+      - "File merge: existing cases preserved when domain YAML already exists"
+      - "make register-dataset DB_URI=... DB_USER=... DB_PASS=... DB_NAME=companies works end-to-end"
+
+  - id: task-068
+    title: "Build question generation CLI: make generate-questions (REQ-F-049)"
+    description: |
+      Create skill-generation-validation-tools/scripts/generate_questions.py and
+      wire to Makefile targets `generate-questions` and `onboard-dataset`.
+
+      The script accepts: --domain (required), --count (default 25),
+      --model (default sonnet), --difficulties (default all five, comma-separated:
+      basic,intermediate,advanced,complex,expert), --cases-dir (default tests/cases/),
+      --skill (default neo4j-cypher-authoring-skill).
+
+      Algorithm:
+      1. Load domain YAML — require dataset: block (error if missing)
+      2. Build generation prompt: inject schema, sampled values, description,
+         existing question list (to avoid duplicates), difficulty distribution target
+      3. Call Claude (--print --model <model_id> --skill <skill>) to generate
+         COUNT questions as a structured JSON list:
+         [{difficulty, question, notes, expected_pattern}]
+      4. For each generated question:
+         a. Call Claude again to generate candidate Cypher
+         b. Execute against live DB → capture actual_rows, execution_ms
+         c. If execution succeeds and rows >= 0: write case with
+            min_results: max(0, actual_rows - tolerance)
+            status: pending (ready for harness)
+         d. If execution fails or 0 rows unexpectedly:
+            status: needs_review (stub preserved for human fix)
+      5. Assign sequential IDs continuing from highest existing ID in file
+      6. Append new cases to domain YAML
+
+      Makefile targets:
+        generate-questions:
+          uv run --project ... python3 .../generate_questions.py \
+            --domain $(DOMAIN) --count $(COUNT) --model $(MODEL) \
+            --difficulties $(DIFFICULTIES)
+
+        onboard-dataset: register-dataset generate-questions
+
+      COUNT defaults to 25 per invocation (not 100 — users run multiple times
+      or pass COUNT=75 to top up to 100).
+    status: pending
+    dependencies: [task-067]
+    acceptance_criteria:
+      - "generate_questions.py generates COUNT questions distributed across requested difficulties"
+      - "Questions follow business-user language rule (verified by spot-check)"
+      - "Each case includes: id, difficulty, question, notes, min_results, execution_ms baseline"
+      - "Cases with 0-row or error execution are written with status: needs_review (not dropped)"
+      - "No duplicate IDs introduced into existing domain YAML"
+      - "make generate-questions DOMAIN=companies COUNT=25 works end-to-end"
+      - "make onboard-dataset DB_URI=... DB_USER=... DB_PASS=... DB_NAME=northwind runs both steps"
+
+  - id: task-069
+    title: "Use onboard-dataset pipeline to complete 100-case expansion (REQ-F-047 + REQ-F-049)"
+    description: |
+      Once task-067 and task-068 are complete, use the new `make generate-questions`
+      pipeline to top up all 10 domains to ≥ 100 cases, replacing the manual
+      hone-task approach originally planned in tasks 057-066.
+
+      For each domain run:
+        make generate-questions DOMAIN=<domain> COUNT=<gap> MODEL=haiku
+
+      Where gap = 100 - current_count. Use haiku model for bulk generation to
+      reduce cost. Review needs_review stubs manually.
+
+      After all domains reach ≥ 100 cases, run full harness validation and
+      confirm ≥ 90% pass rate per domain. Update tasks 057-066 status to
+      superseded if this task completes them all, or close individually.
+
+      This task supersedes tasks 057-066 if the pipeline works correctly.
+    status: pending
+    dependencies: [task-068]
+    acceptance_criteria:
+      - "All 10 domain YAMLs have ≥ 100 test cases"
+      - "needs_review stubs resolved or documented"
+      - "Full harness: ≥ 90% pass rate across all 10 domains"
+      - "make dry-run passes with ≥ 1000 total cases"
