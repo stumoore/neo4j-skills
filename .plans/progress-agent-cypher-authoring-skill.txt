@@ -2177,3 +2177,47 @@ Key Decisions:
   (handles environments where skill is not available)
 - Write query execution uses rolled-back transaction to avoid side effects
 - All acceptance criteria verified via make smoke + dry-run (587 cases loaded)
+
+================================================================================
+TASK-061: Expand northwind domain to ≥ 100 test cases (REQ-F-047)
+Date: 2026-03-23T18:00:00Z
+================================================================================
+Summary: Expanded northwind.yml from 32 to 105 test cases by adding 73 new cases
+across all difficulty tiers and pattern categories.
+
+New cases added by section:
+- Basic (northwind-basic-007 to 020): 14 additional basic cases
+- Intermediate (northwind-intermediate-007 to 020): 14 additional intermediate cases
+- Advanced (northwind-advanced-007 to 020): 14 additional advanced cases
+- Complex (northwind-complex-005 to 012): 8 additional complex cases
+- Expert (northwind-expert-006 to 012): 7 additional expert cases
+- Write (northwind-write-006 to 010): 5 additional write cases
+- Schema introspection (northwind-schema-001 to 004): 4 new schema cases
+- Plugin (northwind-plugin-001 to 004): 4 new plugin cases (APOC + GDS)
+- Temporal edge cases (northwind-temporal-001 to 003): 3 standalone temporal cases
+
+Pattern category coverage achieved:
+- Aggregations: 47 cases
+- Temporal: 12 cases (string date comparison, duration.between, quarterly bucketing)
+- Multi-hop graph traversal: covered by relationship-chain + graph-traversal tags
+- Write: 13 cases (MERGE, SET, DETACH DELETE, CALL IN TRANSACTIONS)
+- Schema introspection: 3+ cases (SHOW INDEXES, SHOW CONSTRAINTS, SHOW PROCEDURES)
+- Plugin: 5 cases (APOC map/collection, GDS Louvain/degree centrality)
+- Edge cases: embedded in advanced/complex questions
+- Ranking: covered in ranking + top-n-per-group tagged cases
+
+Key decisions:
+- Order.orderDate/shippedDate stored as STRING → use string comparison and
+  date(left(str,10)) for temporal cases
+- Order.freight stored as STRING → toFloat() required for numeric comparisons
+- SUPPLIES is 1:1 per product (verified) → no "multiple suppliers" test cases
+- All 77 products are in at least 1 order → "never ordered" returns 0 rows (avoided)
+- GDS cases marked min_results: 0 since GDS graph projection may fail on Community Ed
+
+Validation: dry-run passes for all 105 cases; question_validator shows 6 violations
+all in pre-existing cases (before this task). All 73 new cases are clean.
+
+Files Changed:
+- skill-generation-validation-tools/tests/cases/northwind.yml (32 → 105 cases)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-061 status → completed)
+

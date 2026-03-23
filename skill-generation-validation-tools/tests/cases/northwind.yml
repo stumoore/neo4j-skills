@@ -508,3 +508,941 @@ cases:
     max_runtime_ms: 30000
     is_write_query: true
     notes: "Use CALL (p) { SET p.unitsInStock = p.unitsInStock - 1 } IN TRANSACTIONS OF 10 ROWS pattern. Match all discontinued products first, then apply batch write."
+
+  # ─── ADDITIONAL BASIC (14 more → total 20) ───────────────────────────────────
+
+  - id: northwind-basic-007
+    question: "How many customers does Northwind have in total?"
+    database: northwind
+    difficulty: basic
+    tags: [count, nodes]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 200
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-008
+    question: "How many orders have been placed in total?"
+    database: northwind
+    difficulty: basic
+    tags: [count, nodes]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 1000
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-009
+    question: "List all products in the Beverages category."
+    database: northwind
+    difficulty: basic
+    tags: [match, relationship, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-010
+    question: "Which suppliers are based in the USA?"
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 200
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-011
+    question: "Show me all products with a unit price above 50 dollars."
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, price]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-012
+    question: "List the names of all suppliers."
+    database: northwind
+    difficulty: basic
+    tags: [match, nodes]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 200
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-013
+    question: "Which products have more than 100 units in stock?"
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, inventory]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-014
+    question: "How many suppliers does Northwind work with?"
+    database: northwind
+    difficulty: basic
+    tags: [count, nodes]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 200
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-015
+    question: "List all customers from the USA."
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-016
+    question: "What products are in the Seafood category?"
+    database: northwind
+    difficulty: basic
+    tags: [match, relationship, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-017
+    question: "Which products have zero units on order right now?"
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, inventory]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-018
+    question: "Show me the cheapest 5 products by unit price."
+    database: northwind
+    difficulty: basic
+    tags: [match, order, limit, price]
+    domain: northwind
+    min_results: 5
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-019
+    question: "Which customers are from France?"
+    database: northwind
+    difficulty: basic
+    tags: [match, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-basic-020
+    question: "Show me all products in the Dairy Products category."
+    database: northwind
+    difficulty: basic
+    tags: [match, relationship, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  # ─── ADDITIONAL INTERMEDIATE (14 more → total 20) ────────────────────────────
+
+  - id: northwind-intermediate-007
+    question: "What is the total number of orders shipped to each country? Show top 10 destination countries."
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, group-by, geography, order, limit]
+    domain: northwind
+    min_results: 10
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Use Order.shipCountry for grouping. 830 total orders across multiple ship countries."
+
+  - id: northwind-intermediate-008
+    question: "Which customers have never placed an order? Show their company names."
+    database: northwind
+    difficulty: intermediate
+    tags: [optional-match, not-exists, filter]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Use NOT EXISTS {} or OPTIONAL MATCH pattern. Some Northwind customers may have 0 orders — min_results: 0 to allow for empty result."
+
+  - id: northwind-intermediate-009
+    question: "For each product category, what is the total combined value of all units currently in stock? Show category name and total stock value."
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, math, relationship, group-by]
+    domain: northwind
+    min_results: 8
+    max_db_hits: 2000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Stock value = unitPrice * unitsInStock. Group by category."
+
+  - id: northwind-intermediate-010
+    question: "Which orders were shipped to Brazil? Show order ID and ship city."
+    database: northwind
+    difficulty: intermediate
+    tags: [match, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+
+  - id: northwind-intermediate-011
+    question: "Which products have a reorder level of 0?"
+    database: northwind
+    difficulty: intermediate
+    tags: [match, filter, inventory]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+
+  - id: northwind-intermediate-012
+    question: "What is the total number of products supplied by each country? Show supplier country and product count."
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, relationship, group-by, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+
+  - id: northwind-intermediate-013
+    question: "Find all orders placed after the year 1997. How many were there?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, temporal, string-comparison, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Order.orderDate is stored as STRING 'YYYY-MM-DD HH:MM:SS.mmm' — use string comparison o.orderDate >= '1997-01-01'. Orders span 1996–1998."
+
+  - id: northwind-intermediate-014
+    question: "Which customers have placed exactly one order?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, relationship, filter, group-by]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+
+  - id: northwind-intermediate-015
+    question: "What is the average freight cost across all orders?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, math, type-casting]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Order.freight is a STRING — use toFloat(o.freight) for arithmetic. Average across 830 orders."
+
+  - id: northwind-intermediate-016
+    question: "List the top 10 products by number of times they appear in orders."
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, relationship, order, limit]
+    domain: northwind
+    min_results: 10
+    max_db_hits: 10000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: northwind-intermediate-017
+    question: "Which categories have more than 10 products?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, relationship, filter, group-by]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 2000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+
+  - id: northwind-intermediate-018
+    question: "Find all orders placed in 1996. How many were there and what was the average freight cost?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, temporal, string-comparison, math]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Filter by o.orderDate >= '1996-01-01' AND o.orderDate < '1997-01-01'. freight is STRING so use toFloat()."
+
+  - id: northwind-intermediate-019
+    question: "How many unique customers have ordered products from the Seafood category?"
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, distinct, relationship-chain, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 10000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: northwind-intermediate-020
+    question: "What is the total freight charged per ship country? Show the top 5 countries by total freight cost."
+    database: northwind
+    difficulty: intermediate
+    tags: [aggregation, math, type-casting, group-by, geography, order, limit]
+    domain: northwind
+    min_results: 5
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Order.freight is STRING — cast with toFloat() before summing."
+
+  # ─── ADDITIONAL ADVANCED (14 more → total 20) ────────────────────────────────
+
+  - id: northwind-advanced-007
+    question: "Which orders were placed in 1997 but not yet shipped? Show order ID, customer name, and order date."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, string-comparison, null-handling, relationship, filter]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Filter o.orderDate >= '1996-01-01' AND o.orderDate < '1998-01-01' AND o.shippedDate IS NULL. shippedDate is null for unshipped orders."
+
+  - id: northwind-advanced-008
+    question: "Find products that cost more than the average product price in their category. Show product name, unit price, and category average."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, subquery, comparison, relationship, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: northwind-advanced-009
+    question: "For each quarter of 1997, how many orders were placed? Show year, quarter number, and order count."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, aggregation, string-manipulation, group-by, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Order.orderDate is STRING. Use CASE WHEN to bucket by month into quarters. Orders span 1996-1998."
+
+  - id: northwind-advanced-010
+    question: "Which products have been ordered by customers from at least 5 different countries? Show product name and country count."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, distinct, relationship-chain, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+
+  - id: northwind-advanced-011
+    question: "Find all products that are both discontinued AND currently have units in stock. Show product name, stock level, and category."
+    database: northwind
+    difficulty: advanced
+    tags: [match, filter, compound-predicate, relationship, inventory]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Filter: p.discontinued = true AND p.unitsInStock > 0. Some discontinued products still have remaining stock."
+
+  - id: northwind-advanced-012
+    question: "Which categories generate the highest total freight cost when shipping their products? Show category name and total freight across all orders for that category."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, math, type-casting, relationship-chain, group-by, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+    notes: "Traverse Customer->Order->Product->Category. freight is STRING — cast with toFloat()."
+
+  - id: northwind-advanced-013
+    question: "Find the 5 customers who have spent the most in total freight on their orders. Show company name and total freight."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, math, type-casting, relationship, order, limit]
+    domain: northwind
+    min_results: 5
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Sum toFloat(o.freight) per customer across all their orders."
+
+  - id: northwind-advanced-014
+    question: "Which suppliers have no products currently in stock? Show supplier company name."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, filter, not-exists, relationship, inventory]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Suppliers where all their supplied products have unitsInStock = 0. min_results: 0 in case all suppliers have at least one in-stock product."
+
+  - id: northwind-advanced-015
+    question: "For each supplier country, what is the total value of products they supply that are currently in stock? Rank by total value."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, math, relationship, group-by, geography, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: northwind-advanced-016
+    question: "Find products whose units in stock has fallen below their units on order. These might indicate supply imbalances. Show product name, units in stock, and units on order."
+    database: northwind
+    difficulty: advanced
+    tags: [match, filter, comparison, inventory]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 1000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+
+  - id: northwind-advanced-017
+    question: "Which categories have products from suppliers in more than 3 different countries? Show category name, number of supplier countries, and list the countries."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, collect, distinct, relationship-chain, filter, geography]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+
+  - id: northwind-advanced-018
+    question: "Show orders from 1998 with a freight cost greater than 100. Include the customer company name."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, math, type-casting, filter, relationship]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Filter by o.orderDate >= '1998-01-01' AND toFloat(o.freight) > 100."
+
+  - id: northwind-advanced-019
+    question: "Which customers placed orders in all three years 1996, 1997, and 1998? Show their company names."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, string-comparison, aggregation, filter, all-predicate]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 10000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 12000
+    is_write_query: false
+    notes: "Use COLLECT(DISTINCT left(o.orderDate, 4)) to get distinct years per customer, then filter WHERE '1996' IN years AND '1997' IN years AND '1998' IN years."
+
+  - id: northwind-advanced-020
+    question: "Find the most popular product (by order count) in each supplier's catalog. Show supplier name, best-selling product name, and order count."
+    database: northwind
+    difficulty: advanced
+    tags: [aggregation, ranking, relationship-chain, group-by, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+
+  # ─── ADDITIONAL COMPLEX (8 more → total 12) ──────────────────────────────────
+
+  - id: northwind-complex-005
+    question: "For each product, show how many unique customers have ordered it and the total number of orders it appears in. Sort by popularity."
+    database: northwind
+    difficulty: complex
+    tags: [aggregation, distinct, relationship-chain, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+
+  - id: northwind-complex-006
+    question: "Find customers who ordered products from exactly 3 different categories. Show company name and the 3 category names."
+    database: northwind
+    difficulty: complex
+    tags: [aggregation, collect, filter, relationship-chain, count]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+
+  - id: northwind-complex-007
+    question: "Which products have been ordered by customers in every continent represented in this dataset — North America (USA, Mexico, Canada), Europe (UK, Germany, France, etc.), South America (Brazil)? Show product names that appear across all three regions."
+    database: northwind
+    difficulty: complex
+    tags: [aggregation, collect, filter, geography, relationship-chain, all-predicate]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 25000
+    is_write_query: false
+    notes: "North America = ['USA','Mexico','Canada'], Europe covers many countries, South America includes Brazil. Group customer countries by region, then find products ordered from all 3 regions."
+
+  - id: northwind-complex-008
+    question: "For each year (1996, 1997, 1998), show the top 3 best-selling product categories by total number of order appearances."
+    database: northwind
+    difficulty: complex
+    tags: [temporal, aggregation, ranking, top-n-per-group, relationship-chain, string-comparison]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+    notes: "Extract year from o.orderDate with left(o.orderDate, 4). Group by year and category, then rank within each year."
+
+  - id: northwind-complex-009
+    question: "Find the second-most-ordered product in each category. Show category name, product name, and order count."
+    database: northwind
+    difficulty: complex
+    tags: [aggregation, ranking, top-n-per-group, relationship-chain]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+    notes: "Use COLLECT + index or ORDER BY with SKIP to find the second highest per category."
+
+  - id: northwind-complex-010
+    question: "Find customers who have significantly changed their ordering behaviour: they placed more orders in 1998 than in 1996. Show customer company name, orders in 1996, and orders in 1998."
+    database: northwind
+    difficulty: complex
+    tags: [temporal, aggregation, comparison, subquery, relationship]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 10000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+    notes: "Count orders per customer per year using CALL subquery or WITH aggregation. Filter WHERE orders1998 > orders1996."
+
+  - id: northwind-complex-011
+    question: "Show me the supply chain network: for each category, list the suppliers and their products, showing how many unique customers have bought each product."
+    database: northwind
+    difficulty: complex
+    tags: [aggregation, collect, relationship-chain, group-by]
+    domain: northwind
+    min_results: 8
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 25000
+    is_write_query: false
+
+  - id: northwind-complex-012
+    question: "Find all pairs of products that frequently appear together in the same order (co-purchased at least 50 times). Show both product names and co-purchase count."
+    database: northwind
+    difficulty: complex
+    tags: [common-neighbor, graph-traversal, aggregation, filter, limit]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 30000
+    is_write_query: false
+    notes: "Pattern: MATCH (p1:Product)<-[:ORDERS]-(o:Order)-[:ORDERS]->(p2:Product) WHERE id(p1) < id(p2). min_results: 0 — the threshold 50 may yield 0 pairs. Adjust threshold if needed."
+
+  # ─── ADDITIONAL EXPERT (7 more → total 12) ───────────────────────────────────
+
+  - id: northwind-expert-006
+    question: "Trace the supply chain from all French suppliers through their products to all German buyers. Show the supplier, their product, a sample order, and the buyer."
+    database: northwind
+    difficulty: expert
+    tags: [graph-traversal, relationship-chain, filter, geography]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 25000
+    is_write_query: false
+    notes: "French suppliers: Supplier.country = 'France'. German customers: Customer.country = 'Germany'. Verify that French-supplied products were ordered by German customers."
+
+  - id: northwind-expert-007
+    question: "Use a quantified path to find all indirect supplier connections: suppliers that share at least 2 customers (via their supplied products and those products' orders). Show the two supplier names and shared customer count."
+    database: northwind
+    difficulty: expert
+    tags: [qpe, common-neighbor, aggregation, filter, relationship-chain]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+    notes: "Suppliers are connected via shared customers: (s1:Supplier)-[:SUPPLIES]->(p1:Product)<-[:ORDERS]-(o:Order)<-[:PURCHASED]-(c:Customer)-[:PURCHASED]->(o2:Order)-[:ORDERS]->(p2:Product)<-[:SUPPLIES]-(s2:Supplier). Count distinct customers."
+
+  - id: northwind-expert-008
+    question: "What is the most direct connection between the buyer 'Alfreds Futterkiste' (ALFKI) and any supplier of Seafood products in the network? Show the path."
+    database: northwind
+    difficulty: expert
+    tags: [shortest-path, filter, relationship-chain]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+    notes: "Use SHORTEST 1 (c:Customer {customerID: 'ALFKI'})-[*]-(s:Supplier) or SHORTEST path traversal. Seafood supplier is connected via Order→Product→Category chain."
+
+  - id: northwind-expert-009
+    question: "Detect potential product substitutes: find pairs of products from the same category that have been ordered by the same set of customers (at least 10 customers in common). Show product pair names and shared customer count."
+    database: northwind
+    difficulty: expert
+    tags: [aggregation, common-neighbor, filter, relationship-chain, collect]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 30000
+    is_write_query: false
+    notes: "Pattern: same category, shared customers via orders. min_results: 0 because threshold 10 may not be met by all pairs. Reduce threshold in the query if getting 0 rows."
+
+  - id: northwind-expert-010
+    question: "Find all customers who bought products that form a complete cycle in the supply chain: the customer's country is also a supplier country for one of their ordered products. Show customer company name, product name, and supplier country."
+    database: northwind
+    difficulty: expert
+    tags: [filter, comparison, relationship-chain, graph-traversal]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+    notes: "Match (c:Customer)-[:PURCHASED]->(o:Order)-[:ORDERS]->(p:Product)<-[:SUPPLIES]-(s:Supplier) WHERE c.country = s.country. US customers buying US-supplied products, for example."
+
+  - id: northwind-expert-011
+    question: "Show the year-over-year growth in number of orders per customer country from 1996 to 1997. Include percentage change. Show top 5 countries by absolute order growth."
+    database: northwind
+    difficulty: expert
+    tags: [temporal, aggregation, math, comparison, group-by, order, limit]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 10000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+    notes: "Extract year with left(o.orderDate, 4). Calculate 1996 and 1997 order counts per customer country, then compute growth. Use WITH aggregation and computed columns."
+
+  - id: northwind-expert-012
+    question: "Identify the most efficient supplier in the supply chain: which supplier serves the most orders per unit of stock they maintain? Show supplier name, product count, orders served, and their efficiency ratio."
+    database: northwind
+    difficulty: expert
+    tags: [aggregation, math, ranking, relationship-chain, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 30000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 20000
+    is_write_query: false
+    notes: "Efficiency = total orders served / total units in stock across all supplied products. Handle division-by-zero with CASE WHEN."
+
+  # ─── ADDITIONAL WRITE CASES (5 more → total 10) ──────────────────────────────
+
+  - id: northwind-write-006
+    question: "Register a new supplier called 'Nordic Foods AS' based in Norway. If they already exist, update their country."
+    database: northwind
+    difficulty: intermediate
+    tags: [merge, on-create-set, on-match-set, write]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: true
+    notes: "MERGE on companyName. ON CREATE SET supplierID, contactName etc. ON MATCH SET country = 'Norway'."
+
+  - id: northwind-write-007
+    question: "Mark all products with zero units in stock as discontinued. Show how many products were updated."
+    database: northwind
+    difficulty: advanced
+    tags: [match, filter, set, write, bulk-update]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 1000
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 10000
+    is_write_query: true
+    notes: "MATCH (p:Product) WHERE p.unitsInStock = 0 SET p.discontinued = true. This is a bulk SET — up to 5 products may be affected."
+
+  - id: northwind-write-008
+    question: "Add a new product called 'Lime Cordial' (productID 9902, price 8.99, 30 in stock) and associate it with the existing supplier 'Exotic Liquids'."
+    database: northwind
+    difficulty: intermediate
+    tags: [merge, relationship, write, supplies]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 1000
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 10000
+    is_write_query: true
+    notes: "Use three separate MERGE statements: MERGE product, MERGE supplier (match existing), MERGE (supplier)-[:SUPPLIES]->(product)."
+
+  - id: northwind-write-009
+    question: "Remove the test product with productID 9901 ('Artisan Honey') that was added earlier, along with all its connections to categories and suppliers."
+    database: northwind
+    difficulty: intermediate
+    tags: [match, delete, detach-delete, write]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 500
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: true
+    notes: "Use DETACH DELETE to remove the product node and all its relationships. MATCH (p:Product {productID: 9901}) DETACH DELETE p."
+
+  - id: northwind-write-010
+    question: "Batch update all out-of-stock products to set their unitsOnOrder to 100, processing 5 rows at a time."
+    database: northwind
+    difficulty: expert
+    tags: [call-in-transactions, batch-write, set, write, inventory]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 1000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 30000
+    is_write_query: true
+    notes: "CALL (p) { SET p.unitsOnOrder = 100 } IN TRANSACTIONS OF 5 ROWS. Match all products with unitsInStock = 0 first."
+
+  # ─── SCHEMA INTROSPECTION CASES (4 cases) ────────────────────────────────────
+
+  - id: northwind-schema-001
+    question: "What indexes exist on the northwind database? Show their names, types, and which labels and properties they cover."
+    database: northwind
+    difficulty: basic
+    tags: [schema-introspection, show-indexes]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 0
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "Use SHOW INDEXES. min_results: 0 as northwind may have no user-created indexes (only the lookup index). Gate 1 syntax check is the goal."
+
+  - id: northwind-schema-002
+    question: "Show me the constraints defined on the northwind database."
+    database: northwind
+    difficulty: basic
+    tags: [schema-introspection, show-constraints]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 0
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "Use SHOW CONSTRAINTS. min_results: 0 as northwind may have no constraints defined."
+
+  - id: northwind-schema-003
+    question: "What database procedures are available for working with indexes in this database?"
+    database: northwind
+    difficulty: intermediate
+    tags: [schema-introspection, show-procedures]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 0
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 5000
+    is_write_query: false
+    notes: "Use SHOW PROCEDURES YIELD name, description WHERE name CONTAINS 'index'. Gate 1 and Gate 2 execution are both goals."
+
+  - id: northwind-schema-004
+    question: "Add a RANGE index on the product name field to speed up product searches by name, but only if one doesn't already exist."
+    database: northwind
+    difficulty: intermediate
+    tags: [schema-ddl, create-index, write]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 0
+    max_allocated_memory_bytes: 2097152
+    max_runtime_ms: 10000
+    is_write_query: true
+    notes: "CREATE INDEX IF NOT EXISTS FOR (p:Product) ON (p.productName). The IF NOT EXISTS guard makes it idempotent."
+
+  # ─── PLUGIN CASES (APOC / GDS — 4 cases) ────────────────────────────────────
+
+  - id: northwind-plugin-001
+    question: "Use APOC collection utilities to find the top 3 most frequently ordered products by counting co-occurrences in order lists."
+    database: northwind
+    difficulty: advanced
+    tags: [apoc, apoc-extended, aggregation, collect, relationship-chain]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 20000
+    max_allocated_memory_bytes: 10485760
+    max_runtime_ms: 15000
+    is_write_query: false
+    notes: "Requires capabilities: apoc. Use apoc.coll.sortMaps or COLLECT + ORDER BY. If APOC not needed, standard Cypher aggregation is acceptable fallback."
+
+  - id: northwind-plugin-002
+    question: "Using graph algorithms, find the most central product in the Northwind order network — the product that connects the most customers and suppliers. Use a degree-centrality approach."
+    database: northwind
+    difficulty: expert
+    tags: [gds, graph-algorithm, centrality, relationship-chain]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 50000
+    max_allocated_memory_bytes: 20971520
+    max_runtime_ms: 30000
+    is_write_query: false
+    notes: "Requires capabilities: gds. If GDS not available, use native Cypher degree counting: count of distinct (customers + suppliers) per product node. Mark min_version: gds-optional."
+
+  - id: northwind-plugin-003
+    question: "Use APOC to build a name-to-price lookup map for all Seafood products, so we can reference pricing without running a full query each time."
+    database: northwind
+    difficulty: intermediate
+    tags: [apoc, collect, map, relationship, filter]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 3000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 8000
+    is_write_query: false
+    notes: "Requires capabilities: apoc. Use apoc.map.fromLists(keys, values) or collect + apoc.map.* to build a {name: price} map for Seafood products."
+
+  - id: northwind-plugin-004
+    question: "Find customer communities in the order network using Louvain community detection. Which community does 'Alfreds Futterkiste' belong to, and who are the other members?"
+    database: northwind
+    difficulty: expert
+    tags: [gds, graph-algorithm, community-detection, filter]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 100000
+    max_allocated_memory_bytes: 52428800
+    max_runtime_ms: 60000
+    is_write_query: false
+    notes: "Requires capabilities: gds. Project (Customer)-[:PURCHASED]->(Order)-[:ORDERS]->(Product) bipartite graph, run gds.louvain.stream, then filter for Alfreds Futterkiste's communityId. min_results: 0 because GDS graph projection may fail if community edition."
+
+  # ─── TEMPORAL EDGE CASE CASES (additional standalone temporal) ───────────────
+
+  - id: northwind-temporal-001
+    question: "How many days on average does it take from order date to ship date? Show the average, minimum, and maximum shipping delay."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, math, duration, aggregation, null-handling]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Both orderDate and shippedDate are STRING. Parse with date(left(o.shippedDate,10)) and date(left(o.orderDate,10)), then use duration.between().days. Skip rows WHERE o.shippedDate IS NULL."
+
+  - id: northwind-temporal-002
+    question: "Which orders took more than 30 days to ship? Show order ID, customer name, order date, ship date, and number of days taken."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, math, duration, filter, relationship, null-handling]
+    domain: northwind
+    min_results: 0
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Filter duration.between(date(left(o.orderDate,10)), date(left(o.shippedDate,10))).days > 30. Exclude orders where shippedDate IS NULL."
+
+  - id: northwind-temporal-003
+    question: "Show the monthly order volume trend for 1997. For each month, show the month number and how many orders were placed."
+    database: northwind
+    difficulty: advanced
+    tags: [temporal, aggregation, string-manipulation, group-by, order]
+    domain: northwind
+    min_results: 1
+    max_db_hits: 5000
+    max_allocated_memory_bytes: 5242880
+    max_runtime_ms: 10000
+    is_write_query: false
+    notes: "Extract year with left(o.orderDate,4), month with substring(o.orderDate,5,2). Filter for 1997, group by month."
+
