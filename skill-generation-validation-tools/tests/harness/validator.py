@@ -13,6 +13,8 @@ Gate sequence:
 
 Write queries execute inside an explicit transaction that is always rolled back
 for test isolation (no side-effects on the test database).
+CALL IN TRANSACTIONS queries cannot run inside an explicit transaction; they are
+executed via an implicit (auto-commit) transaction instead — writes are committed.
 """
 
 import json
@@ -80,6 +82,18 @@ _GQL_PATTERNS = [
     (re.compile(rf"(?<!:)\b{clause}\b", re.IGNORECASE), clause)
     for clause in GQL_EXCLUDED_CLAUSES
 ]
+
+# ---------------------------------------------------------------------------
+# CALL IN TRANSACTIONS detection
+# ---------------------------------------------------------------------------
+
+_CALL_IN_TXN_RE = re.compile(r"\bIN\s+TRANSACTIONS\b", re.IGNORECASE)
+
+
+def _is_call_in_transactions(cypher: str) -> bool:
+    """Return True if the query contains CALL { ... } IN TRANSACTIONS."""
+    return bool(_CALL_IN_TXN_RE.search(cypher))
+
 
 # ---------------------------------------------------------------------------
 # Deprecated operator list (Gate 3 — EXPLAIN plan checks)
@@ -459,8 +473,16 @@ def validate(
     elapsed_ms: Optional[float] = None
 
     try:
-        if is_write_query:
-            # Write queries: execute in an explicit txn, always roll back
+        if is_write_query and _is_call_in_transactions(cypher):
+            # CALL IN TRANSACTIONS requires an implicit (auto-commit) transaction.
+            # Cannot run inside an explicit transaction — use execute_query() instead.
+            # Writes ARE committed; this is acceptable for local/writable test databases.
+            t0 = time.monotonic()
+            records, summary, _ = driver.execute_query(cypher, database_=database)
+            elapsed_ms = (time.monotonic() - t0) * 1000.0
+            actual_rows = len(records)
+        elif is_write_query:
+            # Non-CALL-IN-TRANSACTIONS write queries: explicit txn, always roll back
             actual_rows, elapsed_ms = _execute_write_rollback(
                 cypher, driver, database=database
             )
@@ -512,7 +534,8 @@ def validate(
     profile_cypher = _prepend_profile(cypher)
 
     try:
-        if is_write_query:
+        if is_write_query and not _is_call_in_transactions(cypher):
+            # Normal write queries: PROFILE inside rolled-back explicit txn
             profile_metrics_raw, _ = _profile_write_rollback(
                 profile_cypher, driver, database=database
             )

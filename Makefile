@@ -12,6 +12,7 @@ SKILL     := neo4j-cypher-authoring-skill
 CASES_DIR := skill-generation-validation-tools/tests/cases
 RESULTS   := skill-generation-validation-tools/tests/results
 WORKERS   ?= 5
+TIMEOUT   ?= 180
 
 TIMESTAMP := $(shell date +%Y%m%d-%H%M%S)
 
@@ -40,6 +41,7 @@ test-companies:  ## Run companies domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/companies-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/companies-run-$(TIMESTAMP).json \
@@ -53,6 +55,7 @@ test-recommendations:  ## Run recommendations domain (demo.neo4jlabs.com, read-o
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/recommendations-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/recommendations-run-$(TIMESTAMP).json \
@@ -66,6 +69,7 @@ test-ucfraud:  ## Run ucfraud domain (bolt://localhost:7687, writeable, Neo4j 20
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/ucfraud-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/ucfraud-run-$(TIMESTAMP).json \
@@ -79,6 +83,7 @@ test-stackoverflow:  ## Run stackoverflow domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/stackoverflow-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/stackoverflow-run-$(TIMESTAMP).json \
@@ -92,6 +97,7 @@ test-goodreads:  ## Run goodreads domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/goodreads-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/goodreads-run-$(TIMESTAMP).json \
@@ -105,6 +111,7 @@ test-northwind:  ## Run northwind domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/northwind-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/northwind-run-$(TIMESTAMP).json \
@@ -118,6 +125,7 @@ test-twitter:  ## Run twitter domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/twitter-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/twitter-run-$(TIMESTAMP).json \
@@ -131,6 +139,7 @@ test-legalcontracts:  ## Run legalcontracts domain (demo.neo4jlabs.com, read-onl
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/legalcontracts-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/legalcontracts-run-$(TIMESTAMP).json \
@@ -144,6 +153,7 @@ test-retail:  ## Run retail domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/retail-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/retail-run-$(TIMESTAMP).json \
@@ -157,6 +167,7 @@ test-ucnetwork:  ## Run ucnetwork domain (demo.neo4jlabs.com, read-only)
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/ucnetwork-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	$(REPORTER) \
 	  --input $(RESULTS)/ucnetwork-run-$(TIMESTAMP).json \
@@ -171,6 +182,7 @@ test-all:  ## Run all domains sequentially (companies → recommendations → uc
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/companies-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	@echo "=== recommendations ==="
 	$(HARNESS) \
@@ -178,6 +190,7 @@ test-all:  ## Run all domains sequentially (companies → recommendations → uc
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/recommendations-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	@echo "=== ucfraud ==="
 	$(HARNESS) \
@@ -185,6 +198,7 @@ test-all:  ## Run all domains sequentially (companies → recommendations → uc
 	  --skill $(SKILL) \
 	  --report $(RESULTS)/ucfraud-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 	@echo "=== generating reports ==="
 	$(REPORTER) \
@@ -208,6 +222,7 @@ test-basic:  ## Run only basic-difficulty cases across all domains
 	  --difficulty basic \
 	  --report $(RESULTS)/basic-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 
 .PHONY: test-expert
@@ -218,6 +233,7 @@ test-expert:  ## Run only expert-difficulty cases across all domains
 	  --difficulty expert \
 	  --report $(RESULTS)/expert-run-$(TIMESTAMP).json \
 	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
 	  --verbose
 
 # ── Analysis ───────────────────────────────────────────────────────────────────
