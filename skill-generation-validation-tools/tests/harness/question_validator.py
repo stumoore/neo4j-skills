@@ -5,12 +5,15 @@ question_validator.py — Business-language question validator.
 Checks that test case questions are phrased as casual, business-user questions
 (the kind a non-technical analyst or product manager would ask) and do NOT
 contain:
-  - Graph labels (e.g. :Person, :Movie)
-  - Relationship types (e.g. [:ACTED_IN], HAS_SUBSIDIARY)
-  - Cypher keywords (MATCH, WHERE, RETURN, WITH, CALL, MERGE, CREATE, etc.)
-  - Property dot-access syntax (.name, .rating)
+  - Explicit Cypher syntax patterns (node patterns, relationship patterns)
+  - Property dot-access syntax in code context (.name, .rating on variable names)
   - GDS/APOC/db.index procedure prefixes
   - Known schema label/rel-type names from the passed schema dict
+  - ALL_CAPS_WITH_UNDERSCORES relationship type patterns (when schema-matched)
+
+Common English words like "return", "distinct", "match", "create", "delete",
+"shortest", "profile", "collect" are NOT flagged — they appear naturally in
+business questions. Only explicit Cypher syntax patterns are rejected.
 
 Usage:
     from question_validator import QuestionValidator
@@ -30,62 +33,82 @@ import re
 from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
-# Static Cypher keyword list (high-signal keywords to reject in questions)
+# Cypher syntax patterns — always flag these regardless of context
 # ---------------------------------------------------------------------------
 
-_CYPHER_KEYWORDS = frozenset(
-    [
-        # High-signal DML / DDL clauses (rarely appear as English words in questions)
-        "MATCH",
-        "MERGE",
-        "CREATE",
-        "DELETE",
-        "DETACH",
-        "FOREACH",
-        "UNWIND",
-        "RETURN",
-        "UNION",
-        "CALL",
-        "YIELD",
-        # Expression keywords that should not appear in casual business questions
-        "COLLECT",
-        "DISTINCT",
-        "SHORTEST",
-        "PROFILE",
-        "EXPLAIN",
-        "CYPHER",
-        # GQL-only (should not appear in valid queries either)
-        "FINISH",
-        "INSERT",
-    ]
+# Node pattern syntax: ( optionally followed by words/spaces, then :UppercaseWord
+# Requires an opening paren so ": The" in titles does NOT match.
+_NODE_PATTERN = re.compile(r"\([\w\s]*:[A-Z][a-zA-Z]+")
+
+# Relationship type in brackets: [:REL_TYPE] or [r:REL_TYPE]
+_REL_BRACKET_PATTERN = re.compile(r"\[[\w\s]*:[A-Z_]+\]")
+
+# MATCH followed by opening paren — explicit Cypher MATCH clause
+_MATCH_PAREN = re.compile(r"\bMATCH\s*\(", re.IGNORECASE)
+
+# RETURN followed by property dot-access: RETURN n.property
+_RETURN_DOT = re.compile(r"\bRETURN\s+\w+\.", re.IGNORECASE)
+
+# WHERE followed by property dot-access: WHERE n.age > 30
+# Requires the dot to be followed by a letter (not end-of-word/sentence)
+# so "where available." and "where specified." do NOT match.
+_WHERE_DOT = re.compile(r"\bWHERE\s+\w+\.[a-zA-Z]", re.IGNORECASE)
+
+# WITH ... AS aliasing pattern: WITH x AS y
+_WITH_AS = re.compile(r"\bWITH\s+\w+\s+AS\s+\w+\b", re.IGNORECASE)
+
+# Property comparison: variable.property = value (e.g. n.name = 'Alice')
+_PROP_COMPARISON = re.compile(r"\b\w+\.\w+\s*[=<>!]")
+
+# Backtick identifiers (Cypher escaping)
+_BACKTICK = re.compile(r"`[^`]+`")
+
+# ---------------------------------------------------------------------------
+# Dot-access in code context — lower.lower or camelCase.camelCase variable access
+# (excludes domain names, URLs, sentence-ending periods)
+# ---------------------------------------------------------------------------
+
+# Matches patterns like n.name, movie.title, node.property — where both sides
+# are lowercase or camelCase identifiers (not starting with uppercase/digit)
+_DOT_ACCESS_CODE = re.compile(r"\b[a-z][a-zA-Z0-9_]{0,}\.[a-z][a-zA-Z0-9_]{1,}\b")
+
+# Domain names / URLs to exclude from dot-access detection
+_URL_LIKE = re.compile(
+    r"https?://|www\.|"
+    r"\b\w+\.(com|org|net|io|co|uk|de|fr|eu|gov|edu|info|biz)\b"
 )
 
-# Procedure/function prefixes that signal Cypher code
+# ---------------------------------------------------------------------------
+# Procedure/function prefixes — always flag
+# ---------------------------------------------------------------------------
+
 _PROCEDURE_PREFIXES = [
     "gds.",
     "apoc.",
     "db.index.",
     "db.schema.",
     "dbms.",
-    "ai.",
+    "ai.embedding",
     "vector.",
     "algo.",
 ]
 
-# Pattern: colon followed by an uppercase word — Cypher node label syntax (:Label)
-_LABEL_PATTERN = re.compile(r":\s*[A-Z][A-Za-z0-9_]*")
-
-# Pattern: ALL_CAPS_UNDERSCORE word of 3+ chars — likely a relationship type
-_REL_TYPE_PATTERN = re.compile(r"\b([A-Z]{2,}(?:_[A-Z]{2,})+)\b")
-
-# Pattern: word.property access (e.g. n.name, movie.released)
-# Allow common English abbreviations (U.S., a.m., i.e., etc.) by requiring lowercase after dot
-_DOT_ACCESS_PATTERN = re.compile(r"\b\w{2,}\.[a-z][a-zA-Z0-9_]{1,}")
+# ---------------------------------------------------------------------------
+# ALL_CAPS pattern for relationship type detection (schema-aware)
+# Matches: SENT, NEXT, FIRST, SIMILAR_TO, RESPONDING_FOR, HAS_SUBSIDIARY, etc.
+# Pattern: starts uppercase, ends uppercase, middle is uppercase or underscore
+# ---------------------------------------------------------------------------
+_ALL_CAPS_PATTERN = re.compile(r"\b([A-Z][A-Z_]+[A-Z])\b")
 
 
 class QuestionValidator:
     """
     Validates that a question string is phrased in casual business language.
+
+    Uses pattern-based detection rather than keyword lists. Common English words
+    like "return", "distinct", "match", "create", "delete", "shortest", "profile",
+    "collect" are intentionally NOT flagged — only explicit Cypher syntax patterns
+    are rejected.
 
     Args:
         schema: Optional dict (from dataset.schema) used for schema-aware
@@ -124,16 +147,45 @@ class QuestionValidator:
 
         q = question.strip()
 
-        # ── Cypher label syntax (:Label) ─────────────────────────────────────
-        label_m = _LABEL_PATTERN.search(q)
-        if label_m:
-            return False, f"Contains Cypher label syntax: '{label_m.group(0)}'"
+        # ── Explicit Cypher node pattern syntax: (n:Label) or (:Label) ───────
+        m = _NODE_PATTERN.search(q)
+        if m:
+            return False, f"Contains Cypher node pattern syntax: '{m.group(0)}'"
 
-        # ── Cypher keywords (whole-word, case-insensitive) ────────────────────
-        words = re.findall(r"\b[A-Za-z]{2,}\b", q)
-        for word in words:
-            if word.upper() in _CYPHER_KEYWORDS:
-                return False, f"Contains Cypher keyword: '{word}'"
+        # ── Relationship bracket syntax: [:REL_TYPE] ──────────────────────────
+        m = _REL_BRACKET_PATTERN.search(q)
+        if m:
+            return False, f"Contains Cypher relationship bracket syntax: '{m.group(0)}'"
+
+        # ── MATCH ( — explicit Cypher MATCH clause ────────────────────────────
+        m = _MATCH_PAREN.search(q)
+        if m:
+            return False, f"Contains Cypher MATCH clause: '{m.group(0).strip()}'"
+
+        # ── RETURN n. — RETURN followed by property access ────────────────────
+        m = _RETURN_DOT.search(q)
+        if m:
+            return False, f"Contains Cypher RETURN with property access: '{m.group(0).strip()}'"
+
+        # ── WHERE n. — WHERE followed by property access ──────────────────────
+        m = _WHERE_DOT.search(q)
+        if m:
+            return False, f"Contains Cypher WHERE with property access: '{m.group(0).strip()}'"
+
+        # ── WITH x AS y — Cypher aliasing syntax ─────────────────────────────
+        m = _WITH_AS.search(q)
+        if m:
+            return False, f"Contains Cypher WITH...AS aliasing: '{m.group(0)}'"
+
+        # ── n.property = — property comparison ───────────────────────────────
+        m = _PROP_COMPARISON.search(q)
+        if m:
+            return False, f"Contains Cypher property comparison: '{m.group(0)}'"
+
+        # ── Backtick identifiers ──────────────────────────────────────────────
+        m = _BACKTICK.search(q)
+        if m:
+            return False, f"Contains backtick identifier: '{m.group(0)}'"
 
         # ── Procedure/function prefixes ───────────────────────────────────────
         q_lower = q.lower()
@@ -141,26 +193,24 @@ class QuestionValidator:
             if prefix in q_lower:
                 return False, f"Contains procedure prefix: '{prefix}'"
 
-        # ── Dot-access property syntax ────────────────────────────────────────
-        dot_m = _DOT_ACCESS_PATTERN.search(q)
-        if dot_m:
-            return False, f"Contains dot-access property syntax: '{dot_m.group(0)}'"
-
-        # ── Relationship-type pattern (ALL_CAPS_WITH_UNDERSCORES) ─────────────
-        rel_m = _REL_TYPE_PATTERN.search(q)
-        if rel_m:
-            return False, f"Contains relationship-type pattern: '{rel_m.group(0)}'"
+        # ── Dot-access property syntax (code context only) ───────────────────
+        # Only flag if the question doesn't look like it contains a URL
+        if not _URL_LIKE.search(q):
+            m = _DOT_ACCESS_CODE.search(q)
+            if m:
+                return False, f"Contains dot-access property syntax: '{m.group(0)}'"
 
         # ── Schema-aware: known label names ───────────────────────────────────
         for label in self._schema_labels:
-            # Use word-boundary matching to avoid false positives on substrings
             if re.search(r"\b" + re.escape(label) + r"\b", q):
                 return False, f"Contains schema label name: '{label}'"
 
-        # ── Schema-aware: known relationship type names ───────────────────────
-        for rel_type in self._schema_rel_types:
-            if re.search(r"\b" + re.escape(rel_type) + r"\b", q):
-                return False, f"Contains schema relationship type: '{rel_type}'"
+        # ── Schema-aware: relationship type names (ALL_CAPS pattern + schema match)
+        # Only flag if the token matches ALL_CAPS pattern AND is a known rel-type
+        all_caps_matches = _ALL_CAPS_PATTERN.findall(q)
+        for token in all_caps_matches:
+            if token in self._schema_rel_types:
+                return False, f"Contains schema relationship type: '{token}'"
 
         return True, ""
 
@@ -191,38 +241,87 @@ def validate(question: str, schema: Optional[dict[str, Any]] = None) -> tuple[bo
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    _TESTS = [
-        # (question, expected_valid)
-        ("Which companies have more than 5 subsidiaries?", True),
-        ("Show me the top 10 movies by average rating", True),
-        ("What are the most popular tags in the last year?", True),
-        ("Find all (:Organization)-[:HAS_SUBSIDIARY]->() with depth > 2", False),
-        ("MATCH (n:Movie) RETURN n.title LIMIT 10", False),
-        ("Use COLLECT subquery to aggregate results", False),
-        ("Where gds.pageRank is highest", False),
-        ("Use apoc.text.split to tokenize names", False),
-        ("Get the movie.title for films after 2000", False),
-        ("List HAS_SUBSIDIARY chains longer than 3 hops", False),
-    ]
-
+    # Schema for schema-aware tests
     schema_for_test = {
-        "nodes": {"Organization": {}, "Article": {}},
-        "relationships": [{"type": "HAS_SUBSIDIARY"}, {"type": "MENTIONS"}],
+        "nodes": {"Organization": {}, "Article": {}, "User": {}},
+        "relationships": [
+            {"type": "HAS_SUBSIDIARY"},
+            {"type": "MENTIONS"},
+            {"type": "SIMILAR_TO"},
+        ],
     }
 
     validator = QuestionValidator(schema=schema_for_test)
+    no_schema_validator = QuestionValidator()
+
+    _TESTS: list[tuple[str, bool, bool]] = [
+        # (question, expected_with_schema, expected_without_schema)
+
+        # ── Valid business questions (should PASS) ──────────────────────────
+        ("Which companies have more than 5 subsidiaries?", True, True),
+        ("Show me the top 10 movies by average rating", True, True),
+        ("What are the most popular tags in the last year?", True, True),
+        # Previously false-positive cases that should now PASS:
+        ("List all distinct categories", True, True),
+        ("Return its name and the count", True, True),
+        ("Find the shortest path between X and Y", True, True),
+        ("Create a new user named Alice", True, True),
+        ("Delete all orphaned records", True, True),
+        ("Which users have distinct preferences?", True, True),  # 'distinct' as English
+        ("What is the profile of the top customer?", True, True),  # 'profile' as English
+        ("Collect all results and show the summary", True, True),  # 'collect' as English
+        ("Match the invoice to the purchase order", True, True),  # 'match' as English
+        # Book title with colon — should NOT trigger label detection
+        (
+            "Find all books reachable from 'The Berlin Stories: The Last of Mr Norris'",
+            True,
+            True,
+        ),
+        # MAC address with colon — should NOT trigger label detection
+        (
+            "Trace the snapshot history for device with MAC '08:55:31:6A:FF:5'",
+            True,
+            True,
+        ),
+
+        # ── True violations — Cypher syntax (should FAIL regardless of schema) ─
+        ("Find all (:Organization)-[:HAS_SUBSIDIARY]->() with depth > 2", False, False),
+        ("MATCH (n:Movie) RETURN n.title LIMIT 10", False, False),
+        ("MATCH (n:Organization) RETURN n", False, False),
+        ("[:HAS_SUBSIDIARY]", False, False),
+        ("gds.pageRank is highest", False, False),
+        ("Use apoc.text.split to tokenize names", False, False),
+        ("Get the movie.title for films after 2000", False, False),
+        ("WHERE n.age > 30", False, False),
+        ("n.name = 'Alice'", False, False),
+        # ── Schema-aware violations (FAIL with schema, PASS without) ──────────
+        ("Show me all User nodes in the graph", False, True),
+        ("Which users have bought products?", True, True),  # 'users' != 'User' label
+    ]
+
     passed = 0
     failed = 0
-    for question, expected in _TESTS:
-        ok, reason = validator.validate(question)
-        status = "PASS" if ok == expected else "FAIL"
-        if ok == expected:
+    for question, expected_schema, expected_no_schema in _TESTS:
+        ok_schema, reason_schema = validator.validate(question)
+        ok_no_schema, reason_no_schema = no_schema_validator.validate(question)
+
+        schema_ok = ok_schema == expected_schema
+        no_schema_ok = ok_no_schema == expected_no_schema
+        all_ok = schema_ok and no_schema_ok
+
+        status = "PASS" if all_ok else "FAIL"
+        if all_ok:
             passed += 1
         else:
             failed += 1
-        print(f"[{status}] {ok!s:5} expected={expected!s:5}  {question[:60]}")
-        if not ok:
-            print(f"         Reason: {reason}")
+
+        print(f"[{status}] schema={ok_schema!s:5}(exp={expected_schema!s:5})  "
+              f"no-schema={ok_no_schema!s:5}(exp={expected_no_schema!s:5})  "
+              f"{question[:60]}")
+        if not schema_ok:
+            print(f"         Schema reason: {reason_schema}")
+        if not no_schema_ok:
+            print(f"         No-schema reason: {reason_no_schema}")
 
     print(f"\n{passed}/{passed + failed} tests passed")
     if failed:
