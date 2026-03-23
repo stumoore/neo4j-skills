@@ -162,15 +162,25 @@ Quantifier goes **outside** the group: `(pattern){N,M}` ✓ — never `(pattern{
 
 **NEVER** `SHORTEST 1 (a)-[:REL]+` — use `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`. Every node inside a QPE group must be closed: `(()-[:REL]-()-[:REL2]-()){1,}` ✓ — never `(()-[:REL]-){1,}` (dangling edge) ✗.
 
-**REPEATABLE ELEMENTS** is a **MATCH-level mode**, placed at the END of the full MATCH pattern — NEVER inside a QPE group:
+**REPEATABLE ELEMENTS** and **DIFFERENT RELATIONSHIPS** are **MATCH-level modes** placed immediately after the `MATCH` keyword — NEVER at the end of the pattern and NEVER inside a QPE group:
 ```cypher
-// DO:     MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->()){3}(b:Customer) REPEATABLE ELEMENTS
-// DON'T: MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->() REPEATABLE ELEMENTS){3}(b:Customer)
-// DON'T: MATCH ... (()-[:REL]->() REPEATABLE ELEMENTS){2,4} ...  // inside group — SYNTAX ERROR
+// DO:     MATCH REPEATABLE ELEMENTS (a:Customer)(()-[:SHARED_IDENTIFIERS]->()){3}(b:Customer)
+// DO:     MATCH DIFFERENT RELATIONSHIPS (a)-[:REL*1..5]->(b)
+// DON'T: MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->()){3}(b:Customer) REPEATABLE ELEMENTS  // SYNTAX ERROR
+// DON'T: MATCH (a:Customer)(()-[:SHARED_IDENTIFIERS]->() REPEATABLE ELEMENTS){3}(b:Customer)  // inside group — SYNTAX ERROR
 ```
 `REPEATABLE ELEMENTS` always requires bounded `{m,n}` — never `+`, `*`, or `{1,}`.
 
 **QPE groups must always start AND end with a node**: `((:A)-[:REL]->(:B)){1,3}` ✓ — never `((:A)-[:REL]->){1,3}` ✗ (dangling relationship at end).
+
+### ORDER BY and NULL Sorting
+
+Cypher does **not** support `NULLS LAST` / `NULLS FIRST` (SQL syntax — will cause a syntax error). Use plain `ORDER BY x DESC` or `ORDER BY x ASC`. NULLs sort last in ascending order and first in descending order by default — no modifier needed.
+
+```cypher
+// DO:     ORDER BY n.score DESC
+// DON'T: ORDER BY n.score DESC NULLS LAST   // SYNTAX ERROR — not valid Cypher
+```
 
 ### WITH Cardinality Reset
 

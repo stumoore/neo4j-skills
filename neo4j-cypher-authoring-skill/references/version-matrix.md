@@ -28,8 +28,9 @@ Cross-reference with the `database.neo4j_version` in the injected schema context
 - **GRAPH TYPE**: Enterprise Edition only, Preview status. Not for production use.
 - **`+` / `*` QPE shorthands**: Availability as shorthand for `{1,}` / `{0,}` — confirm against
   target version. Use explicit `{1,}` / `{0,}` for maximum compatibility.
-- **`REPEATABLE ELEMENTS`**: Requires **bounded quantifiers** — `{m,n}` form only.
-  Cannot be combined with `+`, `*`, or `{1,}` (unbounded).
+- **`REPEATABLE ELEMENTS` / `DIFFERENT RELATIONSHIPS`**: Goes immediately after `MATCH` keyword —
+  `MATCH REPEATABLE ELEMENTS (pattern)` ✓ — NOT at the end: `MATCH (pattern) REPEATABLE ELEMENTS` ✗ (syntax error).
+  Requires **bounded quantifiers** — `{m,n}` form only. Cannot be combined with `+`, `*`, or `{1,}` (unbounded).
 - **`SHORTEST` keyword**: Do NOT use bare `(a)-[:REL]+(b)` — wrap the hop in a QPE group:
   `SHORTEST 1 (a)(()-[:REL]->()){1,}(b)`.
 - **`elementId()`**: Replaces deprecated `id()` (which returns INTEGER) — available from 2025.06+.
