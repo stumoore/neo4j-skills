@@ -85,6 +85,15 @@
 - `skill-generation-validation-tools/scripts/extract-references.py` — extract asciidoc → Markdown for L3 reference files. Run with `--dry-run` to preview without writing.
 - `skill-generation-validation-tools/scripts/test-extract-references.py` — test suite. Run from the tools dir: `uv run python3 scripts/test-extract-references.py`
 - `skill-generation-validation-tools/scripts/extract-changelog.py` — parse changelog adoc → Markdown. Usage: `uv run python3 scripts/extract-changelog.py --src ../../docs-cypher/modules/ROOT/pages/deprecations-additions-removals-compatibility.adoc --out path/changelog.md [--since 2026.01]`
+- `skill-generation-validation-tools/scripts/register_dataset.py` — discover Neo4j DB schema, capabilities, indexes/constraints, sample property values, call Claude for description, write dataset: YAML block to tests/cases/<domain>.yml. Makefile target: `make register-dataset DB_URI=... DB_USER=... DB_PASS=... DB_NAME=<db>`.
+
+### register_dataset.py — Gotchas
+
+- Version detection tries `database_="system"` first, then falls back to the target database (mirrors runner.py detect_server_version pattern).
+- Relationship direction (from/to) is not auto-detected — outputs `?` placeholders; manual edit required.
+- `--no-claude` flag skips description generation (useful in CI or offline); `'claude'` CLI not-found is handled gracefully too.
+- Property sampling is bounded: max 10 props per label, LIMIT 20 per property — keeps runtime to ~30s for typical DBs.
+- When domain YAML already exists, `cases:` block is preserved; only `database:` and `dataset:` are replaced.
 
 ### extract-references.py — Hybrid Workflow
 

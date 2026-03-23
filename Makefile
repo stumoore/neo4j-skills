@@ -271,6 +271,33 @@ report-latest:  ## Re-render Markdown reports from the 3 most recent JSON files
 	  $(REPORTER) --input $$f --output $$md; \
 	done
 
+# ── Dataset registration ───────────────────────────────────────────────────────
+# Usage: make register-dataset DB_URI=neo4j+s://... DB_USER=companies DB_PASS=companies DB_NAME=companies
+# Optional: DOMAIN=companies (default: DB_NAME)  READ_ONLY=--read-only  NO_CLAUDE=--no-claude
+
+DB_URI    ?= bolt://localhost:7687
+DB_USER   ?= neo4j
+DB_PASS   ?= neo4j
+DB_NAME   ?=
+DOMAIN    ?= $(DB_NAME)
+READ_ONLY ?=
+NO_CLAUDE ?=
+
+REGISTER  := uv run --project skill-generation-validation-tools python3 \
+               skill-generation-validation-tools/scripts/register_dataset.py
+
+.PHONY: register-dataset
+register-dataset:  ## Register a Neo4j DB as a dataset: block in tests/cases/<domain>.yml
+	$(REGISTER) \
+	  --uri $(DB_URI) \
+	  --username $(DB_USER) \
+	  --password $(DB_PASS) \
+	  --database $(DB_NAME) \
+	  --domain $(DOMAIN) \
+	  --model $(MODEL) \
+	  --output-dir $(CASES_DIR) \
+	  $(READ_ONLY) $(NO_CLAUDE)
+
 # ── Help ───────────────────────────────────────────────────────────────────────
 
 .PHONY: help

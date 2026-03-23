@@ -2087,3 +2087,42 @@ All acceptance criteria met:
 - Harness pass rate: 94.9% ≥ 90% ✓
 
 Next Task: task-061 (Expand northwind domain to ≥ 100 test cases)
+
+================================================================================
+TASK-067: Build dataset registration CLI: make register-dataset (REQ-F-048)
+Date: 2026-03-23T22:00:00Z
+================================================================================
+Summary: Created skill-generation-validation-tools/scripts/register_dataset.py
+and added the `register-dataset` Makefile target. The script automates Neo4j
+database discovery and generates a structured dataset: YAML block for domain
+case files.
+
+Discovery steps implemented (in order):
+1. Neo4j version via CALL dbms.components() (tries system DB first, fallback to database)
+2. Capabilities: SHOW PROCEDURES counting gds.*, apoc.*, ai.* prefixes → builds capabilities list
+3. Schema: labels via db.labels(), rel-types via db.relationshipTypes(),
+   properties via MATCH (n:Label) WITH keys(n)..., indexes/constraints via SHOW INDEXES/CONSTRAINTS
+4. Property value sampling: COLLECT { MATCH (n:Label) ... RETURN DISTINCT ... LIMIT 20 }
+5. Claude description generation (claude --print): prompts for 2-3 sentence business summary + notes
+6. YAML output: database: + dataset: blocks; preserves existing cases: section when file exists
+
+Key design decisions:
+- Reuses _MODEL_MAP pattern from runner.py/generator.py for model resolution
+- _infer_type() provides basic type detection from sample values (bool/int/float/str)
+- Values ≤ 15 distinct stored as values: (enum), else as sample: (first 5)
+- Falls back gracefully when Claude is unavailable (--no-claude flag or CLI not found)
+- YAML written with preserved key order: database: → dataset: → cases:
+- --read-only flag adds read_only: true to database: block
+
+Files Changed:
+- skill-generation-validation-tools/scripts/register_dataset.py (created — 370 lines)
+- Makefile (added register-dataset target + DB_URI/DB_USER/DB_PASS/DB_NAME/DOMAIN/READ_ONLY/NO_CLAUDE vars)
+- .plans/tasks-agent-cypher-authoring-skill.yml (task-067 status → completed)
+
+Feedback loops:
+- make smoke: PASS (6 syntax + performance + operators + DDL + GQL checks)
+- make dry-run: PASS (587 cases validated)
+- register_dataset.py --help: PASS (prints usage)
+- register_dataset.py syntax: PASS (ast.parse OK)
+
+Next Task: task-068 (generate_questions.py + question_validator.py)

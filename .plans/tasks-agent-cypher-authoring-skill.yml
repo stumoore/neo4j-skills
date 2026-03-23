@@ -1494,7 +1494,8 @@ tasks:
             skill-generation-validation-tools/scripts/register_dataset.py \
             --uri $(DB_URI) --username $(DB_USER) --password $(DB_PASS) \
             --database $(DB_NAME) --domain $(DOMAIN) --model $(MODEL)
-    status: pending
+    status: completed
+    completed_at: "2026-03-23T22:00:00Z"
     dependencies: [task-056]
     acceptance_criteria:
       - "register_dataset.py exists and runs without errors against a live DB"
