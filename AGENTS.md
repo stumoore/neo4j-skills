@@ -340,3 +340,21 @@ DO-NOT blocks for all three are now in: SKILL.md (QPE section), cypher25-pattern
 - Verified with: `wc -l SKILL.md` (lines) + `python3 -c "words=len(text.split()); print(int(words*1.3))"` (token estimate).
 - task-020 (WebFetch proactive framing) was folded into task-010's SKILL.md — the proactive framing is already present. task-020 can be marked as superseded or trivially completed.
 - SEARCH clause: **GA in Neo4j 2026.02.1+** (was Preview in 2026.01). Vector-only — fulltext still uses `db.index.fulltext.queryNodes()`. demo.neo4jlabs.com upgraded to 2026.02.x — SEARCH clause is available there.
+
+## Companies Dataset — Fulltext Index Distinction (task-054)
+
+The `companies` DB has **two** fulltext indexes with distinct scopes:
+- `entity` — on `Organization(name)` and `Person(name)`. Use for company/person name lookup. `WHERE node:Article` after this call **always returns 0 rows** — Articles are not indexed here.
+- `news_fulltext` — on `Chunk(text)`. Use for keyword/topic search in article content (e.g. "renewable energy", "mergers"). Returns `Chunk` nodes; traverse back to `Article` with `MATCH (a:Article)-[:HAS_CHUNK]->(chunk)`.
+
+**Pattern for article content search** (not name search):
+```cypher
+CALL db.index.fulltext.queryNodes('news_fulltext', 'renewable energy')
+YIELD node AS chunk, score
+MATCH (a:Article)-[:HAS_CHUNK]->(chunk)
+OPTIONAL MATCH (a)-[:MENTIONS]->(org:Organization)
+RETURN a.title, score, collect(DISTINCT org.name) AS companies
+ORDER BY score DESC LIMIT 10
+```
+
+When a test question asks to "search articles/news for topic X" — always use `news_fulltext`, never `entity`.

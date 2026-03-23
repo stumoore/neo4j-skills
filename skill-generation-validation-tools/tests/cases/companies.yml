@@ -59,9 +59,15 @@ dataset:
     indexes:
       - name: entity
         type: FULLTEXT
-        on: Organization(name)
+        on: "Organization(name), Person(name)"
         call: "CALL db.index.fulltext.queryNodes('entity', $q) YIELD node, score"
-        description: "Full-text search on company names"
+        description: "Full-text search on company and person names — ONLY for Organization and Person nodes. NEVER use to search Article titles or Article text."
+        warning: "entity index is on Organization(name) and Person(name) — filtering results with WHERE node:Article ALWAYS returns 0 rows. To search article content use news_fulltext."
+      - name: news_fulltext
+        type: FULLTEXT
+        on: Chunk(text)
+        call: "CALL db.index.fulltext.queryNodes('news_fulltext', $q) YIELD node AS chunk, score"
+        description: "Full-text search on article text chunks. Returns Chunk nodes — traverse back to Article with MATCH (a:Article)-[:HAS_CHUNK]->(chunk). Use for topic/keyword search in article content (e.g. 'renewable energy', 'mergers acquisitions')."
       - name: news
         type: VECTOR
         on: Chunk(embedding)
@@ -78,6 +84,8 @@ dataset:
     - "Largest subsidiary owner: Blackstone (~1037 direct subsidiaries)"
     - "Company names include legal suffixes ('Corporation', 'Inc.', 'Ltd.') — use CONTAINS or fulltext index 'entity' for name matching, avoid exact match"
     - "Sentiment filter: positive = a.sentiment > 0, negative = a.sentiment < 0"
+    - "FULLTEXT INDEX 'entity' is on Organization(name) and Person(name) ONLY — do NOT use it to search Article content; filtering CALL db.index.fulltext.queryNodes('entity',...) with WHERE node:Article returns 0 rows"
+    - "FULLTEXT INDEX 'news_fulltext' is on Chunk(text) — use for keyword/topic search in article text; returns Chunk nodes; traverse to Article with MATCH (a:Article)-[:HAS_CHUNK]->(chunk)"
 
 cases:
 
@@ -536,7 +544,7 @@ cases:
     is_write_query: false
 
   - id: companies-expert-002
-    question: "Find news articles about renewable energy by searching article titles and text for relevant phrases. For the matching articles, also show which companies they mention. Return up to 10 results ordered by relevance score, highest first."
+    question: "Search for article text chunks related to 'renewable energy' using the full-text index on chunk text. For each matching chunk, show the article title it belongs to, the relevance score, and which companies the article mentions. Return up to 10 results ordered by relevance score."
     database: companies
     difficulty: expert
     tags: [fulltext, procedure, graphrag, relationship]
@@ -546,6 +554,15 @@ cases:
     max_allocated_memory_bytes: 100000000
     max_runtime_ms: 60000
     is_write_query: false
+    notes: |
+      Use the 'news_fulltext' fulltext index (on Chunk.text) — NOT the 'entity' index (on Organization/Person names).
+      Correct pattern:
+        CALL db.index.fulltext.queryNodes('news_fulltext', 'renewable energy') YIELD node AS chunk, score
+        MATCH (a:Article)-[:HAS_CHUNK]->(chunk)
+        OPTIONAL MATCH (a)-[:MENTIONS]->(org:Organization)
+        RETURN a.title AS articleTitle, score, collect(DISTINCT org.name)[0..3] AS companies
+        ORDER BY score DESC LIMIT 10
+      NEVER: CALL db.index.fulltext.queryNodes('entity', ...) ... WHERE node:Article — entity index is on Organization names, returns 0 Article rows.
 
   - id: companies-expert-003
     question: "Which companies have ownership chains of between 3 and 5 levels deep — meaning there is a path of exactly 3 to 5 intermediate ownership steps from a top-level parent down to them? List those companies and the length of their ownership chain. Limit to 20 results."

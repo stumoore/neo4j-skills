@@ -1182,7 +1182,8 @@ tasks:
       3. Add a schema note in companies.yml: 'entity index is on Organization(name) —
          never use it to search for Articles'
       4. Verify the fixed case passes Gate 2 with actual results
-    status: pending
+    status: completed
+    completed_at: "2026-03-23T11:10:00Z"
     dependencies: []
     acceptance_criteria:
       - "companies-expert-002 passes Gate 2 with actual_rows >= 1"
