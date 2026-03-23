@@ -1,7 +1,7 @@
 feature: agent-cypher-authoring-skill
 prd: ./prd-agent-cypher-authoring-skill.md
 created_at: 2026-03-19T00:00:00Z
-updated_at: 2026-03-23T15:00:00Z
+updated_at: 2026-03-23T15:30:00Z
 
 tasks:
   - id: task-001
@@ -1503,10 +1503,11 @@ tasks:
       - "make register-dataset DB_URI=... DB_USER=... DB_PASS=... DB_NAME=companies works end-to-end"
 
   - id: task-068
-    title: "Build question generation CLI: make generate-questions (REQ-F-049)"
+    title: "Build question generation CLI: make generate-questions (REQ-F-049 + REQ-F-050)"
     description: |
       Create skill-generation-validation-tools/scripts/generate_questions.py and
       wire to Makefile targets `generate-questions` and `onboard-dataset`.
+      Also create the reusable question_validator.py module (REQ-F-050).
 
       The script accepts: --domain (required), --count (default 25),
       --model (default sonnet), --difficulties (default all five, comma-separated:
@@ -1521,15 +1522,27 @@ tasks:
          COUNT questions as a structured JSON list:
          [{difficulty, question, notes, expected_pattern}]
       4. For each generated question:
-         a. Call Claude again to generate candidate Cypher
-         b. Execute against live DB → capture actual_rows, execution_ms
-         c. If execution succeeds and rows >= 0: write case with
-            min_results: max(0, actual_rows - tolerance)
-            status: pending (ready for harness)
-         d. If execution fails or 0 rows unexpectedly:
-            status: needs_review (stub preserved for human fix)
+         a. Run question_validator.validate(question, schema) — see below
+         b. If validation fails: call Claude once to rewrite as casual business question
+         c. Re-validate rewrite; if still fails: mark status: needs_review with
+            validation_failure: note
+         d. Call Claude again to generate candidate Cypher
+         e. Execute against live DB → capture actual_rows, execution_ms
+         f. Write case with min_results / needs_review as appropriate
       5. Assign sequential IDs continuing from highest existing ID in file
       6. Append new cases to domain YAML
+      7. Print validation statistics: total generated, auto-rewritten, flagged
+
+      question_validator.py (tests/harness/question_validator.py):
+      - validate(question: str, schema: dict) -> (bool, str)
+        Returns (True, "") if valid business language, (False, reason) if technical
+      - Reject patterns: `:UpperCase` labels, ALL_CAPS_UNDERSCORE rel-types,
+        Cypher keywords (MATCH/WHERE/RETURN/WITH/CALL/MERGE/CREATE/DELETE/SET/
+        UNION/EXISTS/COUNT/COLLECT/LIMIT/SKIP), dot-access `word.property`,
+        procedure prefixes (gds./apoc./db.index/ai.), known schema label/rel-type
+        names from the passed schema dict
+      - Schema-aware: loads known label names and rel-type names from schema to
+        catch domain-specific technical terms (e.g. "HAS_SUBSIDIARY", "Organization")
 
       Makefile targets:
         generate-questions:
@@ -1544,13 +1557,44 @@ tasks:
     status: pending
     dependencies: [task-067]
     acceptance_criteria:
+      - "question_validator.py exists as importable module in tests/harness/"
+      - "validate() rejects questions containing Cypher keywords, labels, rel-types, dot-access"
+      - "validate() is schema-aware: uses known label/rel-type names from passed schema dict"
+      - "generate_questions.py runs validator on every question before writing"
+      - "Failed questions are auto-rewritten once; persistent failures get needs_review status"
+      - "Validation statistics printed at end of run (total/rewritten/flagged counts)"
       - "generate_questions.py generates COUNT questions distributed across requested difficulties"
-      - "Questions follow business-user language rule (verified by spot-check)"
       - "Each case includes: id, difficulty, question, notes, min_results, execution_ms baseline"
       - "Cases with 0-row or error execution are written with status: needs_review (not dropped)"
       - "No duplicate IDs introduced into existing domain YAML"
       - "make generate-questions DOMAIN=companies COUNT=25 works end-to-end"
       - "make onboard-dataset DB_URI=... DB_USER=... DB_PASS=... DB_NAME=northwind runs both steps"
+
+  - id: task-070
+    title: "Retrofit question_validator into existing generator.py (REQ-F-050)"
+    description: |
+      Once task-068 creates question_validator.py, retrofit it into the existing
+      generator.py (skill-generation-validation-tools/tests/harness/generator.py)
+      which is used by `make generate` for schema-based question generation.
+
+      Changes to generator.py:
+      1. Import QuestionValidator from question_validator
+      2. After generating each question stub, run validate(question, schema)
+      3. Auto-rewrite on first failure (one Claude call with rewrite prompt)
+      4. Re-validate; persistent failures get needs_review status
+      5. Print validation statistics at end of generation run
+
+      Also: run the validator as a post-hoc audit on ALL existing domain YAML files
+      (tests/cases/*.yml) and produce a report of any questions that still fail
+      validation. Questions flagged by the audit should be manually reviewed and
+      rewritten before the next harness run.
+    status: pending
+    dependencies: [task-068]
+    acceptance_criteria:
+      - "generator.py imports and uses question_validator on every generated question"
+      - "Validation statistics printed at end of generator.py runs"
+      - "Post-hoc audit script or make target produces per-domain violation report"
+      - "make smoke passes after changes to generator.py"
 
   - id: task-069
     title: "Use onboard-dataset pipeline to complete 100-case expansion (REQ-F-047 + REQ-F-049)"
