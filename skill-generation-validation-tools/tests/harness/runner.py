@@ -395,6 +395,9 @@ def _format_dataset_schema(
             if cypher_version:
                 ver_parts.append(f"Cypher {cypher_version}")
             lines.append(f"Database version: {' / '.join(ver_parts)}")
+        # GDS availability — inject so model knows whether gds.* is usable
+        if db_block.get("gds") is True:
+            lines.append("gds: true  (Graph Data Science library installed — gds.* procedures available)")
 
     # ── Nodes ──────────────────────────────────────────────────────────────────
     nodes = schema.get("nodes", {})

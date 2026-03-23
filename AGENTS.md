@@ -311,6 +311,14 @@ Three QPE/subquery patterns the model persistently generates wrong despite guida
 
 DO-NOT blocks for all three are now in: SKILL.md (QPE section), cypher25-patterns.md (top), cypher25-call-in-transactions.md (top).
 
+## GDS / Optional Plugin Capabilities
+
+- `gds: true` in `database:` block signals GDS availability; runner.py injects it into schema context automatically via `_format_dataset_schema()`.
+- GDS L3 reference is in `write/` folder (GDS procedures mutate in-memory graphs — conceptually WRITE).
+- Always drop GDS projections after use (`CALL gds.graph.drop('name')`) — projections consume JVM heap.
+- `gds.util.asNode(nodeId)` is required to convert GDS internal integer nodeIds back to Neo4j nodes in RETURN.
+- GDS is NOT on demo.neo4jlabs.com — never use `gds.*` unless schema context explicitly states `gds: true`.
+
 ## SKILL.md Authoring Notes
 
 - SKILL.md line budget is 300 lines (not 300 non-blank lines). Inline `CYPHER 25` on the same line as each query to save ~10 lines in the Schema-First Protocol section.

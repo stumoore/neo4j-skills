@@ -1585,3 +1585,29 @@ Key Decisions:
 - ucnetwork: devices connect to snapshots via FIRST/LAST; snapshot chain via NEXT
 
 Next Task: All tasks complete
+
+================================================================================
+TASK-048: Add GDS (Graph Data Science) library support as optional capability
+Date: 2026-03-23T15:00:00Z
+================================================================================
+
+Summary:
+Added GDS library support as an optional, capability-gated feature across the
+skill. Created a new L3 reference file for GDS procedures, updated SKILL.md to
+route gds.* queries to it, and updated the runner to inject GDS availability
+into Claude prompts when database.gds: true is set.
+
+Files Changed:
+- neo4j-cypher-authoring-skill/references/write/cypher25-gds.md (created — L3 reference)
+- neo4j-cypher-authoring-skill/SKILL.md (modified — GDS decision tree row + L3 pointer)
+- skill-generation-validation-tools/tests/harness/runner.py (modified — gds: injection)
+- .plans/tasks-agent-cypher-authoring-skill.yml (modified — task-048 completed)
+
+Key Decisions:
+- GDS reference placed in write/ folder (matches WRITE category — gds.write/stream/mutate are mutations)
+- Token estimate ~994 (well within 2000-token budget)
+- Twitter GDS test case deferred — task specifies "once GDS is installed locally"
+- `gds: true` injection happens in _format_dataset_schema() alongside version injection
+- SKILL.md already had a GDS section; only added L3 pointer and decision tree row (net +2 lines)
+
+Next Task: task-049 (Add APOC library support)

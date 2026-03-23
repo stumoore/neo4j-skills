@@ -220,7 +220,7 @@ RETURN n.name,
 - Community detection → not expressible in pure Cypher; use `COLLECT` for local neighborhoods
 - Shortest path → `SHORTEST` keyword (Cypher 25) or `shortestPath()`
 
-**When GDS IS available** (schema block has `gds: true`): Use `CALL gds.*` procedures normally with `YIELD`.
+**When GDS IS available** (schema block has `gds: true`): Use `CALL gds.*` procedures normally with `YIELD`. Load `write/cypher25-gds.md` for graph projection, algorithm streaming, write-back patterns, and `gds.util.asNode()` usage.
 
 ---
 
@@ -327,6 +327,7 @@ CYPHER 25 USE myDatabase MATCH (n:Person) RETURN n.name LIMIT 5;
 | CALL subquery, COUNT{}, COLLECT{}, EXISTS{} | `read/cypher25-subqueries.md` |
 | Type errors, null propagation, casting, type predicates | `read/cypher25-types-and-nulls.md` |
 | Batch writes, CALL IN TRANSACTIONS | `write/cypher25-call-in-transactions.md` |
+| GDS algorithms (`gds.*`) — only when `gds: true` in schema | `write/cypher25-gds.md` |
 | Index creation, SEARCH, fulltext, vector, hints | `schema/cypher25-indexes.md` |
 | GRAPH TYPE DDL (Enterprise Preview — 2026.02+) | `schema/cypher25-graph-types.md` |
 | Naming, casing, formatting (all categories) | `cypher-style-guide.md` |
