@@ -10,6 +10,8 @@ database:
   database: twitter
   neo4j_version: "2026.02"
   cypher_version: "25"
+  gds: true
+  capabilities: [apoc, apoc-extended, genai]
   read_only: false
 
 dataset:

@@ -99,10 +99,45 @@ def _get_driver(
 # ---------------------------------------------------------------------------
 
 
+def detect_capabilities(driver: Any, database: str) -> dict[str, Any]:
+    """
+    Detect optional plugins by counting procedures with known prefixes.
+
+    Returns a dict with:
+        gds: bool  — True if gds.* procedures are available
+        capabilities: list[str]  — e.g. ['apoc', 'apoc-extended', 'genai']
+    """
+    _CHECKS = [
+        ("gds", "gds."),
+        ("apoc", "apoc."),
+        ("genai", "ai."),
+    ]
+    result: dict[str, Any] = {"gds": False, "capabilities": []}
+    for key, prefix in _CHECKS:
+        try:
+            records, _, _ = driver.execute_query(
+                "SHOW PROCEDURES YIELD name WHERE name STARTS WITH $prefix RETURN count(*) AS cnt",
+                prefix=prefix,
+                database_=database,
+            )
+            cnt = int(records[0]["cnt"]) if records else 0
+            if cnt > 0:
+                if key == "gds":
+                    result["gds"] = True
+                else:
+                    result["capabilities"].append(key)
+                    # If apoc procedures > ~400 it's likely apoc-extended too
+                    if key == "apoc" and cnt > 400:
+                        result["capabilities"].append("apoc-extended")
+        except Exception as exc:
+            print(f"  WARNING: capability detection for '{prefix}' failed: {exc}", file=sys.stderr)
+    return result
+
+
 def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
     """
     Inspect the Neo4j schema: node labels, relationship types, property keys,
-    and index information.
+    index information, and optional plugin capabilities.
 
     Returns a dict with:
         labels: list of node label strings
@@ -110,6 +145,8 @@ def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
         indexes: list of index info dicts (name, type, state, labelsOrTypes, properties)
         node_properties: {label: [property_name, ...]}
         rel_properties: {rel_type: [property_name, ...]}
+        gds: bool
+        capabilities: list[str]
     """
     schema: dict[str, Any] = {
         "labels": [],
@@ -117,6 +154,8 @@ def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
         "indexes": [],
         "node_properties": {},
         "rel_properties": {},
+        "gds": False,
+        "capabilities": [],
     }
 
     # Labels
@@ -178,6 +217,11 @@ def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
             schema["rel_properties"][rel_type] = [r["prop"] for r in records]
         except Exception:
             schema["rel_properties"][rel_type] = []
+
+    # Detect optional plugins (GDS, APOC, GenAI)
+    caps = detect_capabilities(driver, database)
+    schema["gds"] = caps["gds"]
+    schema["capabilities"] = caps["capabilities"]
 
     return schema
 
@@ -365,6 +409,13 @@ def build_schema_context(
             props_info.append(f"{prop} ({sem})")
         if props_info:
             lines.append(f"  {label}: {', '.join(props_info)}")
+
+    # Optional plugin capabilities
+    if schema.get("gds"):
+        lines.append("gds: true  (Graph Data Science library installed — gds.* procedures available)")
+    caps = schema.get("capabilities", [])
+    if caps:
+        lines.append(f"capabilities: [{', '.join(caps)}]  (optional plugins available)")
 
     return "\n".join(lines)
 
@@ -684,6 +735,8 @@ def generate(
         print(f"  Labels:         {schema['labels']}")
         print(f"  Rel types:      {schema['relationship_types']}")
         print(f"  ONLINE indexes: {sum(1 for i in schema['indexes'] if i.get('state') == 'ONLINE')}")
+        print(f"  GDS:            {schema['gds']}")
+        print(f"  Capabilities:   {schema['capabilities']}")
 
     # Sample property values and infer semantics
     print("[generator] Sampling property values...", flush=True)
