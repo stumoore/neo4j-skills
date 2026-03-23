@@ -15,12 +15,12 @@ Cross-reference with the `database.neo4j_version` in the injected schema context
 | `REPEATABLE ELEMENTS` match mode | 2025.06 | All | GA |
 | `DIFFERENT RELATIONSHIPS` match mode | 2025.06 | All | GA |
 | `vector()` constructor | 2025.10 | All | GA |
-| `SEARCH` clause — vector indexes | 2026.02.1 | All | GA |
+| `SEARCH` clause — vector indexes | ~2026.01 (Preview) / 2026.02.1 (GA) | All | GA |
 | `GRAPH TYPE` DDL clauses | 2026.02 | Enterprise | Preview |
 
 ## Notes
 
-- **SEARCH clause**: GA for **node vector indexes only** in 2026.02.1. Correct syntax:
+- **SEARCH clause**: Available as Preview from approximately 2026.01 (including demo.neo4jlabs.com); GA for **node vector indexes only** in 2026.02.1. Correct syntax:
   `SEARCH n IN (VECTOR INDEX name FOR $vec LIMIT N) SCORE AS score` — variable name only (NOT `(n)`);
   LIMIT required inside parens; `SCORE AS varname` binds the similarity score after closing paren.
   Fulltext always requires `db.index.fulltext.queryNodes()`. Relationship vector indexes always

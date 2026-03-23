@@ -443,5 +443,5 @@ cases:
     max_allocated_memory_bytes: 52428800
     max_runtime_ms: 30000
     is_write_query: false
-    min_version: "2026.02"
+    min_version: "2026.01"
     notes: "Uses SEARCH clause (GA in 2026.02+) with article_graph_embeddings (128-dim) index."

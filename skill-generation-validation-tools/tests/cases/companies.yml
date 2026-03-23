@@ -652,7 +652,7 @@ cases:
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 15000
     is_write_query: false
-    min_version: "2026.02"
+    min_version: "2026.01"
     notes: "SEARCH clause vector: MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding LIMIT 5 RETURN c.text, score. Embedding dimension 1536 — use a query vector for 'corporate mergers and acquisitions'."
 
   - id: companies-search-002
@@ -666,7 +666,7 @@ cases:
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 15000
     is_write_query: false
-    min_version: "2026.02"
+    min_version: "2026.01"
     notes: "SEARCH clause with WHERE score > 0.75 filter: MATCH (c:Chunk) SEARCH (c) USING VECTOR INDEX news WITH QUERY VECTOR $embedding WHERE score > 0.75 RETURN c.text, score LIMIT 8. The SEARCH clause supports inline score filtering."
 
   # ─── QPP MATCH MODES (REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS) ─────────

@@ -32,6 +32,9 @@ Non-negotiable defaults — apply before writing any query:
 7. **Validate** — `EXPLAIN` every query; `PROFILE` when performance matters
 8. **Recover** — handle 0-result queries, TypeErrors, timeouts autonomously
 9. **READ/WRITE/ADMIN first** — categorize, then load only the relevant L3 folder
+10. **MATCH mode keyword position** — `REPEATABLE ELEMENTS` and `DIFFERENT RELATIONSHIPS` go **immediately after `MATCH`**, never at the end of the pattern:
+    - `MATCH REPEATABLE ELEMENTS (a)(()-[:R]->()){2}(b)` ✓
+    - `MATCH (a)(()-[:R]->()){2}(b) REPEATABLE ELEMENTS` ✗ **SYNTAX ERROR**
 
 ---
 
@@ -260,7 +263,7 @@ Load `schema/cypher25-genai.md` for full signatures, provider map, and re-scorin
 
 ### SEARCH Clause (Vector — GA in Neo4j 2026.02.1+)
 
-> **SEARCH is vector-only** — fulltext always uses `db.index.fulltext.queryNodes()`. **Version check required**: SEARCH clause is GA in Neo4j **2026.02.1+**; use the procedure fallback for older versions (pre-2026.02 databases).
+> **SEARCH is vector-only** — fulltext always uses `db.index.fulltext.queryNodes()`. **Version check**: SEARCH is available as Preview from ~2026.01 (including demo.neo4jlabs.com) and GA in 2026.02.1+. Use the procedure fallback (`db.index.vector.queryNodes()`) only for versions before 2026.01.
 
 ```cypher
 // Vector 2026.02.1+ (SEARCH clause):
@@ -310,6 +313,9 @@ LIMIT 20
 | `collect()[..N]` | `COLLECT { MATCH ... RETURN ... LIMIT N }` |
 | `-- SQL comment` | `// Cypher comment` |
 | `ACYCLIC / TRAIL / WALK` path modes | Not supported in Neo4j 2026.x — omit; use `WHERE` guards |
+| `ORDER BY x DESC NULLS LAST` | `ORDER BY x DESC` — `NULLS LAST`/`FIRST` is SQL, not valid Cypher |
+| `MATCH (a)(p){n}(b) REPEATABLE ELEMENTS` | `MATCH REPEATABLE ELEMENTS (a)(p){n}(b)` — mode goes after MATCH |
+| `NOT EXISTS { MATCH (a)-[:R]->(b) }` | `NOT EXISTS { (a)-[:R]->(b) }` — no MATCH keyword inside EXISTS/NOT EXISTS |
 
 ---
 
