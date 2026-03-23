@@ -8,8 +8,8 @@ contain:
   - Explicit Cypher syntax patterns (node patterns, relationship patterns)
   - Property dot-access syntax in code context (.name, .rating on variable names)
   - GDS/APOC/db.index procedure prefixes
-  - Known schema label/rel-type names from the passed schema dict
-  - ALL_CAPS_WITH_UNDERSCORES relationship type patterns (when schema-matched)
+  - ALL_CAPS_WITH_UNDERSCORES relationship type patterns (SIMILAR_TO, HAS_SUBSIDIARY etc.)
+    — schema-aware when schema dict provided, otherwise catches any ALL_CAPS_UNDERSCORE token
 
 Common English words like "return", "distinct", "match", "create", "delete",
 "shortest", "profile", "collect" are NOT flagged — they appear naturally in
@@ -200,11 +200,6 @@ class QuestionValidator:
             if m:
                 return False, f"Contains dot-access property syntax: '{m.group(0)}'"
 
-        # ── Schema-aware: known label names ───────────────────────────────────
-        for label in self._schema_labels:
-            if re.search(r"\b" + re.escape(label) + r"\b", q):
-                return False, f"Contains schema label name: '{label}'"
-
         # ── Schema-aware: relationship type names (ALL_CAPS pattern + schema match)
         # Only flag if the token matches ALL_CAPS pattern AND is a known rel-type
         all_caps_matches = _ALL_CAPS_PATTERN.findall(q)
@@ -294,9 +289,11 @@ if __name__ == "__main__":
         ("Get the movie.title for films after 2000", False, False),
         ("WHERE n.age > 30", False, False),
         ("n.name = 'Alice'", False, False),
-        # ── Schema-aware violations (FAIL with schema, PASS without) ──────────
-        ("Show me all User nodes in the graph", False, True),
-        ("Which users have bought products?", True, True),  # 'users' != 'User' label
+        # ── Capitalized domain terms — fine in natural English ────────────────
+        ("Show me all User records in the system", True, True),  # 'User' as English word
+        ("Which customers have placed orders?", True, True),
+        ("List all Genre categories available", True, True),
+        ("Which users have bought products?", True, True),
     ]
 
     passed = 0
