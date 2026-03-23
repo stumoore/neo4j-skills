@@ -104,15 +104,14 @@ def detect_capabilities(driver: Any, database: str) -> dict[str, Any]:
     Detect optional plugins by counting procedures with known prefixes.
 
     Returns a dict with:
-        gds: bool  — True if gds.* procedures are available
-        capabilities: list[str]  — e.g. ['apoc', 'apoc-extended', 'genai']
+        capabilities: list[str]  — e.g. ['gds', 'apoc', 'apoc-extended', 'genai']
     """
     _CHECKS = [
         ("gds", "gds."),
         ("apoc", "apoc."),
         ("genai", "ai."),
     ]
-    result: dict[str, Any] = {"gds": False, "capabilities": []}
+    capabilities: list[str] = []
     for key, prefix in _CHECKS:
         try:
             records, _, _ = driver.execute_query(
@@ -122,16 +121,13 @@ def detect_capabilities(driver: Any, database: str) -> dict[str, Any]:
             )
             cnt = int(records[0]["cnt"]) if records else 0
             if cnt > 0:
-                if key == "gds":
-                    result["gds"] = True
-                else:
-                    result["capabilities"].append(key)
-                    # If apoc procedures > ~400 it's likely apoc-extended too
-                    if key == "apoc" and cnt > 400:
-                        result["capabilities"].append("apoc-extended")
+                capabilities.append(key)
+                # If apoc procedures > ~400 it's likely apoc-extended too
+                if key == "apoc" and cnt > 400:
+                    capabilities.append("apoc-extended")
         except Exception as exc:
             print(f"  WARNING: capability detection for '{prefix}' failed: {exc}", file=sys.stderr)
-    return result
+    return {"capabilities": capabilities}
 
 
 def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
@@ -154,7 +150,6 @@ def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
         "indexes": [],
         "node_properties": {},
         "rel_properties": {},
-        "gds": False,
         "capabilities": [],
     }
 
@@ -220,7 +215,6 @@ def inspect_schema(driver: Any, database: str) -> dict[str, Any]:
 
     # Detect optional plugins (GDS, APOC, GenAI)
     caps = detect_capabilities(driver, database)
-    schema["gds"] = caps["gds"]
     schema["capabilities"] = caps["capabilities"]
 
     return schema
@@ -410,12 +404,10 @@ def build_schema_context(
         if props_info:
             lines.append(f"  {label}: {', '.join(props_info)}")
 
-    # Optional plugin capabilities
-    if schema.get("gds"):
-        lines.append("gds: true  (Graph Data Science library installed — gds.* procedures available)")
+    # Optional plugin capabilities (unified list: gds, apoc, apoc-extended, genai, ...)
     caps = schema.get("capabilities", [])
     if caps:
-        lines.append(f"capabilities: [{', '.join(caps)}]  (optional plugins available)")
+        lines.append(f"capabilities: [{', '.join(caps)}]  (optional plugins available — gds.* usable if 'gds' listed; apoc.* if 'apoc' listed)")
 
     return "\n".join(lines)
 
@@ -735,7 +727,6 @@ def generate(
         print(f"  Labels:         {schema['labels']}")
         print(f"  Rel types:      {schema['relationship_types']}")
         print(f"  ONLINE indexes: {sum(1 for i in schema['indexes'] if i.get('state') == 'ONLINE')}")
-        print(f"  GDS:            {schema['gds']}")
         print(f"  Capabilities:   {schema['capabilities']}")
 
     # Sample property values and infer semantics

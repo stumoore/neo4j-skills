@@ -10,8 +10,7 @@ database:
   database: goodreads
   neo4j_version: "2026.01"
   cypher_version: "25"
-  gds: true
-  capabilities: [apoc, apoc-extended, genai]
+  capabilities: [gds, apoc, apoc-extended, genai]
   read_only: true  # demo.neo4jlabs.com — write cases SKIP rather than FAIL
 
 dataset:

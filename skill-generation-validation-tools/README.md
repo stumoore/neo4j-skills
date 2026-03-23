@@ -96,8 +96,7 @@ database:
   neo4j_version: "2026.01"    # used to gate version-specific features in prompts
   cypher_version: "25"
   read_only: true              # SKIP write cases instead of FAIL
-  gds: true                    # GDS library available
-  capabilities: [apoc, apoc-extended, genai]  # optional plugins available
+  capabilities: [gds, apoc, apoc-extended, genai]  # optional plugins (unified list)
 
 dataset:
   name: companies
@@ -105,19 +104,34 @@ dataset:
     <description injected into the Claude prompt as schema context>
   schema:
     nodes:
-      - label: Organization
-        properties: [name, country, founded, employees, revenue]
-        notes: "..."
+      Organization:
+        description: "A company or corporate entity"
+        note: "ALWAYS :Organization — never :Company or :Firm"
+        properties:
+          name:        {type: STRING,  sample: ["Apple", "Microsoft"]}
+          nbrEmployees: {type: INTEGER, min: 1, max: 2400000}
+          revenue:      {type: FLOAT,   min: 0, description: "Annual revenue in USD"}
+          summary:      {type: STRING}
+      Chunk:
+        properties:
+          text:      {type: STRING}
+          embedding: {type: VECTOR, dimensions: 1536, similarity: cosine}
     relationships:
-      - type: HAS_SUBSIDIARY
-        from: Organization
-        to: Organization
+      - {type: HAS_SUBSIDIARY, from: Organization, to: Organization}
+      - {type: MENTIONS,       from: Article,      to: Organization}
     indexes:
       - name: entity
         type: FULLTEXT
-        labels: [Organization]
-        properties: [name]
-        note: "..."
+        on: Organization(name)
+        call: "CALL db.index.fulltext.queryNodes('entity', $q) YIELD node, score"
+      - name: news
+        type: VECTOR
+        on: Chunk(embedding)
+        dimensions: 1536
+        similarity: cosine
+        call: "CALL db.index.vector.queryNodes('news', N, $vec) YIELD node, score"
+  notes:
+    - "Company names include legal suffixes — use CONTAINS or fulltext for name matching"
 
 cases:
   - id: companies-basic-001
@@ -148,18 +162,18 @@ cases:
 
 | Domain | URI | Version | Local/Remote | Write? | Capabilities |
 |---|---|---|---|---|---|
-| companies | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| recommendations | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| goodreads | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| stackoverflow | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| legalcontracts | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| retail | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| ucnetwork | demo.neo4jlabs.com | 2026.01 | remote | SKIP | apoc, apoc-extended, genai, gds |
-| ucfraud | localhost:7687 | 2026.02.1 | local | YES | apoc, apoc-extended, genai, gds |
-| northwind | localhost:7687 | 2026.02 | local | YES | apoc, apoc-extended, genai, gds |
-| twitter | localhost:7687 | 2026.02 | local | YES | apoc, apoc-extended, genai, gds |
+| companies | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| recommendations | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| goodreads | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| stackoverflow | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| legalcontracts | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| retail | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| ucnetwork | demo.neo4jlabs.com | 2026.01 | remote | SKIP | gds, apoc, apoc-extended, genai |
+| ucfraud | localhost:7687 | 2026.02.1 | local | YES | gds, apoc, apoc-extended, genai |
+| northwind | localhost:7687 | 2026.02 | local | YES | gds, apoc, apoc-extended, genai |
+| twitter | localhost:7687 | 2026.02 | local | YES | gds, apoc, apoc-extended, genai |
 
-**Note**: demo.neo4jlabs.com runs Neo4j 2026.01.x — the `SEARCH` clause (vector index) is **not available** there (GA in 2026.02.1+). Local instances run 2026.02.x and support SEARCH.
+**Note**: `SEARCH` clause is available on demo.neo4jlabs.com as Preview (2026.01) and is GA in 2026.02.1+. Local instances run 2026.02.x.
 
 ---
 
@@ -309,7 +323,7 @@ Each output file is capped at **2,000 tokens** (enforced by the extractor). GQL-
 
 ## Known Limitations
 
-- `SEARCH` clause cases only run on local Neo4j 2026.02+ (not demo.neo4jlabs.com 2026.01)
+- `SEARCH` clause is available on demo.neo4jlabs.com (Preview in 2026.01, GA in 2026.02.1); cases using SEARCH should work on both demo and local
 - GDS algorithm cases require a local Neo4j instance with GDS installed
 - Execution timeouts (180s) may cause false failures for complex ucnetwork queries under API load — use `WORKERS=2` for these
 - The `CALL IN TRANSACTIONS` write pattern requires an implicit (auto-commit) transaction — the harness handles this automatically

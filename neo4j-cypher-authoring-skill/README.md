@@ -96,7 +96,7 @@ All predicate values and MERGE keys use `$params`. Inline literals are only allo
 | `WHEN` conditional | 2025.06 | |
 | `REPEATABLE ELEMENTS` / `DIFFERENT RELATIONSHIPS` | 2025.06 | Must follow `MATCH` keyword directly |
 | `vector()` function | 2025.10 | |
-| `SEARCH` clause (vector index) | 2026.02.1 | Not available on demo.neo4jlabs.com (2026.01) |
+| `SEARCH` clause (vector index) | ~2026.01 (Preview) / 2026.02.1 (GA) | Available on demo.neo4jlabs.com as Preview |
 | GRAPH TYPE DDL | 2026.02 | Enterprise Preview only |
 
 Cross-reference `references/version-matrix.md` before using any version-gated feature.
@@ -107,12 +107,17 @@ Cross-reference `references/version-matrix.md` before using any version-gated fe
 
 Plugins are gated — only use when the schema context declares them available:
 
-| Plugin | Flag | Procedures | Availability |
+| Plugin | Capability token | Procedures | Availability |
 |---|---|---|---|
-| Graph Data Science | `gds: true` | `gds.*` | Self-managed (installed); Aura (always on) |
-| APOC Core | `capabilities: [apoc]` | `apoc.*` | Self-managed (installed); Aura (always on) |
-| APOC Extended | `capabilities: [apoc-extended]` | additional `apoc.*` | Self-managed only; NOT on Aura |
-| GenAI plugin | `capabilities: [genai]` | `ai.similarity.*`, `ai.embedding.*` | Self-managed; `ai.embedding.*` is Aura-only |
+| Graph Data Science | `gds` | `gds.*` | Self-managed (installed); Aura (always on) |
+| APOC Core | `apoc` | `apoc.*` | Self-managed (installed); Aura (always on) |
+| APOC Extended | `apoc-extended` | additional `apoc.*` | Self-managed only; NOT on Aura |
+| GenAI plugin | `genai` | `ai.similarity.*`, `ai.embedding.*` | Self-managed; `ai.embedding.*` is Aura-only |
+
+All capabilities are declared in a single `capabilities:` list in the schema context:
+```yaml
+capabilities: [gds, apoc, apoc-extended, genai]
+```
 
 Detection query (for schema tooling):
 ```cypher

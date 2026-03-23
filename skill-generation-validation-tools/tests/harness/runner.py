@@ -395,14 +395,16 @@ def _format_dataset_schema(
             if cypher_version:
                 ver_parts.append(f"Cypher {cypher_version}")
             lines.append(f"Database version: {' / '.join(ver_parts)}")
-        # GDS availability — inject so model knows whether gds.* is usable
-        if db_block.get("gds") is True:
-            lines.append("gds: true  (Graph Data Science library installed — gds.* procedures available)")
-        # Capabilities (apoc, apoc-extended, genai, etc.)
-        capabilities = db_block.get("capabilities", [])
+        # Capabilities — gds, apoc, apoc-extended, genai, etc.
+        # Supports both legacy `gds: true` + `capabilities: [...]` and unified `capabilities: [gds, ...]`
+        capabilities = list(db_block.get("capabilities", []))
+        if db_block.get("gds") is True and "gds" not in capabilities:
+            capabilities.insert(0, "gds")
         if capabilities:
             caps_str = ", ".join(str(c) for c in capabilities)
-            lines.append(f"capabilities: [{caps_str}]  (optional plugins available — use apoc.* only when 'apoc' listed)")
+            has_gds = "gds" in capabilities
+            gds_note = "  gds.* procedures available;" if has_gds else ""
+            lines.append(f"capabilities: [{caps_str}]  (optional plugins available —{gds_note} use apoc.* only when 'apoc' listed)")
 
     # ── Nodes ──────────────────────────────────────────────────────────────────
     nodes = schema.get("nodes", {})
