@@ -1038,3 +1038,55 @@ tasks:
       - "SKILL.md routes to cypher25-gds.md for gds.* queries"
       - "SKILL.md clearly states: do NOT use gds.* unless schema context has gds: true"
       - "Native Cypher fallbacks documented for degree/betweenness/PageRank approximations"
+
+  - id: task-049
+    title: "Add APOC library support as optional capability in skill"
+    description: |
+      APOC (Awesome Procedures on Cypher) is a Neo4j plugin providing ~500 utility procedures
+      and functions. Core APOC is included with Neo4j 5+ and Aura. Available as:
+      - apoc-core: bundled with Neo4j 5+ / always-on in Aura
+      - apoc-extended: optional plugin, not in Aura
+      This task adds:
+      1. `capabilities` flag in YAML database: block (e.g., `capabilities: [apoc, apoc-extended]`)
+      2. New L3 reference file `references/read/cypher25-apoc.md` covering:
+         - apoc.map.*, apoc.coll.*, apoc.text.* (string normalization, similarity)
+         - apoc.date.*, apoc.temporal.* (date arithmetic)
+         - apoc.path.* (subgraph traversal)
+         - apoc.export.* (data export procedures)
+         - apoc.load.* (CSV/JSON load)
+      3. SKILL.md: add capability-gating rule (only use apoc.* if capabilities includes apoc)
+      4. Note that Aura always has apoc-core; local/cloud depends on installation
+    status: pending
+    dependencies:
+      - task-048
+    acceptance_criteria:
+      - "YAML database: block supports capabilities: [apoc, apoc-extended, gds, genai]"
+      - "references/read/cypher25-apoc.md exists with 15+ procedure/function examples"
+      - "SKILL.md routes to cypher25-apoc.md for apoc.* calls"
+      - "SKILL.md states: use apoc.* only when capabilities includes 'apoc'"
+      - "Aura always-on note documented"
+
+  - id: task-050
+    title: "Add Neo4j GenAI plugin support (ai.*) as optional capability in skill"
+    description: |
+      The Neo4j GenAI plugin (available from 2025.x / Aura) adds:
+      - ai.similarity.* — vector similarity functions (cosine, euclidean, etc.)
+      - ai.embedding.* (Aura only) — inline embedding generation via configured provider
+      - Integration with OpenAI, Azure OpenAI, Vertex AI, Bedrock for embedding computation
+      This task adds:
+      1. `capabilities: [genai]` flag in YAML database: block
+      2. New L3 reference file `references/schema/cypher25-genai.md` covering:
+         - ai.similarity.cosine($vec1, $vec2)
+         - ai.similarity.euclidean($vec1, $vec2)
+         - ai.embedding.* patterns (Aura)
+         - When to use ai.* vs db.index.vector.queryNodes()
+      3. SKILL.md: add capability-gating rule for ai.* functions
+      4. Note that Aura always has GenAI plugin; local depends on genai plugin installation
+    status: pending
+    dependencies:
+      - task-049
+    acceptance_criteria:
+      - "references/schema/cypher25-genai.md exists with ai.similarity.* and ai.embedding.* examples"
+      - "SKILL.md routes to cypher25-genai.md for ai.* calls"
+      - "Aura always-on note documented"
+      - "Distinction between ai.similarity.cosine() (scalar) vs vector index search (top-K) documented"
