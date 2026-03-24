@@ -189,9 +189,37 @@ Quantifier goes **outside** the group: `(pattern){N,M}` ✓ — never `(pattern{
 
 Cypher does **not** support `NULLS LAST` / `NULLS FIRST` (SQL syntax — will cause a syntax error). Use plain `ORDER BY x DESC` or `ORDER BY x ASC`. NULLs sort last in ascending order and first in descending order by default — no modifier needed.
 
+`ORDER BY` items must be **expressions only** — never append `AS alias` to a sort key:
+
 ```cypher
-// DO:     ORDER BY n.score DESC
+// DO:     ORDER BY n.publication_year DESC, n.rating DESC
+// DON'T: ORDER BY n.publication_year DESC, n.rating AS rating DESC   // SYNTAX ERROR — AS not allowed in ORDER BY
 // DON'T: ORDER BY n.score DESC NULLS LAST   // SYNTAX ERROR — not valid Cypher
+```
+
+### Conditional Counting
+
+`count(variable WHERE condition)` is **NOT valid Cypher** — it is SQL syntax. Use one of these patterns:
+
+```cypher
+// DO: sum/CASE pattern
+sum(CASE WHEN r.rating = 5 THEN 1 ELSE 0 END) AS five_star_count
+
+// DO: COUNT subquery (Cypher 25)
+COUNT { MATCH (r:Review)-[:WRITTEN_FOR]->(b) WHERE r.rating = 5 } AS five_star_count
+
+// DON'T: count(r WHERE r.rating = 5)   // SYNTAX ERROR — not valid Cypher
+```
+
+### Variable Scope After WITH
+
+`WITH` projects a new scope. Any variable NOT listed in the `WITH` clause is out of scope afterwards. Use `count(*)` when the entity variable is no longer in scope:
+
+```cypher
+WITH b.category AS cat, b.rating AS rating   // 'b' is dropped from scope here
+RETURN cat, avg(rating) AS avg_rating,
+       count(*) AS book_count                // correct — 'b' is out of scope
+// DON'T: count(b) AS book_count            // SYNTAX ERROR — 'b' not defined after the WITH above
 ```
 
 ### Subquery Body Format Rules
