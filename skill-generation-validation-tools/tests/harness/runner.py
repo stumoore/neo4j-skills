@@ -117,6 +117,9 @@ class TestCase:
     # Minimum Neo4j version required to run this test (YYYY.MM format, e.g. "2026.02")
     # Cases with min_version > detected server version are SKIPPED rather than FAIL.
     min_version: Optional[str] = None
+    # If True, a zero-row result at Gate 2 is treated as SKIPPED rather than FAIL.
+    # Use for queries that depend on sparse or potentially-absent data.
+    skip_if_empty: bool = False
     # Source file (set by loader)
     source_file: str = ""
 
@@ -232,6 +235,7 @@ def load_cases(
                 max_runtime_ms=raw.get("max_runtime_ms"),
                 is_write_query=bool(raw.get("is_write_query", False)),
                 min_version=str(raw["min_version"]) if raw.get("min_version") else None,
+                skip_if_empty=bool(raw.get("skip_if_empty", False)),
                 source_file=str(f),
             )
 
@@ -1233,13 +1237,25 @@ def run_case(
         for g in validation.gates
     ]
 
+    # skip_if_empty: treat zero-row Gate 2 failure as SKIPPED rather than FAIL
+    final_verdict = validation.verdict
+    skip_reason: Optional[str] = None
+    if tc.skip_if_empty and validation.failed_gate() == 2:
+        gate2_reason = next(
+            (g.reason for g in validation.gates if g.gate == 2 and g.verdict == FAIL),
+            "",
+        )
+        if "0 rows" in gate2_reason or "returned 0" in gate2_reason.lower():
+            final_verdict = SKIPPED
+            skip_reason = "skip_if_empty: query returned 0 rows"
+
     return TestCaseResult(
         case_id=tc.id,
         question=tc.question,
         difficulty=tc.difficulty,
         tags=tc.tags,
-        verdict=validation.verdict,
-        failed_gate=validation.failed_gate(),
+        verdict=final_verdict,
+        failed_gate=None if final_verdict == SKIPPED else validation.failed_gate(),
         warned_gate=validation.warned_gate(),
         generated_cypher=generated_cypher,
         metrics=validation.metrics,
@@ -1248,6 +1264,7 @@ def run_case(
         duration_s=round(time.monotonic() - t0, 3),
         generation_ms=generation_ms,
         execution_ms=execution_ms,
+        skip_reason=skip_reason,
     )
 
 
