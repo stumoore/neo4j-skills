@@ -665,7 +665,7 @@ cases:
     max_allocated_memory_bytes: 10485760
     max_runtime_ms: 8000
     is_write_query: false
-    notes: "publication_year is a STRING — use toInteger(b.publication_year) and FLOOR division to get the decade"
+    notes: "publication_year is a STRING — use toInteger(b.publication_year) and FLOOR division to get the decade. IMPORTANT: after aggregating RETURN, ORDER BY must use RETURN aliases (e.g. ORDER BY decade), NOT pre-aggregation variables (NOT ORDER BY decade_start)."
 
   - id: goodreads-intermediate-008
     question: "Which authors have written books in multiple languages? Show the author name and the list of distinct languages."
