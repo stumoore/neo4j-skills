@@ -178,6 +178,7 @@ def load_cases(
     *,
     difficulty_filter: Optional[str] = None,
     domain_filter: Optional[str] = None,
+    ids_filter: Optional[set[str]] = None,
 ) -> list[TestCase]:
     """
     Load test cases from a YAML file or directory of YAML files.
@@ -200,6 +201,7 @@ def load_cases(
         path: Path to a .yml file or directory containing .yml files.
         difficulty_filter: If set, only load cases with this difficulty.
         domain_filter: If set, only load cases from this domain.
+        ids_filter: If set, only load cases whose id is in this set.
 
     Returns:
         List of TestCase objects.
@@ -236,6 +238,8 @@ def load_cases(
             if difficulty_filter and tc.difficulty != difficulty_filter:
                 continue
             if domain_filter and tc.domain != domain_filter:
+                continue
+            if ids_filter and tc.id not in ids_filter:
                 continue
 
             cases.append(tc)
@@ -1687,6 +1691,16 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Filter test cases by domain (e.g. 'companies')",
     )
     parser.add_argument(
+        "--ids",
+        default=None,
+        metavar="ID[,ID,...]",
+        help=(
+            "Comma-separated list of case IDs to run (e.g. 'companies-basic-001,companies-expert-003'). "
+            "Useful for re-running only failed cases from a previous report. "
+            "Can be combined with --cases pointing to a directory to search all domains."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate YAML structure without executing queries or invoking Claude",
@@ -1775,12 +1789,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     cases_path = Path(args.cases)
 
+    # Parse IDs filter
+    ids_filter: Optional[set[str]] = None
+    if args.ids:
+        ids_filter = {i.strip() for i in args.ids.split(",") if i.strip()}
+
     # Load test cases
     try:
         cases = load_cases(
             cases_path,
             difficulty_filter=args.difficulty,
             domain_filter=args.domain,
+            ids_filter=ids_filter,
         )
     except ImportError as e:
         print(f"ERROR: {e}", file=sys.stderr)

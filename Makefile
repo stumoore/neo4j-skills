@@ -256,6 +256,26 @@ test-expert:  ## Run only expert-difficulty cases across all domains
 	  --model $(MODEL) \
 	  --verbose
 
+# ── Run individual case IDs ────────────────────────────────────────────────────
+# Usage: make run-ids IDS=companies-basic-001,companies-expert-003
+# Optional: DOMAIN=companies to scope to a specific domain YAML
+# Optional: REPORT=path/to/output.json (default: results/ids-run-<timestamp>.json)
+
+IDS    ?=
+REPORT ?= $(RESULTS)/ids-run-$(TIMESTAMP).json
+
+.PHONY: run-ids
+run-ids:  ## Re-run specific case IDs (IDS=id1,id2,...); DOMAIN= to scope to one domain
+	$(HARNESS) \
+	  --cases $(if $(DOMAIN),$(CASES_DIR)/$(DOMAIN).yml,$(CASES_DIR)) \
+	  --skill $(SKILL) \
+	  --ids $(IDS) \
+	  --report $(REPORT) \
+	  --workers $(WORKERS) \
+	  --timeout $(TIMEOUT) \
+	  --model $(MODEL) \
+	  --verbose
+
 # ── Analysis ───────────────────────────────────────────────────────────────────
 
 .PHONY: analyze
