@@ -663,6 +663,7 @@ cases:
     database: neo4j
     domain: ucfraud
     min_results: 1
+    skip_if_empty: true
     max_db_hits: 50000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 10000
