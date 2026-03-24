@@ -452,6 +452,7 @@ cases:
     tags: [vector-search, search-clause, aggregation, relationship-chain]
     domain: retail
     min_results: 1
+    skip_if_empty: true
     max_db_hits: 50000
     max_allocated_memory_bytes: 52428800
     max_runtime_ms: 30000

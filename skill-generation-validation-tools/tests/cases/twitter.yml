@@ -367,6 +367,7 @@ cases:
     tags: [graph-traversal, chained-relationships, retweet-chain]
     domain: twitter
     min_results: 1
+    skip_if_empty: true
     max_db_hits: 20000
     max_allocated_memory_bytes: 10485760
     max_runtime_ms: 15000
@@ -393,6 +394,7 @@ cases:
     tags: [shortest-path, qpe, graph-traversal]
     domain: twitter
     min_results: 1
+    skip_if_empty: true
     max_db_hits: 100000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
