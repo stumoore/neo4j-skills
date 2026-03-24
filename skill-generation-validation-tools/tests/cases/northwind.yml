@@ -1433,7 +1433,7 @@ cases:
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 10000
     is_write_query: false
-    notes: "Filter duration.between(date(left(o.orderDate,10)), date(left(o.shippedDate,10))).days > 30. Exclude orders where shippedDate IS NULL."
+    notes: "CRITICAL: shippedDate may contain the literal string 'NULL' (not SQL null). ALWAYS filter: WHERE o.shippedDate IS NOT NULL AND o.shippedDate <> 'NULL'. Then: duration.between(date(left(o.orderDate,10)), date(left(o.shippedDate,10))).days > 30"
 
   - id: northwind-temporal-003
     question: "Show the monthly order volume trend for 1997. For each month, show the month number and how many orders were placed."
