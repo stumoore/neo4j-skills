@@ -1154,18 +1154,17 @@ cases:
     notes: "Pure Cypher — GDS forbidden for legalcontracts user. Two-step: first MATCH (p)-[:PARTY_TO]->(c)<-[:PARTY_TO]-(co) to get direct links, then MATCH (co)-[:PARTY_TO]->(c2)<-[:PARTY_TO]-(p2) to get 2nd degree. Both queries should use DISTINCT to count unique parties and LIMIT to bound the result."
 
   - id: legalcontracts-expert-007
-    question: "Find all parties that are exactly 2 contract-hops away from 'THE VÄRDE FUND VI-A, L.P.' — meaning parties who share a contract with one of Värde's direct co-signatories but do NOT share a contract directly with Värde itself. Show those parties and how many shared-contract paths lead to them."
+    question: "Find all parties that are exactly 2 contract-hops away from 'Cisco Systems, Inc.' — meaning parties who share a contract with one of Cisco's direct co-signatories but do NOT share a contract directly with Cisco itself. Show those parties and how many shared-contract paths lead to them."
     database: legalcontracts
     difficulty: expert
     tags: [graph-traversal, two-hop, not-exists, aggregation, filter]
     domain: legalcontracts
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 100000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "THE VÄRDE FUND VI-A, L.P. has 23 direct co-signatories (all JV). Pattern: MATCH (varde:Party {name:'THE VÄRDE FUND VI-A, L.P.'})-[:PARTY_TO]->(c1:Contract)<-[:PARTY_TO]-(co:Party)-[:PARTY_TO]->(c2:Contract)<-[:PARTY_TO]-(p2:Party) WHERE p2 <> varde AND NOT EXISTS { (varde)-[:PARTY_TO]->(:Contract)<-[:PARTY_TO]-(p2) } WITH p2, count(*) AS paths RETURN p2.name, paths ORDER BY paths DESC LIMIT 20"
+    notes: "Cisco Systems, Inc. has 6 genuine 2-hop-only parties. Pattern: MATCH (cisco:Party {name:'Cisco Systems, Inc.'})-[:PARTY_TO]->(c1:Contract)<-[:PARTY_TO]-(co:Party) WHERE co <> cisco MATCH (co)-[:PARTY_TO]->(c2:Contract)<-[:PARTY_TO]-(cand:Party) WHERE cand <> cisco AND cand <> co AND NOT EXISTS { (cisco)-[:PARTY_TO]->(:Contract)<-[:PARTY_TO]-(cand) } WITH cand, count(*) AS paths RETURN cand.name, paths ORDER BY paths DESC"
 
   - id: legalcontracts-expert-008
     question: "For each contract type, rank parties by their total contract value within that type (using only contracts with specified amounts). Show the rank, party name, contract type, and total value for the top 3 per type."

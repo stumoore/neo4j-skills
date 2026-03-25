@@ -16,6 +16,7 @@ Exit codes:
     0 — all test cases PASS
     1 — at least one FAIL
     2 — at least one WARN, no FAIL
+    3 — aborted early due to API rate limit (429)
 """
 
 import argparse
@@ -45,6 +46,14 @@ sys.path.insert(0, str(_HERE))
 from validator import FAIL, PASS, WARN, ValidationResult, validate  # noqa: E402
 
 SKIPPED = "SKIPPED"
+
+
+class RateLimitError(RuntimeError):
+    """Raised when the Claude API returns a 429 / usage-limit response.
+
+    Propagates out of the run loop so the harness can write a partial report
+    and exit with code 3 instead of silently timing out every remaining case.
+    """
 
 # ---------------------------------------------------------------------------
 # Model ID mapping: short name → full Anthropic model ID
@@ -163,9 +172,12 @@ class RunReport:
     failed: int
     skipped: int
     cases: list[TestCaseResult]
+    rate_limit_abort: Optional[str] = None  # set when run was cut short by 429
 
     @property
     def exit_code(self) -> int:
+        if self.rate_limit_abort:
+            return 3
         if self.failed > 0:
             return 1
         if self.warned > 0:
@@ -756,6 +768,18 @@ def _load_skill_content(skill_name: str) -> Optional[str]:
     return None
 
 
+_RATE_LIMIT_PATTERNS = re.compile(
+    r"429|rate.limit|usage.limit|overloaded|too many requests|"
+    r"quota.exceeded|credit.balance|billing|token.*limit",
+    re.IGNORECASE,
+)
+
+
+def _is_rate_limit_response(text: str) -> bool:
+    """Return True if the Claude CLI output indicates a 429 / usage-limit error."""
+    return bool(_RATE_LIMIT_PATTERNS.search(text))
+
+
 def invoke_claude(
     prompt: str,
     skill_name: str,
@@ -808,6 +832,13 @@ def invoke_claude(
             env={**os.environ},
         )
         generation_ms = int((time.perf_counter() - t0) * 1000)
+        # Check both stdout and stderr for rate-limit signals regardless of exit code.
+        combined = (result.stdout or "") + (result.stderr or "")
+        if _is_rate_limit_response(combined):
+            raise RateLimitError(
+                "Claude API rate limit (429 / usage limit) detected. "
+                "Aborting run. Retry after your session limit resets."
+            )
         if result.returncode != 0:
             err = result.stderr.strip() or f"claude exited {result.returncode}"
             return "", err, generation_ms
@@ -1479,24 +1510,35 @@ def run_all(
     passed = warned = failed = skipped = 0
     n_workers = max(1, min(workers, len(cases)))
 
+    rate_limit_abort: Optional[str] = None
+
     if n_workers == 1:
         # Serial execution
         for i, tc in enumerate(cases, 1):
             schema_text = schema_cache.get(tc.domain)
             value_hints = value_hints_cache.get(tc.domain)
             tc_driver = domain_drivers.get(tc.domain, driver)
-            result, log_lines = _run_case_buffered(
-                tc, skill_name, tc_driver,
-                idx=i, total=len(cases),
-                dry_run=dry_run,
-                claude_timeout_s=claude_timeout_s,
-                schema_text=schema_text,
-                value_hints=value_hints,
-                verbose=verbose,
-                server_version=server_version,
-                domain_read_only=tc.domain in read_only_domains,
-                model_id=model_id,
-            )
+            try:
+                result, log_lines = _run_case_buffered(
+                    tc, skill_name, tc_driver,
+                    idx=i, total=len(cases),
+                    dry_run=dry_run,
+                    claude_timeout_s=claude_timeout_s,
+                    schema_text=schema_text,
+                    value_hints=value_hints,
+                    verbose=verbose,
+                    server_version=server_version,
+                    domain_read_only=tc.domain in read_only_domains,
+                    model_id=model_id,
+                )
+            except RateLimitError as exc:
+                rate_limit_abort = str(exc)
+                print(
+                    f"\n[ABORT] Rate limit hit after {i - 1}/{len(cases)} cases. "
+                    f"Writing partial report and exiting.\n  {exc}",
+                    file=sys.stderr, flush=True,
+                )
+                break
             for line in log_lines:
                 print(line, flush=True)
             results.append(result)
@@ -1540,6 +1582,14 @@ def run_all(
                 i = future_to_idx[future]
                 try:
                     result, log_lines = future.result()
+                except RateLimitError as exc:
+                    rate_limit_abort = str(exc)
+                    print(
+                        f"\n[ABORT] Rate limit hit. Writing partial report and exiting.\n  {exc}",
+                        file=sys.stderr, flush=True,
+                    )
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    break
                 except Exception as exc:
                     # Shouldn't reach here — _run_case_buffered is exception-safe
                     log_lines = [f"[worker error on case {i}] {exc}"]
@@ -1576,6 +1626,7 @@ def run_all(
         failed=failed,
         skipped=skipped,
         cases=results,
+        rate_limit_abort=rate_limit_abort,
     )
 
 
@@ -1608,7 +1659,7 @@ def report_to_dict(report: RunReport) -> dict[str, Any]:
     total_gen_ms = sum(r.generation_ms for r in report.cases)
     total_exec_ms = sum(r.execution_ms for r in report.cases)
     n = report.total or 1
-    return {
+    d: dict[str, Any] = {
         "run_id": report.run_id,
         "started_at": report.started_at,
         "completed_at": report.completed_at,
@@ -1627,6 +1678,9 @@ def report_to_dict(report: RunReport) -> dict[str, Any]:
         },
         "cases": [_result_to_dict(r) for r in report.cases],
     }
+    if report.rate_limit_abort:
+        d["rate_limit_abort"] = report.rate_limit_abort
+    return d
 
 
 def write_report(report: RunReport, path: Path) -> None:
@@ -1925,16 +1979,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     skipped_note = f", {report.skipped} SKIPPED" if report.skipped else ""
     total_gen_ms = sum(r.generation_ms for r in report.cases)
     total_exec_ms = sum(r.execution_ms for r in report.cases)
-    n_cases = report.total or 1
+    n_cases = len(report.cases) or 1
     avg_gen_s = total_gen_ms / 1000 / n_cases
     avg_exec_s = total_exec_ms / 1000 / n_cases
+    ran_note = f" ({len(report.cases)}/{report.total} ran)" if report.rate_limit_abort else ""
     print(
         f"\nResults: {report.passed}/{report.total} PASS, "
-        f"{report.warned} WARN, {report.failed} FAIL{skipped_note}"
+        f"{report.warned} WARN, {report.failed} FAIL{skipped_note}{ran_note}"
         f" | gen: {total_gen_ms / 1000:.1f}s total ({avg_gen_s:.1f}s avg)"
         f" | exec: {total_exec_ms / 1000:.1f}s total ({avg_exec_s:.1f}s avg)",
         flush=True,
     )
+    if report.rate_limit_abort:
+        print(
+            f"[RATE LIMIT] Run aborted early: {report.rate_limit_abort}",
+            file=sys.stderr, flush=True,
+        )
 
     # Write report
     write_report(report, report_path)

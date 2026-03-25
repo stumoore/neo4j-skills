@@ -101,9 +101,9 @@ dataset:
     - "User connects to Review via PUBLISHED; Review connects to Book via WRITTEN_FOR — two hops to get user's reviewed books"
     - "Vector search: use CALL db.index.vector.queryNodes('book-descriptions', N, $vec) YIELD node, score — the SEARCH clause is NOT valid Cypher 25 syntax"
     - "Labels Genre, Publisher, and Series do NOT exist in this dataset — do not reference them"
-    - "Books confirmed to exist: 'The Name of the Wind (The Kingkiller Chronicle, #1)', 'Betrayed (House of Night, #2)', 'To Kill a Mockingbird', 'Harry Potter and the Sorcerer\\'s Stone', 'Night Visions 5', 'The Tommyknockers', 'The Berlin Stories: The Last of Mr Norris/Goodbye to Berlin'"
-    - "Books that do NOT exist: 'The Hunger Games', 'Divergent' — do not use these in test queries"
-    - "SIMILAR_TO network: 'The Name of the Wind' and 'Betrayed (House of Night #2)' have 0 SIMILAR_TO links — do NOT use them in path traversal queries. Use 'Night Visions 5' (6 neighbors) or 'The Berlin Stories' (7 neighbors) instead."
+    - "Books confirmed to exist: 'The Name of the Wind (The Kingkiller Chronicle, #1)', 'Betrayed (House of Night, #2)', 'Harry Potter and the Sorcerer\\'s Stone', 'Night Visions 5', 'The Tommyknockers', 'The Berlin Stories: The Last of Mr Norris/Goodbye to Berlin', 'Mrs. Dalloway'"
+    - "Books that do NOT exist: 'The Hunger Games', 'Divergent', 'To Kill a Mockingbird' — do not use these in test queries"
+    - "SIMILAR_TO network: 'The Name of the Wind' and 'Betrayed (House of Night #2)' have 0 SIMILAR_TO links — do NOT use them in path traversal queries. 'Night Visions 5' has 6 outgoing links but 0 2-hop paths. 'The Berlin Stories' has 7 incoming links but 0 2-hop paths. For 2-hop traversal use 'Mrs. Dalloway' (6 undirected 2-hop neighbors confirmed)."
     - "SIMILAR_TO is very sparse: most books have 0 links. Use the confirmed books above for path/traversal test cases."
 
 cases:
@@ -1002,7 +1002,6 @@ cases:
     tags: [relationship, temporal, string-comparison, aggregation, order]
     domain: goodreads
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 200000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 20000
@@ -1145,18 +1144,17 @@ cases:
     notes: "publication_year is STRING — use toIntegerOrNull() to safely convert. Pearson computation requires WITH clauses."
 
   - id: goodreads-complex-006
-    question: "Build a reading recommendation: given that a user liked 'To Kill a Mockingbird' (rated it 5 stars), find other books that users who also gave that book 5 stars tended to rate highly. Show the top 5 collaborative recommendations."
+    question: "Build a reading recommendation: given that a user liked 'The Name of the Wind (The Kingkiller Chronicle, #1)' (rated it 5 stars), find other books that users who also gave that book 5 stars tended to rate highly. Show the top 5 collaborative recommendations."
     database: goodreads
     difficulty: complex
     tags: [collaborative-filtering, multi-hop, aggregation, subquery]
     domain: goodreads
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 500000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "'To Kill a Mockingbird' is confirmed to exist in the database. Collaborative filtering pattern: Book<-WRITTEN_FOR-Review<-PUBLISHED-User-PUBLISHED->Review->WRITTEN_FOR->OtherBook."
+    notes: "'The Name of the Wind (The Kingkiller Chronicle, #1)' has 2731 five-star reviewers. Collaborative filtering pattern: Book<-WRITTEN_FOR-Review<-PUBLISHED-User-PUBLISHED->Review->WRITTEN_FOR->OtherBook."
 
   - id: goodreads-complex-007
     question: "For each language in the database (excluding null), compute the Gini coefficient of the ratings distribution — a measure of inequality in popularity. Use the total ratings counts of books in that language. Show top 5 languages by Gini coefficient."
@@ -1210,32 +1208,31 @@ cases:
   # ─── EXPERT (additional cases) ───────────────────────────────────────────────
 
   - id: goodreads-expert-006
-    question: "Enumerate ALL shortest paths between 'Night Visions 5' and 'The Tommyknockers' through the similarity network (undirected). How many shortest paths exist and what books appear in them?"
+    question: "Find all shortest paths between 'Night Visions 5' and 'The Tommyknockers' through the undirected similarity network. How many shortest paths exist and what books appear on them?"
     database: goodreads
     difficulty: expert
-    tags: [all-shortest-paths, qpe, graph-traversal]
+    tags: [all-shortest-paths, graph-traversal]
     domain: goodreads
     min_results: 1
     max_db_hits: 10000
     max_allocated_memory_bytes: 10485760
     max_runtime_ms: 15000
     is_write_query: false
-    notes: "Use ALL SHORTEST (n)-[:SIMILAR_TO]-(m) QPE syntax. Both books are confirmed connected in the similarity network."
+    notes: "Use allShortestPaths() function: MATCH p = allShortestPaths((start)-[:SIMILAR_TO*]-(end)). Both books are confirmed connected in the similarity network. Do NOT use QPE with path variable assignment — allShortestPaths() is the correct approach here."
 
   - id: goodreads-expert-007
-    question: "Using quantified path patterns, find all books reachable from 'The Berlin Stories: The Last of Mr Norris/Goodbye to Berlin' through exactly 2 hops in the undirected similarity network. Show distinct reachable book titles."
+    question: "Using quantified path patterns, find all books reachable from 'Mrs. Dalloway' through exactly 2 hops in the undirected similarity network. Show distinct reachable book titles."
     database: goodreads
     difficulty: expert
     tags: [qpe, bounded-quantifier, graph-traversal]
     domain: goodreads
-    min_results: 1
-    skip_if_empty: true
+    min_results: 6
     max_db_hits: 5000
     max_allocated_memory_bytes: 10485760
     max_runtime_ms: 15000
     is_write_query: false
     min_version: "2025.06"
-    notes: "Use QPE {2,2} for exactly 2 hops: (()-[:SIMILAR_TO]-(:Book)){2,2}. 'The Berlin Stories' confirmed to have 7 incoming SIMILAR_TO links (use undirected)."
+    notes: "'Mrs. Dalloway' has 6 confirmed undirected 2-hop SIMILAR_TO neighbors (excluding the start book itself). Use QPE {2,2} undirected pattern."
 
   - id: goodreads-expert-008
     question: "Build a comprehensive author profile for 'Stephen King': show total books, total ratings across all books, average rating across books, earliest publication year, latest publication year, and count of books that appear in the similarity network."
@@ -1250,18 +1247,17 @@ cases:
     is_write_query: false
 
   - id: goodreads-expert-009
-    question: "Find the most influential books in the similarity network: books that appear in the most shortest paths between any two other books. Use betweenness-like centrality — count how many book pairs have a shortest path that passes through each book. Show top 5 by path count."
+    question: "Find the top 5 most-connected books in the undirected SIMILAR_TO network by degree (count of direct neighbors). For each book, also show how many additional unique books are reachable at exactly 2 hops that are NOT already direct neighbors. Order by degree descending."
     database: goodreads
     difficulty: expert
-    tags: [qpe, shortest-path, centrality, aggregation, similar-to]
+    tags: [aggregation, multi-hop, graph-traversal, similar-to, subquery]
     domain: goodreads
-    min_results: 1
-    skip_if_empty: true
-    max_db_hits: 50000
+    min_results: 3
+    max_db_hits: 200000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "SIMILAR_TO network is sparse. Compute shortest paths using SHORTEST keyword and count intermediate nodes."
+    notes: "Use two MATCH steps: first collect direct neighbors, then match 2-hop paths excluding the direct neighbors. Standard Cypher — no GDS needed. Pattern: MATCH (b)-[:SIMILAR_TO]-(n1) WITH b, collect(DISTINCT n1) AS direct ... MATCH (b)-[:SIMILAR_TO]-()-[:SIMILAR_TO]-(n2) WHERE NOT n2 = b AND NOT n2 IN direct."
 
   - id: goodreads-basic-024
     question: "What are the top 5 most common languages in the book library?"

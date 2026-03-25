@@ -46,6 +46,7 @@ Non-negotiable defaults — apply before writing any query:
     - A COLLECT subquery: `COLLECT { MATCH (a)-[]->(b) RETURN b.name ORDER BY b.name }` ✓
 16. **`ORDER BY expr AS alias` is ILLEGAL in Cypher** — `AS` is not allowed in ORDER BY items. Write `ORDER BY b.average_rating DESC`, never `ORDER BY b.average_rating AS average_rating DESC`.
 17. **SQL window functions do not exist in Cypher** — `rank() OVER (PARTITION BY ...)`, `ROW_NUMBER() OVER (...)`, `DENSE_RANK() OVER (...)` are SQL syntax and will cause a syntax error. For "rank within group" use: `WITH cat, collect({supplier:s, value:v}) AS ranked UNWIND range(0, size(ranked)-1) AS idx RETURN cat, ranked[idx].supplier, idx+1 AS rank`.
+18. **`WHERE` cannot follow a bare `UNWIND`** — after `UNWIND ... AS x`, a standalone `WHERE` clause is a syntax error. Use `WITH ... WHERE` to filter: `UNWIND list AS x UNWIND list2 AS y WITH x, y WHERE x < y`. Standalone `WHERE` is only valid after `MATCH`, `OPTIONAL MATCH`, or `WITH`.
 
 ---
 
@@ -196,8 +197,10 @@ Cypher does **not** support `NULLS LAST` / `NULLS FIRST` (SQL syntax — will ca
 ```cypher
 // DO:     ORDER BY n.publication_year DESC, n.rating DESC
 // DO:     RETURN decade, count(*) AS cnt  ORDER BY decade    // reference RETURN alias after aggregation
+// DO:     RETURN CASE p.channelId WHEN 1 THEN 'a' END AS channel, count(*) AS cnt  ORDER BY channel
 // DON'T: ORDER BY n.publication_year DESC, n.rating AS rating DESC   // SYNTAX ERROR — AS not allowed in ORDER BY
 // DON'T: ORDER BY decade_start   // decade_start was a pre-aggregation variable — use the RETURN alias 'decade'
+// DON'T: ORDER BY p.channelId    // 'p' is not in scope after aggregating RETURN — use ORDER BY channel
 // DON'T: ORDER BY n.score DESC NULLS LAST   // SYNTAX ERROR — not valid Cypher
 ```
 
@@ -416,7 +419,7 @@ CYPHER 25 USE myDatabase MATCH (n:Person) RETURN n.name LIMIT 5;
 |---|---|---|
 | **READ** | MATCH, OPTIONAL MATCH, CALL subquery, WITH, RETURN, COUNT{}/COLLECT{}/EXISTS{}, SEARCH | `references/read/` |
 | **WRITE** | CREATE, MERGE, SET, REMOVE, DELETE, DETACH DELETE, CALL IN TRANSACTIONS, FOREACH, LOAD CSV | `references/write/` |
-| **SCHEMA** | CREATE/DROP INDEX, CREATE/DROP CONSTRAINT, SHOW INDEXES, SHOW CONSTRAINTS, SHOW PROCEDURES, GRAPH TYPE DDL (ALTER CURRENT GRAPH TYPE, EXTEND GRAPH TYPE, SHOW GRAPH TYPES, DROP GRAPH TYPE ELEMENTS) | `references/schema/` |
+| **SCHEMA** | CREATE/DROP INDEX, CREATE/DROP CONSTRAINT, SHOW INDEXES, SHOW CONSTRAINTS, SHOW PROCEDURES, GRAPH TYPE DDL (ALTER CURRENT GRAPH TYPE SET, EXTEND GRAPH TYPE WITH, SHOW CURRENT GRAPH TYPE, DROP GRAPH TYPE ELEMENTS) | `references/schema/` |
 | **ADMIN** | CREATE/DROP DATABASE, ALTER USER, roles/privileges, SHOW TRANSACTIONS, SHOW SERVERS | `references/admin/` |
 
 **Step 2 — Load only the relevant L3 file(s):**
@@ -456,6 +459,7 @@ Do **not** load all files — select only what the current query type requires.
 **TypeErrors:** prefer `toIntegerOrNull`/`toFloatOrNull` over base casting; guard with `IS NOT NULL` before coercion.
 **No `least()`/`greatest()`** — these SQL functions do not exist in Cypher. Use `CASE WHEN a < b THEN a ELSE b END`.
 **DateTime vs date() mismatch** — `DateTime >= date('2025-01-01')` returns 0 rows: use `.year` accessor (`t.date.year = 2025`) or `datetime()` literals for DateTime-typed properties.
+**Date arithmetic** — to compute the number of days between two DATE values: `duration.between(date1, date2).days`. Do NOT use `date.epochDays` (no such field) or `(date2 - date1).days` (type error). For STRING dates like `'1996-07-04 00:00:00.000'`, parse first: `duration.between(date(left(strDate, 10)), date(left(otherDate, 10))).days`.
 **Timeouts:** EXPLAIN → fix AllNodesScan/CartesianProduct → add LIMIT → switch to `CALL IN TRANSACTIONS OF 1000 ROWS`.
 
 ---

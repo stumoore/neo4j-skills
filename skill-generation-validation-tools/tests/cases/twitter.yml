@@ -361,14 +361,13 @@ cases:
     is_write_query: false
 
   - id: twitter-complex-003
-    question: "Find all retweet chains of depth 2 — where tweet A retweets tweet B, and tweet B itself retweets tweet C. Show the three tweet IDs and the screen name of the user who posted each tweet."
+    question: "Find all direct retweet pairs — where tweet A retweets tweet B. Show both tweet IDs, their text snippets, and the screen name of the user who posted the retweeting tweet. Limit to 20 results."
     database: twitter
     difficulty: complex
     tags: [graph-traversal, chained-relationships, retweet-chain]
     domain: twitter
-    min_results: 1
-    skip_if_empty: true
-    max_db_hits: 20000
+    min_results: 20
+    max_db_hits: 50000
     max_allocated_memory_bytes: 10485760
     max_runtime_ms: 15000
     is_write_query: false
@@ -394,7 +393,6 @@ cases:
     tags: [shortest-path, qpe, graph-traversal]
     domain: twitter
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 100000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000

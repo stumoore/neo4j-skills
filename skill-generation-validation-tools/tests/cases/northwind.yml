@@ -69,7 +69,7 @@ dataset:
           requiredDate: {type: STRING, description: "Requested delivery date (stored as string)"}
           shippedDate:  {type: STRING, description: "Actual shipment date (stored as string; may be the LITERAL STRING 'NULL' for unshipped orders — always filter IS NOT NULL AND <> 'NULL' before parsing)"}
           freight:      {type: STRING, description: "Freight charge (stored as string — use toFloat() to compare)"}
-          shipCountry:  {type: STRING, sample: ["France", "Germany", "UK", "USA", "Brazil"]}
+          shipCountry:  {type: STRING, sample: ["France", "Germany", "UK", "USA", "Argentina", "Canada", "Mexico"], description: "Ship country name — some records may have garbled data (postal codes instead of country names). Valid countries: Argentina, Austria, Belgium, Canada, Denmark, Finland, France, Germany, Ireland, Italy, Mexico, Norway, Poland, Portugal, Sweden, Switzerland, UK, USA, Venezuela"}
           shipCity:     {type: STRING}
           shipName:     {type: STRING}
     relationships:
@@ -722,13 +722,12 @@ cases:
     notes: "Stock value = unitPrice * unitsInStock. Group by category."
 
   - id: northwind-intermediate-010
-    question: "Which orders were shipped to Brazil? Show order ID and ship city."
+    question: "Which orders were shipped to France? Show order ID and ship city."
     database: northwind
     difficulty: intermediate
     tags: [match, filter, geography]
     domain: northwind
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 3000
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 8000
@@ -1405,7 +1404,6 @@ cases:
     max_allocated_memory_bytes: 52428800
     max_runtime_ms: 60000
     is_write_query: false
-    skip_if_empty: true
     notes: "Requires capabilities: gds. Project (Customer)-[:PURCHASED]->(Order)-[:ORDERS]->(Product) bipartite graph, run gds.louvain.stream, then filter for Alfreds Futterkiste's communityId. min_results: 0 because GDS graph projection may fail if community edition."
 
   # ─── TEMPORAL EDGE CASE CASES (additional standalone temporal) ───────────────
@@ -1417,7 +1415,6 @@ cases:
     tags: [temporal, math, duration, aggregation, null-handling]
     domain: northwind
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 5000
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 10000
@@ -1435,7 +1432,6 @@ cases:
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 10000
     is_write_query: false
-    skip_if_empty: true
     notes: "CRITICAL: shippedDate may contain the literal string 'NULL' (not SQL null). ALWAYS filter: WHERE o.shippedDate IS NOT NULL AND o.shippedDate <> 'NULL'. Then: duration.between(date(left(o.orderDate,10)), date(left(o.shippedDate,10))).days > 30"
 
   - id: northwind-temporal-003

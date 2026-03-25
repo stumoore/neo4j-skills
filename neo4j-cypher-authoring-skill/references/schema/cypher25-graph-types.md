@@ -1,6 +1,6 @@
-> Source: git@github.com:neo4j/docs-cypher.git@238ab12a — hand-authored from Neo4j 2026.02 release notes
-> Generated: 2026-03-22T00:00:00Z
-> See: version-matrix.md for availability; https://neo4j.com/docs/cypher-manual/25/administration/graph-types/
+> Source: verified against Neo4j 2026.02.2 Enterprise — hand-authored
+> Generated: 2026-03-24T00:00:00Z
+> See: version-matrix.md for availability
 
 > **PREVIEW — Enterprise Edition only, Neo4j 2026.02+**
 > GRAPH TYPE DDL is a Preview feature. Not for production use. Syntax may change before GA.
@@ -12,125 +12,106 @@ GRAPH TYPE DDL adds optional schema constraints to a graph database. Only explic
 element types (node types and relationship types) are subject to constraint enforcement. All
 other nodes and relationships remain unconstrained (open-model semantics).
 
-## Key Concepts
+## CRITICAL: Syntax Differs From Documentation — Use Verified Forms Below
 
-- **Element type**: A typed, schema-constrained node or relationship. Uses `::` annotation syntax.
-- **Open-model semantics**: Nodes and relationships NOT covered by a declared element type are unconstrained — they can have any labels and properties. GRAPH TYPE constraints only apply to declared types.
-- **Mandatory property**: A property declared in an element type that must be present and non-null.
-- **Property type validation**: Properties declared with a type (e.g., `STRING`, `INTEGER`) are validated on write.
+The correct syntax uses `IMPLIES {}` blocks (NOT `::` or `[]` notation from older docs):
 
-## SHOW GRAPH TYPES
+```
+-- Property declaration: propName TYPE [NOT NULL]  (NO colon between name and type)
+-- Valid: name STRING NOT NULL   OR   name STRING!
+-- INVALID: name :: STRING NOT NULL  (the :: separator is NOT used inside IMPLIES blocks)
+```
+
+## SHOW CURRENT GRAPH TYPE
 
 ```cypher
 CYPHER 25
-SHOW GRAPH TYPES
+SHOW CURRENT GRAPH TYPE
 ```
 
-List all declared graph types in the current database.
+Returns 1 row with a `specification` column showing all declared element types.
 
 ```cypher
 CYPHER 25
-SHOW GRAPH TYPES YIELD *
+SHOW CURRENT GRAPH TYPE YIELD *
 ```
 
-List all graph types with full column output.
+> **Note**: `SHOW GRAPH TYPES` is NOT valid — use `SHOW CURRENT GRAPH TYPE`.
 
 ## ALTER CURRENT GRAPH TYPE SET (declare element types)
 
-Declare a node element type with mandatory typed properties:
+Each call to `ALTER CURRENT GRAPH TYPE SET { ... }` adds to (or updates) the existing graph type.
+To "extend" the schema, simply call `ALTER CURRENT GRAPH TYPE SET` again with new element types.
+There is no separate EXTEND command — `EXTEND GRAPH TYPE WITH` is NOT valid syntax.
+
+### Declare a node element type
 
 ```cypher
 CYPHER 25
-ALTER CURRENT GRAPH TYPE SET
-  (::Person {
-    name :: STRING NOT NULL,
-    age  :: INTEGER
-  })
+ALTER CURRENT GRAPH TYPE SET {
+  (:Person IMPLIES { name STRING NOT NULL, age INTEGER })
+}
 ```
 
-Declare a relationship element type (requires source and target node types):
+- Properties: `propName TYPE` — no colon between name and type
+- `NOT NULL` or `!` marks a property as mandatory: `name STRING NOT NULL` or `name STRING!`
+- Optional properties (type-validated if present): `age INTEGER`
+
+### Declare a relationship element type
 
 ```cypher
 CYPHER 25
-ALTER CURRENT GRAPH TYPE SET
-  [::KNOWS {
-    since :: DATE
-  }]
+ALTER CURRENT GRAPH TYPE SET {
+  (:Person)-[:KNOWS IMPLIES { since DATE }]->(:Person)
+}
 ```
 
-> **Note**: `:: TYPE NOT NULL` marks the property as mandatory (must be present and non-null).
-> A property declared without `NOT NULL` is optional but type-validated if present.
+Relationship element types require source and target node label patterns.
+The `IMPLIES {}` block lists property constraints (empty `{}` is valid for no property constraints).
 
-## EXTEND GRAPH TYPE (add element types to existing schema)
+### Declare multiple element types in one statement
 
 ```cypher
 CYPHER 25
-EXTEND GRAPH TYPE WITH
-  (::Company {
-    name     :: STRING NOT NULL,
-    founded  :: INTEGER
-  }),
-  [::EMPLOYS {
-    startDate :: DATE NOT NULL
-  }]
+ALTER CURRENT GRAPH TYPE SET {
+  (:Person IMPLIES { name STRING NOT NULL }),
+  (:Person)-[:KNOWS IMPLIES { since DATE NOT NULL }]->(:Person)
+}
 ```
 
-`EXTEND GRAPH TYPE WITH` adds new element types without replacing existing ones.
-Use this to incrementally evolve the schema.
+## Adding Element Types to Existing Schema ("Extend")
 
-## DROP GRAPH TYPE ELEMENTS
-
-Remove specific element types from the graph type:
+To add new element types without removing existing ones, call `ALTER CURRENT GRAPH TYPE SET`
+with only the new types. Existing element types are preserved.
 
 ```cypher
+-- First declaration:
 CYPHER 25
-DROP GRAPH TYPE ELEMENTS (::Person), [::KNOWS]
+ALTER CURRENT GRAPH TYPE SET {
+  (:Company IMPLIES { name STRING NOT NULL, founded INTEGER })
+}
+
+-- Later, add more types (does not remove Company):
+CYPHER 25
+ALTER CURRENT GRAPH TYPE SET {
+  (:Employee IMPLIES { employeeId STRING NOT NULL }),
+  (:Company)-[:EMPLOYS IMPLIES { startDate DATE NOT NULL }]->(:Employee)
+}
 ```
 
-> **Caution**: Dropping an element type removes its schema constraints but does not delete
-> the underlying data. Existing nodes and relationships with those labels/types remain.
+## Element Type Property Types
 
-## ALTER ELEMENT TYPES (modify property declarations)
+Valid property types in IMPLIES blocks:
 
-```cypher
-CYPHER 25
-ALTER ELEMENT TYPES (::Person)
-  SET (age :: INTEGER NOT NULL)
-```
-
-Adds or modifies property declarations on an existing element type.
-
-## Element Type Annotation Syntax
-
-| Syntax | Meaning |
+| Type | Example |
 |---|---|
-| `(::Label)` | Node element type for label `Label` |
-| `[::REL_TYPE]` | Relationship element type for `REL_TYPE` |
-| `prop :: STRING NOT NULL` | Mandatory STRING property |
-| `prop :: INTEGER` | Optional INTEGER property (validated if present) |
-| `prop :: DATE NOT NULL` | Mandatory DATE property |
-| `prop :: FLOAT` | Optional FLOAT property |
-| `prop :: BOOLEAN NOT NULL` | Mandatory BOOLEAN property |
-
-## Write Query Interaction
-
-Element type constraints are enforced on `CREATE` and `MERGE` operations:
-
-```cypher
-CYPHER 25
-CREATE (p::Person {name: 'Alice', age: 30})
-```
-
-The `::` annotation in a `CREATE` or `MERGE` clause explicitly asserts the node matches a
-declared element type, triggering type validation. Without `::` in the data clause, the node
-is created as a regular node (no type validation, even if a matching element type exists).
-
-## When to Use GRAPH TYPE DDL
-
-- Enforcing data quality guarantees on high-value node/relationship types
-- Preventing NULL values in key properties without a full CONSTRAINT
-- Gradual schema adoption — declare types for critical entities only; leave others open
-- Enterprise deployments requiring audit-traceable schema governance
+| `STRING` | `name STRING NOT NULL` |
+| `INTEGER` | `age INTEGER` |
+| `FLOAT` | `amount FLOAT NOT NULL` |
+| `BOOLEAN` | `active BOOLEAN` |
+| `DATE` | `startDate DATE` |
+| `DATETIME` | `createdAt DATETIME NOT NULL` |
+| `DURATION` | `ttl DURATION` |
 
 ## SKILL.md Routing
 

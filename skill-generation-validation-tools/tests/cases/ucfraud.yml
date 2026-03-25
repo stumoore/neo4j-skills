@@ -81,7 +81,7 @@ dataset:
       - {type: USES_PHONE,         from: Customer,   to: PhoneNumber}
       - {type: RESIDES_AT,         from: Customer,   to: Address}
       - {type: LOCATED_IN,         from: Address,    to: Country}
-      - {type: HAS_ALERT,          from: Account,    to: Alert}
+      - {type: HAS_ALERT,          from: Scenario,   to: Alert,        description: "A Scenario groups related Alerts — (s:Scenario)-[:HAS_ALERT]->(alert:Alert). NOT from Account."}
       - {type: HAS_STATUS,         from: Alert,      to: AlertStatus}
       - {type: ASSOCIATED_WITH,    from: Transaction, to: Jurisdiction}
     indexes:
@@ -657,18 +657,17 @@ cases:
   # requires value translation (enum → property value, range normalization).
   # ---------------------------------------------------------------------------
   - id: "ucf-casual-001"
-    question: "Show me all open alerts that have been marked as critical — I want to see the most urgent outstanding issues."
+    question: "Show me all alerts that are currently in New status — the ones that haven't been reviewed yet. Show the alert ID and the scenario they belong to."
     difficulty: intermediate
     tags: [match, filter, casual-language, value-translation, alert]
     database: neo4j
     domain: ucfraud
     min_results: 1
-    skip_if_empty: true
     max_db_hits: 50000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 10000
     is_write_query: false
-    notes: "Alert node only has alertId (no severity or status properties). AlertStatus.status values are formatted like '01-New', '02-Validated'. The query should look for accounts with any alerts in New status: (a:Account)-[:HAS_ALERT]->(al:Alert)-[:HAS_STATUS]->(as:AlertStatus) WHERE as.status STARTS WITH '01'"
+    notes: "HAS_ALERT goes from Scenario to Alert (NOT from Account). AlertStatus.status values: '01-New', '02-Validated', '03-ConfirmedValidated', etc. Pattern: (s:Scenario)-[:HAS_ALERT]->(al:Alert)-[:HAS_STATUS]->(as:AlertStatus) WHERE as.status STARTS WITH '01'"
 
   - id: "ucf-casual-002"
     question: "Which savings accounts are frozen right now? I need a list of accounts that are locked and can't transact."
@@ -716,19 +715,18 @@ cases:
   # Enterprise instance validates Gate 2 (DDL runs without error).
   # ---------------------------------------------------------------------------
   - id: "ucf-graphtype-001"
-    question: "List all declared graph type element types in the fraud database to understand what schema constraints are currently enforced."
+    question: "Show the current graph type specification for the fraud database — what schema constraints and element types are currently enforced?"
     difficulty: basic
     tags: [graph-type, schema, ddl, show]
     database: neo4j
     domain: ucfraud
-    min_results: 0
+    min_results: 1
     max_db_hits: 1000
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 5000
     is_write_query: false
     min_version: "2026.02"
-    skip_if_empty: true
-    notes: "Correct syntax: SHOW CURRENT GRAPH TYPE (not 'SHOW GRAPH TYPES' — that is invalid). min_results: 0 is acceptable since no graph type may be declared yet."
+    notes: "Correct syntax: SHOW CURRENT GRAPH TYPE (returns 1 row with 'specification' column). SHOW GRAPH TYPES and SHOW GRAPH TYPE ELEMENTS are NOT valid syntax."
 
   - id: "ucf-graphtype-002"
     question: "Declare a schema element type for the account holder entity that enforces a mandatory customerID string and mandatory name string, to improve data quality on new customer records."
@@ -742,11 +740,10 @@ cases:
     max_runtime_ms: 10000
     is_write_query: true
     min_version: "2026.02"
-    skip_if_empty: true
-    notes: "Exact syntax: ALTER CURRENT GRAPH TYPE SET (::Customer { customerID :: STRING NOT NULL, name :: STRING NOT NULL }) — node element type goes directly after SET, no outer braces around the whole statement."
+    notes: "Correct syntax: ALTER CURRENT GRAPH TYPE SET { (:Customer IMPLIES {customerID STRING NOT NULL, name STRING NOT NULL}) } — use outer braces after SET, node label in IMPLIES block. Property syntax: propName TYPE NOT NULL (no colon between name and type). Do NOT use ::."
 
   - id: "ucf-graphtype-003"
-    question: "Extend the database schema to add an element type for transactions that enforces a mandatory transactionID string and mandatory amount float, and add a schema constraint for the payment-sent relationship type."
+    question: "Extend the database schema to add an element type for transactions that enforces a mandatory transactionID string and mandatory status string, and also declare a schema element type for the payment-sent relationship between accounts and transactions."
     difficulty: advanced
     tags: [graph-type, schema, ddl, extend, element-type, relationship]
     database: neo4j
@@ -757,8 +754,7 @@ cases:
     max_runtime_ms: 10000
     is_write_query: true
     min_version: "2026.02"
-    skip_if_empty: true
-    notes: "EXTEND GRAPH TYPE WITH ::Transaction (transactionID :: STRING NOT NULL, amount :: FLOAT NOT NULL) and [::SENT] relationship element type; is_write_query:true; expects EXTEND GRAPH TYPE WITH syntax"
+    notes: "No EXTEND command exists — use ALTER CURRENT GRAPH TYPE SET to add new element types. Correct syntax: ALTER CURRENT GRAPH TYPE SET { (:Transaction IMPLIES {transactionID STRING NOT NULL, status STRING NOT NULL}), (:Account)-[:SENT IMPLIES {}]->(:Transaction) }. Property syntax: propName TYPE [NOT NULL] — no colon between name and type."
 
   # ---------------------------------------------------------------------------
   # QPP MATCH MODES (REPEATABLE ELEMENTS, DIFFERENT RELATIONSHIPS)
