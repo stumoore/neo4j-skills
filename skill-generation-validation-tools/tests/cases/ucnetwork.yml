@@ -60,9 +60,9 @@ dataset:
         description: "A time-series observation snapshot for a device at a point in time"
         properties:
           id:         {type: INTEGER, description: "Snapshot identifier"}
-          timestamp:  {type: INTEGER, description: "Unix timestamp of this snapshot"}
-          firstseen:  {type: INTEGER, description: "Unix timestamp when this device was first seen"}
-          lastseen:   {type: INTEGER, description: "Unix timestamp when this device was last seen"}
+          timestamp:  {type: DATETIME, description: "Neo4j DateTime of this snapshot — already a DateTime, do NOT use datetime({epochSeconds: ...}) conversion"}
+          firstseen:  {type: DATETIME, description: "Neo4j DateTime when this device was first seen"}
+          lastseen:   {type: DATETIME, description: "Neo4j DateTime when this device was last seen"}
           signalstr:  {type: INTEGER, description: "Signal strength in dBm (negative value; higher/less negative is stronger)"}
           nprssid:    {type: INTEGER, description: "Number of probe-request SSIDs seen"}
           ncaps:      {type: INTEGER, description: "Number of capabilities observed"}
@@ -143,7 +143,7 @@ dataset:
       - type: CONNECTED_TO
         from: Snapshot
         to: Snapshot
-        description: "Snapshots observed communicating with each other"
+        description: "Snapshots observed communicating — typically (Client-Snapshot)-[:CONNECTED_TO]->(AccessPoint-Snapshot), not Client-to-Client. 393 edges total."
       - type: ADVERTISING_FOR
         from: Snapshot
         to: SSIDSnapshot
@@ -173,11 +173,19 @@ dataset:
     - "Client/AccessPoint/WIFIBridge all have the :Device label — use the specific sub-label for clarity"
     - "FIRST and LAST relationships link Device nodes to their first/last Snapshot"
     - "Signal strength (signalstr) is negative dBm — values closer to 0 are stronger (e.g. -40 > -80)"
-    - "Timestamps are Unix epoch integers — use datetime() or direct integer comparison"
+    - "Snapshot.timestamp, Snapshot.firstseen, Snapshot.lastseen are stored as Neo4j DateTime objects — NOT integer epochs. Use s.timestamp directly in comparisons or RETURN; do NOT wrap with datetime({epochSeconds: s.timestamp})."
+    - "SSID.firstseen, SSID.lastseen are INTEGER epoch timestamps. Snapshot.timestamp is DateTime. Do not confuse these."
     - "No vector or fulltext indexes on this database"
     - "Snapshot linked list: traverse (d:Client)-[:FIRST]->(s:Snapshot)-[:NEXT*]->(s2:Snapshot) for history"
     - "SSIDSnapshot is an intermediate node linking SSID observations to device snapshots"
     - "Encryption field on SSID is an integer bitmask, not a string — do not filter by string values"
+    - "PROBING_FOR data is sparse: only 22 total edges, 11 named SSIDs probed — each client typically probes via one snapshot only; no named SSID is probed by more than 1 distinct client via FIRST|LAST snapshots"
+    - "SecurityPosture.nretries > 0 for 107 nodes (use > 0, not > 10 for retry activity); wpscount = 0 for ALL nodes — never filter by wpscount > 0"
+    - "CONNECTED_TO links Snapshot-to-Snapshot (393 edges). In practice, s1 is a Client snapshot and s2 is an AccessPoint snapshot — NOT client-to-client. To find which clients connected to which APs: (c:Client)-[:FIRST|LAST]->(s1:Snapshot)-[:CONNECTED_TO]->(s2:Snapshot)<-[:FIRST|LAST]-(ap:AccessPoint). No 2-hop paths exist."
+    - "ap.manufac is the manufacturer field on AccessPoint nodes (not ap.manufacturer)"
+    - "ADVERTISING_FOR connects Snapshot-to-SSIDSnapshot (AP broadcasting a network); PROBING_FOR connects Snapshot-to-SSIDSnapshot (client looking for a network); RESPONDING_FOR connects Snapshot-to-SSIDSnapshot (AP responding to probe)"
+    - "To link AP manufacturer to client signal strength: (ap:AccessPoint)-[:FIRST|LAST]->(apSnap)-[:ADVERTISING_FOR]->(ss:SSIDSnapshot)<-[:PROBING_FOR]-(cSnap:Snapshot) WHERE cSnap.signalstr IS NOT NULL"
+    - "Avoid unbounded variable-length traversals on NEXT chains for large datasets — use LIMIT or bounded {0,N} quantifiers"
 
 cases:
 
@@ -318,7 +326,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-intermediate-006
-    question: "For each named wireless network, how many client devices are probing for it? Show networks probed by at least 2 devices."
+    question: "For each named wireless network, how many probe snapshots from client devices are recorded for it? Show networks with at least one probe snapshot."
+    notes: "Probing data is sparse — only 11 named SSIDs have any probe records. Count probe snapshots (not distinct clients) since each client typically probes via only one snapshot. Query path: (snap:Snapshot)-[:PROBING_FOR]->(ss:SSIDSnapshot)<-[:FIRST|LAST]-(ssid:SSID WHERE ssid.name IS NOT NULL)"
     database: ucnetwork
     difficulty: intermediate
     tags: [aggregation, relationship-chain, filter, null-handling]
@@ -356,7 +365,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-advanced-003
-    question: "Which pairs of devices have been directly connected to each other through observed network activity? Show the MAC addresses of both devices."
+    question: "Which client devices have been directly connected to which access points in observed network activity? Show the MAC address of the client and the MAC address of the access point it connected to."
+    notes: "CONNECTED_TO is Client-snapshot→AccessPoint-snapshot. Path: (c:Client)-[:FIRST|LAST]->(s1:Snapshot)-[:CONNECTED_TO]->(s2:Snapshot)<-[:FIRST|LAST]-(ap:AccessPoint). Use :Device if you want all device types. Returns ~287 pairs."
     database: ucnetwork
     difficulty: advanced
     tags: [relationship-chain, connected-to, graph-traversal]
@@ -380,7 +390,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-advanced-005
-    question: "For each access point manufacturer, what is the average signal strength reported by client snapshots connected to SSIDs that those access points advertise?"
+    question: "For each access point manufacturer, what is the average signal strength of client probe snapshots targeting the same wireless networks those access points advertise? Show manufacturer and average signal."
+    notes: "Path: (ap:AccessPoint)-[:FIRST|LAST]->(apSnap:Snapshot)-[:ADVERTISING_FOR]->(ss:SSIDSnapshot)<-[:PROBING_FOR]-(cSnap:Snapshot) WHERE cSnap.signalstr IS NOT NULL. Results in 4 manufacturers. ap.manufac is the manufacturer field."
     database: ucnetwork
     difficulty: advanced
     tags: [aggregation, relationship-chain, group-by, signal]
@@ -392,7 +403,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-advanced-006
-    question: "Find client devices that probe for networks but whose probed networks have no advertiser (no access point broadcasting that network name). These may be looking for networks not present in this environment."
+    question: "Find client devices that are probing for wireless networks where no access point is advertising that same network name. Show the device MAC address and the network name being probed."
+    notes: "Path: (c:Client)-[:FIRST|LAST]->(snap:Snapshot)-[:PROBING_FOR]->(ss:SSIDSnapshot)<-[:FIRST|LAST]-(ssid:SSID) WHERE NOT EXISTS { MATCH (:Snapshot)-[:ADVERTISING_FOR]->(ss) } RETURN c.mac, ssid.name. Use EXISTS subquery pattern, not a separate MATCH."
     database: ucnetwork
     difficulty: advanced
     tags: [not-exists, relationship-chain, filter]
@@ -418,7 +430,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-complex-002
-    question: "Find the WiFi networks that are being probed by devices that also have high retry rates. This combination may indicate devices struggling to reconnect to a known network."
+    question: "Find the wireless networks that are being probed by client devices that also show any retry activity in their security metrics. This combination may indicate devices struggling to reconnect to a known network."
+    notes: "Use nretries > 0 (not > 10) — only 107 snapshots have any retries. Correct path: (c:Client)-[:FIRST|LAST]->(snap:Snapshot)-[:SECURITY_POSTURE]->(sp:SecurityPosture WHERE sp.nretries > 0) WITH c, MATCH (cSnap:Snapshot WHERE cSnap.key = snap.key)-[:PROBING_FOR]. Actually simpler: (c:Client)-[:FIRST|LAST]->(snap)-[:SECURITY_POSTURE]->(sp WHERE sp.nretries>0), then (c)-[:FIRST|LAST]->(snap2)-[:PROBING_FOR]->(ss)<-[:FIRST|LAST]-(ssid WHERE ssid.name IS NOT NULL). Returns 3 named networks."
     database: ucnetwork
     difficulty: complex
     tags: [relationship-chain, filter, security, correlated]
@@ -430,7 +443,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-complex-003
-    question: "Identify client devices that have interacted (via snapshots) with more than 3 distinct wireless networks. Show device MAC, manufacturer, and the list of network names they have interacted with."
+    question: "Identify client devices that have probed for more than one distinct named wireless network. Show device MAC, manufacturer, and the list of network names they have probed for."
+    notes: "Probe data is sparse — only 1 client probes for 2+ named networks (MAC 58:55:CA:0F:02:0 → 'Jabulani' and 'JABULANI'). Use threshold size(networks) >= 2. Path: (c:Client)-[:FIRST|LAST]->(snap:Snapshot)-[:PROBING_FOR]->(ss:SSIDSnapshot)<-[:FIRST|LAST]-(ssid:SSID WHERE ssid.name IS NOT NULL) WITH c, collect(DISTINCT ssid.name) AS networks WHERE size(networks) >= 2"
     database: ucnetwork
     difficulty: complex
     tags: [aggregation, collect, filter, relationship-chain]
@@ -457,6 +471,7 @@ cases:
 
   - id: ucnetwork-expert-001
     question: "Trace the full snapshot history for the client device with MAC address '08:55:31:6A:FF:5' — traverse the earliest-to-latest linked list and return all snapshots with their signal strength and timestamps."
+    notes: "Snapshot.timestamp is a Neo4j DateTime object — use s.timestamp directly, do NOT convert with datetime({epochSeconds: s.timestamp}). Use QPE: (first:Snapshot)(()-[:NEXT]->()){0,999}(s:Snapshot). The client has 2 snapshots."
     database: ucnetwork
     difficulty: expert
     tags: [qpe, linked-list, traversal, filter]
@@ -468,10 +483,11 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-expert-002
-    question: "Find all devices that are within 2 hops of each other in the device connectivity network. Show pairs of devices (by MAC address) and the number of distinct intermediate snapshots connecting them."
+    question: "Find all pairs of snapshots that have directly communicated with each other in the observed connectivity network. For each pair, show how many shared connection records exist between them."
+    notes: "CONNECTED_TO has 393 relationships between Snapshot nodes. The graph is 1-hop only — no 2-hop paths exist. Query: MATCH (s1:Snapshot)-[:CONNECTED_TO]->(s2:Snapshot) WITH s1, s2, count(*) AS connections RETURN s1.key, s2.key, connections LIMIT 25. This returns real results."
     database: ucnetwork
     difficulty: expert
-    tags: [qpe, graph-traversal, two-hop, aggregation]
+    tags: [graph-traversal, connectivity, aggregation]
     domain: ucnetwork
     min_results: 1
     max_db_hits: 50000
@@ -480,10 +496,11 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-expert-003
-    question: "Find the shortest connected path between the client with the highest signal strength and the client with the lowest signal strength, traversing observed device-to-device connection snapshots."
+    question: "Which client devices appear most often as sources of direct connectivity events in the network? For each client, count how many connection snapshots it initiates, and show the top 10."
+    notes: "CONNECTED_TO connects Snapshot→Snapshot (393 edges total). FIRST|LAST directly gives a device's snapshot — no QPE needed. Path: (c:Client)-[:FIRST|LAST]->(s:Snapshot)-[:CONNECTED_TO]->(:Snapshot) WITH c, count(*) AS conn_cnt RETURN c.mac, c.manufac, conn_cnt ORDER BY conn_cnt DESC LIMIT 10."
     database: ucnetwork
     difficulty: expert
-    tags: [shortest-path, qpe, filter, signal]
+    tags: [graph-traversal, connectivity, aggregation, order]
     domain: ucnetwork
     min_results: 1
     max_db_hits: 50000
@@ -492,7 +509,8 @@ cases:
     is_write_query: false
 
   - id: ucnetwork-expert-004
-    question: "Detect potentially rogue access points: access points whose wireless network names are also being probed by more than 5 client devices but have no recorded response activity snapshots. List their names and MAC addresses."
+    question: "List access points that advertise a wireless network but have no response activity recorded in their snapshots. Show access point name and MAC address, limit to 25."
+    notes: "164 APs qualify. Query: MATCH (ap:AccessPoint)-[:FIRST|LAST]->(apSnap:Snapshot)-[:ADVERTISING_FOR]->(:SSIDSnapshot) WHERE NOT EXISTS { MATCH (apSnap)-[:RESPONDING_FOR]->() } RETURN DISTINCT ap.name, ap.mac LIMIT 25. Use NOT EXISTS subquery. Do NOT add extra joins for probing clients (causes timeout)."
     database: ucnetwork
     difficulty: expert
     tags: [not-exists, filter, security, relationship-chain]

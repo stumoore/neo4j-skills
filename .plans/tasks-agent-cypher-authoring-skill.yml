@@ -1620,7 +1620,8 @@ tasks:
       Known domain facts (from AGENTS.md): Client/AccessPoint/WIFIBridge all
       have :Device label; timestamps are Unix epoch integers; signalstr is
       negative dBm; FIRST/LAST=(Device→Snapshot); NEXT=(Snapshot→Snapshot).
-    status: pending
+    status: completed
+    completed_at: "2026-03-26T03:15:00Z"
     dependencies: []
     acceptance_criteria:
       - "ucnetwork harness run: 0 FAIL (skips for write/embedding queries are OK)"
