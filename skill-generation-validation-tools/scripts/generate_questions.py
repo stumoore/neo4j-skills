@@ -317,13 +317,10 @@ def _build_generation_prompt(
     ]
 
     if existing_questions:
-        # Show a sample of existing questions to avoid duplicates
-        sample = existing_questions[:20]
+        # Show ALL existing questions to avoid duplicates
         lines.append("EXISTING questions (do NOT duplicate these):")
-        for q in sample:
+        for q in existing_questions:
             lines.append(f"  - {q}")
-        if len(existing_questions) > 20:
-            lines.append(f"  ... and {len(existing_questions) - 20} more")
         lines.append("")
 
     lines.append(f"Return exactly {count} questions as a JSON object with a 'questions' array.")

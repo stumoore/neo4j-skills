@@ -2263,3 +2263,35 @@ Key Decisions:
 - Rewrite prompt instructs Claude to return only the rewritten question (no markdown)
 - Post-hoc audit script is a separate CLI, not integrated into the runner/harness
 - make smoke updated to include both question_validator self-test and audit --help
+
+================================================================================
+TASK-073: Fix generate_questions.py: show ALL existing questions for dedup
+Date: 2026-03-26T00:00:00Z
+================================================================================
+
+Summary:
+Fixed a bug in _build_generation_prompt() where `existing_questions[:20]` silently
+dropped all but the first 20 existing questions from the dedup section of the
+generation prompt. With 100+ cases per domain, 80+ existing questions were invisible
+to Claude, leading to duplicate question generation.
+
+Fix:
+- Removed `sample = existing_questions[:20]` slice
+- Removed the `"... and N more"` truncation message
+- Now iterates over the full `existing_questions` list
+- Question strings only (no metadata) — _extract_existing_questions() already returns strings
+
+Acceptance Criteria Verified:
+- All existing question strings appear in the dedup prompt (tested with 59 questions)
+- No truncation message in output
+- Tested via inline unit test (pytest-style assertion in subprocess)
+
+Files Changed:
+- skill-generation-validation-tools/scripts/generate_questions.py (3 lines changed)
+
+Key Decision:
+No max cap was added — task description said "if the list is very long (>100),
+consider passing only the question text (not full metadata)". Since _extract_existing_questions
+already extracts only question text (not full case metadata), no additional truncation
+is needed. Very large lists (500+) might exceed context limits but that is an edge case
+well beyond the current 100-case expansion target.
