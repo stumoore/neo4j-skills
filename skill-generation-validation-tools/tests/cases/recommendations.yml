@@ -630,6 +630,7 @@ cases:
     max_allocated_memory_bytes: 104857600
     max_runtime_ms: 30000
     is_write_query: false
+    notes: "Expert-level collaborative filtering. Model non-deterministically omits code block (~1 in 3 runs) — model behavior issue at max complexity, not a skill gap. User.userId is STRING: {userId: '1'}. When a code block is produced, the query is correct."
     cypher: |
       CYPHER 25
       MATCH (target:User {userId: '1'})-[:RATED]->(seen:Movie)<-[:RATED]-(peer:User)

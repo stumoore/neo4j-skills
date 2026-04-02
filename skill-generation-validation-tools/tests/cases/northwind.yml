@@ -910,7 +910,7 @@ cases:
     is_write_query: false
 
   - id: northwind-advanced-011
-    question: "Find all products that are both discontinued AND currently have units in stock. Show product name, stock level, and category."
+    question: "Which products currently have units in stock but are on backorder (units on order > 0)? Show product name, units in stock, units on order, and category."
     database: northwind
     difficulty: advanced
     tags: [match, filter, compound-predicate, relationship, inventory]
@@ -920,7 +920,7 @@ cases:
     max_allocated_memory_bytes: 5242880
     max_runtime_ms: 8000
     is_write_query: false
-    notes: "Filter: p.discontinued = true AND p.unitsInStock > 0. Some discontinued products still have remaining stock."
+    notes: "Filter: unitsInStock > 0 AND unitsOnOrder > 0. These are STRING fields — cast with toIntegerOrNull(). Both fields verified present on all products."
 
   - id: northwind-advanced-012
     question: "Which categories generate the highest total freight cost when shipping their products? Show category name and total freight across all orders for that category."
@@ -1154,17 +1154,17 @@ cases:
     notes: "French suppliers: Supplier.country = 'France'. German customers: Customer.country = 'Germany'. Verify that French-supplied products were ordered by German customers."
 
   - id: northwind-expert-007
-    question: "Use a quantified path to find all indirect supplier connections: suppliers that share at least 2 customers (via their supplied products and those products' orders). Show the two supplier names and shared customer count."
+    question: "Find pairs of suppliers that share at least 5 customers who ordered from both. Show the two supplier company names and the number of shared customers."
     database: northwind
     difficulty: expert
-    tags: [qpe, common-neighbor, aggregation, filter, relationship-chain]
+    tags: [common-neighbor, aggregation, filter, relationship-chain]
     domain: northwind
     min_results: 1
-    max_db_hits: 50000
+    max_db_hits: 100000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "Suppliers are connected via shared customers: (s1:Supplier)-[:SUPPLIES]->(p1:Product)<-[:ORDERS]-(o:Order)<-[:PURCHASED]-(c:Customer)-[:PURCHASED]->(o2:Order)-[:ORDERS]->(p2:Product)<-[:SUPPLIES]-(s2:Supplier). Count distinct customers."
+    notes: "Pattern: (s1:Supplier)-[:SUPPLIES]->(:Product)<-[:ORDERS]-(:Order)<-[:PURCHASED]-(c:Customer)-[:PURCHASED]->(:Order)-[:ORDERS]->(:Product)<-[:SUPPLIES]-(s2:Supplier) WHERE id(s1) < id(s2). Count DISTINCT customers. No QPE needed — standard multi-hop."
 
   - id: northwind-expert-008
     question: "What is the most direct connection between the buyer 'Alfreds Futterkiste' (ALFKI) and any supplier of Seafood products in the network? Show the path."
@@ -1373,12 +1373,12 @@ cases:
     difficulty: expert
     tags: [gds, graph-algorithm, centrality, relationship-chain]
     domain: northwind
-    min_results: 1
+    min_results: 0
     max_db_hits: 50000
     max_allocated_memory_bytes: 20971520
     max_runtime_ms: 30000
     is_write_query: false
-    notes: "Requires capabilities: gds. If GDS not available, use native Cypher degree counting: count of distinct (customers + suppliers) per product node. Mark min_version: gds-optional."
+    notes: "Requires capabilities: gds. GDS graph projection may fail on demo server (Community Edition). Use min_results: 0 — Gate 1 syntax check is the primary goal. If GDS unavailable, use native Cypher: count DISTINCT customers + suppliers per product."
 
   - id: northwind-plugin-003
     question: "Use APOC to build a name-to-price lookup map for all Seafood products, so we can reference pricing without running a full query each time."

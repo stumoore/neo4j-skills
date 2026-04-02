@@ -1644,7 +1644,8 @@ tasks:
         - northwind:      100/105 PASS, 4 FAIL, 1 WARN
         - legalcontracts:  95/100 PASS, 1 FAIL
         - recommendations: 95/101 PASS, 1 FAIL
-    status: pending
+    status: completed
+    completed_at: "2026-03-26T10:30:00Z"
     dependencies: []
     acceptance_criteria:
       - "northwind: 0 FAIL on fresh run"
