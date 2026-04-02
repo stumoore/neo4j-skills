@@ -2495,3 +2495,31 @@ Acceptance criteria:
 ✓ All domains: property types and formats documented (datetime, date, int, bool,
   string types all explicitly noted for non-obvious properties)
 
+
+================================================================================
+TASK-078: Add 30s query execution timeout and EXPLAIN estimated-rows pre-check to validator.py
+Date: 2026-04-02T12:00:00Z
+================================================================================
+
+Summary:
+Added two defenses against indefinite harness hangs:
+1. 30-second driver-level timeout on all Gate 1/2/4 query executions via neo4j.Query(cypher, timeout=30).
+2. EXPLAIN EstimatedRows pre-check in Gate 1: immediately FAILs queries where the planner estimates >50M rows.
+
+Key fix discovered during review: driver.execute_query(cypher, timeout=30) would pass timeout
+as a Cypher parameter, not a transaction timeout. The correct approach is to wrap the query in
+neo4j.Query(text, timeout=seconds). Added _query_with_timeout() helper to both validator.py and
+generate_questions.py for this purpose.
+
+Files Changed:
+- skill-generation-validation-tools/tests/harness/validator.py (modified — added constants, _query_with_timeout(), _is_timeout_error(), EstimatedRows check, timeout on all execute_query/session.run/begin_transaction calls)
+- skill-generation-validation-tools/scripts/generate_questions.py (modified — added _QUERY_TIMEOUT_S constant, _query_with_timeout() helper, timeout on all 3 driver execute_query calls)
+
+Key Decisions:
+- Use neo4j.Query(text, timeout=N) not execute_query(text, timeout=N) — the latter passes timeout as a Cypher parameter
+- session.run() also accepts a Query object with timeout set, used for CALL IN TRANSACTIONS paths
+- begin_transaction(timeout=N) used for explicit write rollback transactions
+- _is_timeout_error() checks message string first (works offline), then isinstance (neo4j-specific errors)
+- Gate 4 timeout raises FAIL (not WARN) since a hanging PROFILE is as dangerous as a hanging execution
+
+Next Task: task-076a (expand stackoverflow to ≥100 cases)

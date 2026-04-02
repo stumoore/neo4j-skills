@@ -50,6 +50,26 @@ _HARNESS_DIR = _HERE.parent / "tests" / "harness"
 sys.path.insert(0, str(_HARNESS_DIR))
 
 # ---------------------------------------------------------------------------
+# Driver-level timeout constant (matches validator.py)
+# ---------------------------------------------------------------------------
+
+_QUERY_TIMEOUT_S: int = 30
+"""Timeout in seconds passed to every driver.execute_query() / tx call."""
+
+try:
+    from neo4j import Query as _Neo4jQuery  # type: ignore
+except ImportError:
+    _Neo4jQuery = None  # type: ignore
+
+
+def _query_with_timeout(cypher: str) -> Any:
+    """Wrap cypher in neo4j.Query with timeout set. Falls back to raw string."""
+    if _Neo4jQuery is not None:
+        return _Neo4jQuery(cypher, timeout=_QUERY_TIMEOUT_S)
+    return cypher
+
+
+# ---------------------------------------------------------------------------
 # YAML helpers
 # ---------------------------------------------------------------------------
 
@@ -267,6 +287,8 @@ BAD examples (these contain technical terms — do NOT generate these):
 - "MATCH (m:Movie) WHERE m.released > 2000 RETURN m.title"
 - "Use gds.pageRank.stream to rank companies"
 
+IMPORTANT: Your response MUST be ONLY a valid JSON object. Do NOT include any text before or after the JSON. Do NOT add explanations, summaries, or section headers. Start your response with { and end with }.
+
 Output ONLY a valid JSON object with this structure:
 {
   "questions": [
@@ -280,6 +302,7 @@ Output ONLY a valid JSON object with this structure:
 }
 
 Do NOT include candidate Cypher in this output — only questions.
+Do NOT include any markdown headers, bullet points, or prose.
 """
 
 
@@ -332,7 +355,7 @@ def _call_claude_for_questions(
     prompt: str,
     *,
     model_id: str = _DEFAULT_MODEL_ID,
-    timeout_s: int = 180,
+    timeout_s: int = 300,
 ) -> tuple[list[dict[str, Any]], Optional[str]]:
     """
     Invoke Claude to generate questions.
@@ -362,23 +385,92 @@ def _call_claude_for_questions(
     except Exception as exc:
         return [], f"Unexpected error: {exc}"
 
-    # Parse JSON from response
+    # Parse JSON from response — try multiple strategies
     stripped = response.strip()
+
+    # Strategy 1: JSON inside a code block (```json ... ```)
     json_match = re.search(r"```(?:json)?\s*\n(.*?)```", stripped, re.DOTALL)
     if json_match:
-        stripped = json_match.group(1).strip()
+        candidate = json_match.group(1).strip()
+        try:
+            data = json.loads(candidate)
+            questions = data.get("questions", [])
+            if questions:
+                return questions, None
+        except json.JSONDecodeError:
+            pass
 
-    # Try to find raw JSON object
+    # Strategy 2: Find the outermost JSON object with a "questions" key
+    # Search for {"questions": [...]} pattern
+    for match in re.finditer(r'\{[^{}]*"questions"\s*:\s*\[', stripped):
+        start = match.start()
+        # Walk forward to find the matching closing brace
+        depth = 0
+        for i, ch in enumerate(stripped[start:]):
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = stripped[start:start + i + 1]
+                    try:
+                        data = json.loads(candidate)
+                        questions = data.get("questions", [])
+                        if questions:
+                            return questions, None
+                    except json.JSONDecodeError:
+                        break
+
+    # Strategy 3: Any JSON object in the response
     json_obj_match = re.search(r"\{.*\}", stripped, re.DOTALL)
     if json_obj_match:
-        stripped = json_obj_match.group(0)
+        candidate = json_obj_match.group(0)
+        try:
+            data = json.loads(candidate)
+            questions = data.get("questions", [])
+            if isinstance(questions, list):
+                return questions, None
+        except json.JSONDecodeError:
+            pass
 
-    try:
-        data = json.loads(stripped)
-        questions = data.get("questions", [])
-        return questions, None
-    except json.JSONDecodeError as exc:
-        return [], f"Failed to parse JSON from Claude response: {exc}\n\nResponse (first 500 chars): {response[:500]}"
+    # Strategy 4: Retry with sonnet if model_id is haiku and all strategies failed
+    if model_id != _DEFAULT_MODEL_ID:
+        print(f"  WARNING: {model_id} returned non-JSON response, retrying with {_DEFAULT_MODEL_ID}...", flush=True)
+        cmd_retry = ["claude", "--model", _DEFAULT_MODEL_ID, "--print", "--output-format", "text"]
+        try:
+            result_retry = subprocess.run(
+                cmd_retry,
+                input=full_prompt,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                env={**os.environ},
+            )
+            if result_retry.returncode == 0:
+                response2 = result_retry.stdout
+                stripped2 = response2.strip()
+                json_match2 = re.search(r"```(?:json)?\s*\n(.*?)```", stripped2, re.DOTALL)
+                if json_match2:
+                    try:
+                        data2 = json.loads(json_match2.group(1).strip())
+                        qs2 = data2.get("questions", [])
+                        if qs2:
+                            return qs2, None
+                    except json.JSONDecodeError:
+                        pass
+                json_obj2 = re.search(r"\{.*\}", stripped2, re.DOTALL)
+                if json_obj2:
+                    try:
+                        data2 = json.loads(json_obj2.group(0))
+                        qs2 = data2.get("questions", [])
+                        if isinstance(qs2, list) and qs2:
+                            return qs2, None
+                    except json.JSONDecodeError:
+                        pass
+        except Exception:
+            pass
+
+    return [], f"Failed to parse JSON from Claude response: no valid JSON found\n\nResponse (first 500 chars): {response[:500]}"
 
 
 # ---------------------------------------------------------------------------
@@ -572,7 +664,7 @@ def _execute_query(
         t0 = time.monotonic()
         if is_write_query:
             with driver.session(database=database) as session:
-                with session.begin_transaction() as tx:
+                with session.begin_transaction(timeout=_QUERY_TIMEOUT_S) as tx:
                     try:
                         r = tx.run(cypher)
                         rows = r.data()
@@ -580,12 +672,12 @@ def _execute_query(
                     finally:
                         tx.rollback()
         else:
-            records, summary, _ = driver.execute_query(cypher, database_=database)
+            records, summary, _ = driver.execute_query(_query_with_timeout(cypher), database_=database)
             result["actual_rows"] = len(records)
             # Attempt PROFILE to capture db_hits for read queries
             try:
                 profile_cypher = _prepend_profile(cypher)
-                _, profile_summary, _ = driver.execute_query(profile_cypher, database_=database)
+                _, profile_summary, _ = driver.execute_query(_query_with_timeout(profile_cypher), database_=database)
                 if profile_summary and profile_summary.profile:
                     result["db_hits"] = _sum_plan_db_hits(profile_summary.profile)
             except Exception:
@@ -719,6 +811,7 @@ def run(
     neo4j_password: Optional[str],
     *,
     verbose: bool = False,
+    no_cypher: bool = False,
 ) -> None:
     """Main generation pipeline."""
     _require_yaml()
@@ -754,14 +847,18 @@ def run(
     print(f"  Model: {model_id}")
     print(f"  Count: {count}  Difficulties: {difficulties}")
     print(f"  Existing cases: {len(existing_cases)}")
+    if no_cypher:
+        print(f"  --no-cypher: skipping Cypher generation and DB execution")
 
-    # Connect to Neo4j
-    driver = _get_driver(uri, username, password)
-    try:
-        driver.verify_connectivity()
-    except Exception as exc:
-        print(f"ERROR: Cannot connect to Neo4j at {uri}: {exc}", file=sys.stderr)
-        sys.exit(1)
+    # Connect to Neo4j (skip when --no-cypher)
+    driver = None
+    if not no_cypher:
+        driver = _get_driver(uri, username, password)
+        try:
+            driver.verify_connectivity()
+        except Exception as exc:
+            print(f"ERROR: Cannot connect to Neo4j at {uri}: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     # Import question validator
     try:
@@ -843,37 +940,44 @@ def run(
                 needs_review = True
                 stats["flagged_needs_review"] += 1
 
-        # Generate candidate Cypher
-        if verbose:
-            print(f"  [{i+1}/{len(questions)}] {difficulty}: {question[:70]}")
-        else:
-            print(f"  [{i+1}/{len(questions)}] Generating Cypher for: {question[:60]}...", flush=True)
-
-        cypher, is_write, cypher_err = _generate_cypher(
-            question=question,
-            schema_text=schema_text,
-            database=database,
-            difficulty=difficulty,
-            model_id=model_id,
-            skill=skill,
-        )
-
-        if cypher_err:
-            print(f"    WARNING: Cypher generation failed: {cypher_err}", file=sys.stderr)
-
-        # Execute against DB to capture baseline
+        # Generate candidate Cypher (skip when --no-cypher)
+        cypher: Optional[str] = None
+        is_write = False
         execution: dict[str, Any] = {"actual_rows": None, "execution_ms": None, "error": None}
-        if cypher:
-            execution = _execute_query(driver, database, cypher, is_write)
-            actual_rows = execution.get("actual_rows")
-            if execution.get("error"):
-                print(f"    WARNING: Execution error: {execution['error'][:100]}", file=sys.stderr)
-                needs_review = True
-            elif actual_rows == 0 and not is_write:
-                print(f"    WARNING: Query returned 0 rows — marking needs_review", file=sys.stderr)
-                needs_review = True
-            elif actual_rows is not None:
-                print(f"    OK: {actual_rows} rows in {execution.get('execution_ms', '?')}ms")
+
+        if no_cypher:
+            print(f"  [{i+1}/{len(questions)}] {difficulty}: {question[:70]} [no-cypher]", flush=True)
+            needs_review = True
+        else:
+            if verbose:
+                print(f"  [{i+1}/{len(questions)}] {difficulty}: {question[:70]}")
+            else:
+                print(f"  [{i+1}/{len(questions)}] Generating Cypher for: {question[:60]}...", flush=True)
+
+            cypher, is_write, cypher_err = _generate_cypher(
+                question=question,
+                schema_text=schema_text,
+                database=database,
+                difficulty=difficulty,
+                model_id=model_id,
+                skill=skill,
+            )
+
+            if cypher_err:
+                print(f"    WARNING: Cypher generation failed: {cypher_err}", file=sys.stderr)
+
+            # Execute against DB to capture baseline
+            if cypher:
+                execution = _execute_query(driver, database, cypher, is_write)
+                actual_rows = execution.get("actual_rows")
+                if execution.get("error"):
+                    print(f"    WARNING: Execution error: {execution['error'][:100]}", file=sys.stderr)
+                    needs_review = True
+                elif actual_rows == 0 and not is_write:
+                    print(f"    WARNING: Query returned 0 rows — marking needs_review", file=sys.stderr)
+                    needs_review = True
+                elif actual_rows is not None:
+                    print(f"    OK: {actual_rows} rows in {execution.get('execution_ms', '?')}ms")
 
         # Compute next case ID
         case_id = _next_case_id(existing_cases + new_cases, domain, difficulty)
@@ -904,7 +1008,8 @@ def run(
     print(f"  Needs review:     {stats['flagged_needs_review']}")
     print(f"  Appended {len(new_cases)} new cases to {domain_path}")
 
-    driver.close()
+    if driver is not None:
+        driver.close()
 
 
 # ---------------------------------------------------------------------------
@@ -967,6 +1072,15 @@ def main() -> None:
         action="store_true",
         help="Enable verbose output",
     )
+    parser.add_argument(
+        "--no-cypher",
+        action="store_true",
+        help=(
+            "Skip Cypher generation and DB execution. "
+            "Cases are written with status: needs_review. "
+            "Useful for fast bulk question generation before harness validation."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -997,6 +1111,7 @@ def main() -> None:
         neo4j_username=args.neo4j_username,
         neo4j_password=args.neo4j_password,
         verbose=args.verbose,
+        no_cypher=args.no_cypher,
     )
 
 

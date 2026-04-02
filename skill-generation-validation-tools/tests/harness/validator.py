@@ -26,6 +26,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+try:
+    import neo4j.exceptions as _neo4j_exc  # type: ignore
+    from neo4j import Query as _Neo4jQuery  # type: ignore
+except ImportError:  # pragma: no cover — only missing in offline smoke-test env
+    _neo4j_exc = None  # type: ignore
+    _Neo4jQuery = None  # type: ignore
+
 # ---------------------------------------------------------------------------
 # Verdict constants
 # ---------------------------------------------------------------------------
@@ -33,6 +40,31 @@ from typing import Any, Optional
 PASS = "PASS"
 WARN = "WARN"
 FAIL = "FAIL"
+
+# ---------------------------------------------------------------------------
+# Driver-level timeouts and EXPLAIN pre-check constants
+# ---------------------------------------------------------------------------
+
+_QUERY_TIMEOUT_S: int = 30
+"""Timeout in seconds passed to every driver.execute_query() / tx.run() call."""
+
+_MAX_EXPLAIN_ESTIMATED_ROWS: int = 50_000_000
+"""Gate 1 fails immediately when EXPLAIN EstimatedRows exceeds this value."""
+
+
+def _query_with_timeout(cypher: str) -> Any:
+    """
+    Wrap a Cypher string in a neo4j.Query object with the module timeout set.
+
+    If neo4j is not installed (offline smoke tests), returns the raw string.
+    Using neo4j.Query is required because driver.execute_query() only honours
+    the ``timeout`` attribute when the first argument is a Query object — bare
+    string queries cannot carry a timeout via **kwargs.
+    """
+    if _Neo4jQuery is not None:
+        return _Neo4jQuery(cypher, timeout=_QUERY_TIMEOUT_S)
+    return cypher  # offline fallback (smoke tests only)
+
 
 # ---------------------------------------------------------------------------
 # Deprecated syntax patterns (Gate 3 — source text checks)
@@ -485,16 +517,32 @@ def validate(
 
         try:
             records, summary, _ = driver.execute_query(
-                explain_cypher, database_=database
+                _query_with_timeout(explain_cypher), database_=database
             )
             # Capture the plan as text for Gate 3 operator scan
             if hasattr(summary, "plan") and summary.plan:
                 plan_text = _plan_to_text(summary.plan)
+                # EstimatedRows pre-check: reject queries likely to full-scan the graph
+                estimated_rows = summary.plan.arguments.get("EstimatedRows", 0)
+                if estimated_rows > _MAX_EXPLAIN_ESTIMATED_ROWS:
+                    gate1.verdict = FAIL
+                    gate1.reason = (
+                        f"EXPLAIN estimated {estimated_rows:,} rows — query likely missing "
+                        "index for initial lookup or unbounded expansion; add a MATCH using "
+                        "an indexed property first"
+                    )
+                    gate1.details = {"estimated_rows": estimated_rows, "threshold": _MAX_EXPLAIN_ESTIMATED_ROWS}
+                    gates.append(gate1)
+                    return _build_result(cypher, gates, {})
             gate1.verdict = PASS
             gate1.reason = "EXPLAIN succeeded"
         except Exception as exc:
-            gate1.verdict = FAIL
-            gate1.reason = f"Syntax error: {exc}"
+            if _is_timeout_error(exc):
+                gate1.verdict = FAIL
+                gate1.reason = "Query timed out after 30s — likely missing index or unbounded scan"
+            else:
+                gate1.verdict = FAIL
+                gate1.reason = f"Syntax error: {exc}"
             gates.append(gate1)
             return _build_result(cypher, gates, {})
 
@@ -515,7 +563,7 @@ def validate(
             # Writes ARE committed; acceptable for local/writable test databases.
             t0 = time.monotonic()
             with driver.session(database=database) as _session:
-                _result = _session.run(cypher)
+                _result = _session.run(_query_with_timeout(cypher))
                 records = list(_result)
                 actual_rows = len(records)
             elapsed_ms = (time.monotonic() - t0) * 1000.0
@@ -527,7 +575,7 @@ def validate(
         else:
             t0 = time.monotonic()
             records, summary, _ = driver.execute_query(
-                cypher, database_=database
+                _query_with_timeout(cypher), database_=database
             )
             elapsed_ms = (time.monotonic() - t0) * 1000.0
             actual_rows = len(records)
@@ -542,8 +590,12 @@ def validate(
             gate2.reason = f"Returned {actual_rows} rows (min: {min_results})"
 
     except Exception as exc:
-        gate2.verdict = FAIL
-        gate2.reason = f"Execution error: {exc}"
+        if _is_timeout_error(exc):
+            gate2.verdict = FAIL
+            gate2.reason = "Query timed out after 30s — likely missing index or unbounded scan"
+        else:
+            gate2.verdict = FAIL
+            gate2.reason = f"Execution error: {exc}"
         gates.append(gate2)
         return _build_result(cypher, gates, {})
 
@@ -600,7 +652,7 @@ def validate(
             # NOTE: this commits the write again — acceptable for write-enabled test DBs.
             t0 = time.monotonic()
             with driver.session(database=database) as _session:
-                _result = _session.run(profile_cypher)
+                _result = _session.run(_query_with_timeout(profile_cypher))
                 _summary = _result.consume()
                 plan = getattr(_summary, "profile", None)
                 gate4_metrics = extract_profile_metrics(plan)
@@ -610,7 +662,7 @@ def validate(
         else:
             t0 = time.monotonic()
             _, summary, _ = driver.execute_query(
-                profile_cypher, database_=database
+                _query_with_timeout(profile_cypher), database_=database
             )
             profile_elapsed = (time.monotonic() - t0) * 1000.0
             plan = getattr(summary, "profile", None)
@@ -619,13 +671,22 @@ def validate(
                 gate4_metrics["elapsedTimeMs"] = profile_elapsed
 
     except Exception as exc:
-        gates.append(
-            GateResult(
-                gate=4,
-                verdict=WARN,
-                reason=f"PROFILE execution failed (Gate 4 skipped): {exc}",
+        if _is_timeout_error(exc):
+            gates.append(
+                GateResult(
+                    gate=4,
+                    verdict=FAIL,
+                    reason="Query timed out after 30s — likely missing index or unbounded scan",
+                )
             )
-        )
+        else:
+            gates.append(
+                GateResult(
+                    gate=4,
+                    verdict=WARN,
+                    reason=f"PROFILE execution failed (Gate 4 skipped): {exc}",
+                )
+            )
         return _build_result(cypher, gates, gate4_metrics)
 
     perf_issues = check_performance(
@@ -710,6 +771,17 @@ def _plan_to_text(plan: Any) -> str:
     return " ".join(parts)
 
 
+def _is_timeout_error(exc: BaseException) -> bool:
+    """Return True if the exception represents a query timeout from the Neo4j driver."""
+    msg = str(exc).lower()
+    if "timeout" in msg:
+        return True
+    if _neo4j_exc is not None:
+        if isinstance(exc, (_neo4j_exc.TransientError, _neo4j_exc.ClientError)):
+            return "timeout" in msg
+    return False
+
+
 def _execute_write_rollback(
     cypher: str, driver: Any, *, database: str
 ) -> tuple[int, Optional[float]]:
@@ -720,7 +792,7 @@ def _execute_write_rollback(
     """
     with driver.session(database=database) as session:
         t0 = time.monotonic()
-        tx = session.begin_transaction()
+        tx = session.begin_transaction(timeout=_QUERY_TIMEOUT_S)
         try:
             result = tx.run(cypher)
             records = list(result)
@@ -741,7 +813,7 @@ def _profile_write_rollback(
     """
     with driver.session(database=database) as session:
         t0 = time.monotonic()
-        tx = session.begin_transaction()
+        tx = session.begin_transaction(timeout=_QUERY_TIMEOUT_S)
         try:
             result = tx.run(profile_cypher)
             list(result)  # consume records

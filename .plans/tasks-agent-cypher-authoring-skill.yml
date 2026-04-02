@@ -1,7 +1,7 @@
 feature: agent-cypher-authoring-skill
 prd: ./prd-agent-cypher-authoring-skill.md
 created_at: 2026-03-19T00:00:00Z
-updated_at: 2026-03-26T00:00:00Z
+updated_at: 2026-04-02T00:00:00Z
 
 tasks:
   - id: task-001
@@ -1733,17 +1733,15 @@ tasks:
       - "ucfraud schema includes Scenario node and correct HAS_ALERT direction"
       - "All domains: property types and formats documented in schema.nodes.properties descriptions"
 
-  - id: task-076
-    title: "Expand stackoverflow, twitter, retail to ≥ 100 cases using generate-questions"
+  - id: task-076a
+    title: "Expand stackoverflow to ≥ 100 cases using generate-questions"
     description: |
-      These three domains are on demo.neo4jlabs.com (read-only) and have the
-      simplest expansion path.
+      Domain is on demo.neo4jlabs.com (read-only).
 
-      Current counts: stackoverflow=27, twitter=32, retail=27
-      Target: ≥ 100 each → gaps: stackoverflow=73, twitter=68, retail=73
+      Current count: stackoverflow=27
+      Target: ≥ 100 → gap: 73
 
-      For each domain:
-        make generate-questions DOMAIN=<domain> COUNT=<gap> MODEL=haiku
+        make generate-questions DOMAIN=stackoverflow COUNT=73 MODEL=haiku
 
       After generation:
         - Review needs_review cases, fix or remove
@@ -1753,10 +1751,52 @@ tasks:
 
       Note: use haiku for cost efficiency on bulk generation.
     status: pending
-    dependencies: [task-073, task-074, task-075]
+    dependencies: [task-073, task-074, task-075, task-078]
     acceptance_criteria:
       - "stackoverflow.yml has ≥ 100 cases, 0 FAIL on harness run"
+
+  - id: task-076b
+    title: "Expand twitter to ≥ 100 cases using generate-questions"
+    description: |
+      Domain is on demo.neo4jlabs.com (read-only).
+
+      Current count: twitter=32
+      Target: ≥ 100 → gap: 68
+
+        make generate-questions DOMAIN=twitter COUNT=68 MODEL=haiku
+
+      After generation:
+        - Review needs_review cases, fix or remove
+        - Run full harness and fix any failures before committing
+        - Ensure 0 FAIL (skips for write/vector OK)
+        - Commit with descriptive message
+
+      Note: use haiku for cost efficiency on bulk generation.
+    status: pending
+    dependencies: [task-073, task-074, task-075, task-078]
+    acceptance_criteria:
       - "twitter.yml has ≥ 100 cases, 0 FAIL on harness run"
+
+  - id: task-076c
+    title: "Expand retail to ≥ 100 cases using generate-questions"
+    description: |
+      Domain is on demo.neo4jlabs.com (read-only).
+
+      Current count: retail=27
+      Target: ≥ 100 → gap: 73
+
+        make generate-questions DOMAIN=retail COUNT=73 MODEL=haiku
+
+      After generation:
+        - Review needs_review cases, fix or remove
+        - Run full harness and fix any failures before committing
+        - Ensure 0 FAIL (skips for write/vector OK)
+        - Commit with descriptive message
+
+      Note: use haiku for cost efficiency on bulk generation.
+    status: pending
+    dependencies: [task-073, task-074, task-075, task-078]
+    acceptance_criteria:
       - "retail.yml has ≥ 100 cases, 0 FAIL on harness run"
 
   - id: task-077
@@ -1785,6 +1825,51 @@ tasks:
       - "ucfraud.yml has ≥ 100 cases, 0 FAIL on harness run"
       - "ucnetwork.yml has ≥ 100 cases, 0 FAIL on harness run"
 
+  - id: task-078
+    title: "Add 30s query execution timeout and EXPLAIN estimated-rows pre-check to validator.py"
+    description: |
+      Harness runs hang indefinitely when queries do full scans without index usage.
+      Two defenses needed in validator.py:
+
+      1. TIMEOUT: Use the Neo4j driver's built-in transaction timeout mechanism.
+         Pass timeout=30 (seconds) to all driver.execute_query() calls via the
+         `timeout` kwarg. For session.run() and tx.run() calls (write rollback,
+         CALL IN TRANSACTIONS), set it via session config:
+           driver.session(database=database, default_access_mode=..., timeout=30)
+         or via transaction config: session.begin_transaction(timeout=30).
+         On timeout the driver raises neo4j.exceptions.TransientError or ClientError
+         with message containing "timeout" — catch and convert to a FAIL gate result:
+         "Query timed out after 30s — likely missing index or unbounded scan"
+         The timeout applies to Gates 1, 2, and 4 independently.
+
+      2. EXPLAIN ESTIMATED ROWS PRE-CHECK (Gate 1 extension):
+         After a successful EXPLAIN, extract the root plan's EstimatedRows from
+         summary.plan.arguments. If EstimatedRows > 50_000_000 (configurable constant
+         _MAX_EXPLAIN_ESTIMATED_ROWS = 50_000_000), FAIL Gate 1 immediately with:
+         "EXPLAIN estimated {n:,} rows — query likely missing index for initial lookup
+         or unbounded expansion; add a MATCH using an indexed property first"
+         This prevents Gate 2/4 from running queries that would scan the whole graph.
+
+      Implementation notes:
+        - Extract EstimatedRows: plan.arguments.get('EstimatedRows', 0) on the ROOT
+          plan node only (not summed — root represents the full output cardinality)
+        - Add _QUERY_TIMEOUT_S = 30 and _MAX_EXPLAIN_ESTIMATED_ROWS = 50_000_000
+          as module-level constants
+        - All four gate executions in validate() must pass timeout to the driver
+        - Add the same timeout to generator.py's live DB execution
+        - Update AGENTS.md with: "validator.py has 30s driver-level timeout per gate;
+          queries with EXPLAIN EstimatedRows >50M fail immediately at Gate 1"
+    status: completed
+    completed_at: "2026-04-02T12:00:00Z"
+    dependencies: []
+    priority: high
+    acceptance_criteria:
+      - "validator.py has _QUERY_TIMEOUT_S = 30 and passes timeout= to all driver calls"
+      - "Gate 1 fails immediately when EXPLAIN EstimatedRows > 50_000_000"
+      - "Harness run completes within 10 minutes on all 10 domains (no infinite hangs)"
+      - "Timed-out cases show verdict FAIL with clear timeout message"
+      - "generator.py live-execution calls also pass timeout= to driver"
+
   - id: task-069
     title: "Use onboard-dataset pipeline to complete 100-case expansion (REQ-F-047 + REQ-F-049)"
     description: |
@@ -1804,9 +1889,366 @@ tasks:
 
       This task supersedes tasks 057-066 if the pipeline works correctly.
     status: pending
-    dependencies: [task-076, task-077]
+    dependencies: [task-076a, task-076b, task-076c, task-077]
     acceptance_criteria:
       - "All 10 domain YAMLs have ≥ 100 test cases"
       - "needs_review stubs resolved or documented"
       - "Full harness: ≥ 90% pass rate across all 10 domains"
       - "make dry-run passes with ≥ 1000 total cases"
+
+  - id: task-079
+    title: "Implement ValidationResult dataclass and validate_question_language function (REQ-F-051)"
+    description: |
+      Create `skill-generation-validation-tools/tests/harness/question_validator.py`
+      as a standalone module implementing the public API specified in REQ-F-051.
+
+      1. Define a `ValidationResult` dataclass with three fields:
+           - `is_valid: bool`
+           - `violations: list[str]`  — each entry is "<matched_token> → <rule_name>",
+             e.g. "MATCH → Cypher keyword", "Organization → schema label", "n.name → property dot-access"
+           - `suggested_rewrite: str | None`  — None when is_valid=True
+
+      2. Implement `validate_question_language(question: str, domain_schema: dict, model: str = "claude-sonnet-4-6") -> ValidationResult`:
+           - `domain_schema` accepts keys: `labels` (list[str]), `rel_types` (list[str]),
+             `properties` (list[str]), `procedure_prefixes` (list[str]); all optional.
+           - Detection rules (applied in order, collect all violations before deciding):
+               a. Schema labels: check each word in question against `domain_schema.get("labels", [])`
+                  (case-insensitive) AND regex `:([A-Z][A-Za-z]+)` for inline label syntax
+               b. Relationship types: check against `domain_schema.get("rel_types", [])` plus
+                  regex `\b[A-Z]{2,}(_[A-Z]{2,})+\b` (ALL_CAPS_WITH_UNDERSCORES)
+               c. Cypher keywords: fixed set — MATCH, WHERE, RETURN, WITH, CALL, MERGE, CREATE,
+                  DELETE, SET, UNION, EXISTS, COUNT, COLLECT, LIMIT, SKIP, ORDER BY, OPTIONAL,
+                  UNWIND, FOREACH, PROFILE, EXPLAIN, YIELD — matched as whole words, case-insensitive
+               d. Property dot-access: regex `\b\w+\.\w+\b`
+               e. Procedure/function names: check against `domain_schema.get("procedure_prefixes", [])`
+                  plus built-in prefixes: `gds.`, `apoc.`, `db.index`, `ai.`, `db.schema`
+               f. Schema property names: check question words against `domain_schema.get("properties", [])`
+           - If no violations: return `ValidationResult(is_valid=True, violations=[], suggested_rewrite=None)`
+           - If violations found: call Claude via `claude --print --model <model>` subprocess with
+             prompt: "Rewrite this question as natural business language. Remove all graph database
+             terms, Cypher keywords, label names, and technical identifiers. Return only the
+             rewritten question, nothing else.\n\nOriginal: <question>"
+             Capture stdout as `suggested_rewrite`. Return `ValidationResult(is_valid=False, violations=[...], suggested_rewrite=<rewrite>)`
+           - If the Claude subprocess fails (non-zero exit or empty output): set `suggested_rewrite=None`
+
+      3. The module must be importable as:
+           `from harness.question_validator import validate_question_language`
+         and also directly as a script: `python question_validator.py "<question>"` (prints JSON result).
+
+      4. Add unit tests in `skill-generation-validation-tools/tests/test_question_validator.py`
+         covering: clean question passes, Cypher keyword detected, schema label detected,
+         dot-access detected, rel-type pattern detected, violations list has correct format strings.
+         Unit tests must NOT require a live Claude call (mock the subprocess).
+    status: pending
+    dependencies: [task-050]
+    priority: high
+    acceptance_criteria:
+      - "`from harness.question_validator import validate_question_language` succeeds"
+      - "ValidationResult has is_valid, violations, suggested_rewrite fields"
+      - "validate_question_language('MATCH (o:Organization) RETURN o.name', {'labels': ['Organization']}) returns is_valid=False with ≥ 2 violations"
+      - "validate_question_language('Which organizations mentioned the most news articles last year?', {}) returns is_valid=True"
+      - "model parameter is forwarded to claude subprocess as --model flag"
+      - "All unit tests pass without live DB or Claude connection"
+
+  - id: task-080
+    title: "Integrate question_validator into generate_questions.py and generator.py (REQ-F-050 + REQ-F-051)"
+    description: |
+      Wire the `validate_question_language` function from question_validator.py into
+      both generation scripts so every question is validated before being written to YAML.
+
+      Changes to `skill-generation-validation-tools/tests/harness/generator.py`:
+        1. Import: `from harness.question_validator import validate_question_language`
+        2. After generating each question string via Claude, call:
+             `result = validate_question_language(question, domain_schema, model=args.model)`
+        3. If `result.is_valid`: use question as-is.
+        4. If not `result.is_valid` and `result.suggested_rewrite` is not None:
+             - Replace question with `result.suggested_rewrite`
+             - Increment `auto_rewritten_count` counter
+             - Run validate_question_language once more on the rewrite; if still fails,
+               treat as needs_review (see step 5)
+        5. If not `result.is_valid` and rewrite also fails (or suggested_rewrite is None):
+             - Write case stub with `status: needs_review` and `validation_failure: "<violations list>"`
+             - Increment `needs_review_count` counter
+        6. At end of generation run, print summary:
+             "Question validation: {total} generated, {auto_rewritten} auto-rewritten, {needs_review} flagged needs_review"
+
+      Same changes to `skill-generation-validation-tools/tests/harness/generate_questions.py`
+      (if it exists as a separate file from generator.py — if not, confirm and document).
+
+      The `domain_schema` dict passed to the validator must be populated from the `dataset.schema`
+      block loaded at the start of each generation run: extract `labels`, `rel_types`, and build
+      `procedure_prefixes` from `capabilities` (e.g. `gds.`, `apoc.`) if present.
+    status: pending
+    dependencies: [task-079]
+    priority: high
+    acceptance_criteria:
+      - "Running `make generate-questions DOMAIN=companies COUNT=5` prints validation summary line at end"
+      - "Generated questions in YAML contain no Cypher keywords or graph labels"
+      - "Cases auto-rewritten by validator have no special marker (clean pass)"
+      - "Cases that fail both passes are written with status: needs_review and validation_failure: key"
+      - "auto_rewritten and needs_review counts are non-negative integers in all runs"
+
+  - id: task-081
+    title: "Add question vocabulary discipline note to SKILL.md Output Format section (REQ-F-052)"
+    description: |
+      Update `neo4j-cypher-authoring-skill/SKILL.md` to add a vocabulary discipline
+      rule to the Output Format section (the section documenting the dual yaml/cypher
+      block format from REQ-F-032).
+
+      Add the following note immediately after the dual output format block description
+      (after the paragraph explaining query_literals / query_parametrized / parameters):
+
+      ---
+      **Question / Prompt Vocabulary Discipline**
+
+      Any question or prompt submitted by a human user that contains graph-internal terms
+      (node labels, relationship type names, Cypher keywords, property dot-access syntax,
+      procedure names, or index names) MUST be silently rephrased into natural business
+      language before being used as a question or presented back to the user. Never echo
+      graph-internal vocabulary back to a business user. Examples:
+
+      | User says | Present as |
+      |---|---|
+      | `MATCH (o:Organization) RETURN o.name` | "Show me all organization names" |
+      | `WHERE n.status = 'flagged'` | "Show me flagged items" |
+      | `CALL gds.pageRank.stream('myGraph')` | "Rank nodes by influence" |
+
+      This rule applies to questions authored by agents, questions passed in by orchestrators,
+      and any intermediate tool output that references the query being built.
+      ---
+
+      The addition must fit within the SKILL.md line budget (REQ-NF-001: ≤ 300 lines).
+      If the budget is exceeded, trim equivalent lines from a lower-priority section
+      (e.g., consolidate an example in the WebFetch Escalation section).
+    status: pending
+    dependencies: []
+    priority: medium
+    acceptance_criteria:
+      - "SKILL.md Output Format section contains the vocabulary discipline note"
+      - "The three example rows (MATCH, WHERE, CALL gds) are present in the table"
+      - "SKILL.md total line count remains ≤ 300"
+      - "The note explicitly states it applies to agent-authored questions AND orchestrator-passed questions"
+
+  # ── Schema retrieval sub-skill tasks (added 2026-04-02, REQ-F-053/054/055) ──
+
+  - id: task-083
+    title: "Create references/schema/schema-retrieval.md — schema discovery sub-skill (REQ-F-053)"
+    description: |
+      Create a new L3 reference file at neo4j-cypher-authoring-skill/references/schema/schema-retrieval.md
+      containing all six named schema discovery Cypher blocks that an LLM can copy-paste
+      and run directly against any Neo4j database via MCP or direct driver access.
+
+      The file must contain the following named steps as fenced Cypher blocks, each with a
+      comment header identifying the step name and purpose:
+
+      Step 1 — VERSION
+        CALL dbms.components() YIELD name, versions RETURN name, versions[0] AS version
+        (run against the 'system' database; cross-reference references/version-matrix.md for
+        feature availability)
+
+      Step 2 — CAPABILITIES
+        SHOW PROCEDURES YIELD name
+        WHERE name STARTS WITH 'gds.' OR name STARTS WITH 'apoc.' OR name STARTS WITH 'ai.'
+        RETURN name ORDER BY name
+        (also include APOC detection query:
+         SHOW PROCEDURES YIELD name WHERE name = 'apoc.meta.schema'
+         RETURN count(name) > 0 AS apocAvailable)
+
+      Step 3 — FULL SCHEMA (preferred when APOC available)
+        CALL apoc.meta.schema() YIELD value RETURN value
+        Fallback (no APOC):
+        CALL db.schema.visualization() YIELD nodes, relationships RETURN nodes, relationships
+
+      Step 4 — PROPERTY VALUE SAMPLING (per label × property)
+        MATCH (n:Label) RETURN DISTINCT n.property LIMIT 20
+        (template — substitute Label and property for each label×property pair discovered
+        in Step 3; sampling stops at 20 values to avoid large result sets)
+
+      Step 5 — INDEXES
+        SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state
+        WHERE state = 'ONLINE'
+
+      Step 6 — CONSTRAINTS
+        SHOW CONSTRAINTS YIELD name, type, labelsOrTypes, properties
+
+      All queries must have the CYPHER 25 prefix where syntactically required.
+      The discovery query sequence in this file must mirror the logic in
+      skill-generation-validation-tools/scripts/register_dataset.py (discover_version,
+      discover_capabilities, discover_schema functions) so the sub-skill and the CLI
+      produce equivalent results.
+
+      File must:
+      - have a > Source: header (hand-authored, version-pinned)
+      - be ≤ 2,000 tokens
+      - be syntactically valid for Neo4j 2025.x and 2026.x
+      - include a note that Steps 1–3 are sufficient for most query generation tasks;
+        Steps 4–6 are recommended for production queries requiring index awareness
+    status: pending
+    dependencies:
+      - task-006
+      - task-067
+    priority: high
+    acceptance_criteria:
+      - "references/schema/schema-retrieval.md exists with a > Source: header"
+      - "File contains all six named discovery steps as fenced Cypher blocks with comment headers"
+      - "APOC detection query present and documented as prerequisite for Step 3 preferred path"
+      - "Property sampling step uses MATCH (n:Label) RETURN DISTINCT n.property LIMIT 20 pattern"
+      - "All six Cypher blocks are syntactically valid (confirmed via EXPLAIN on live DB or syntax check)"
+      - "File cross-references references/version-matrix.md for version-gated features"
+      - "File is ≤ 2,000 tokens"
+      - "Discovery logic matches register_dataset.py: same queries, same fallback sequence"
+
+  - id: task-084
+    title: "Add Schema Annotation Workflow to schema-retrieval.md (REQ-F-054)"
+    description: |
+      Extend references/schema/schema-retrieval.md (created in task-083) with a
+      Schema Annotation Workflow section — a structured 5-step process the LLM
+      follows after running the discovery queries to produce a domain-language
+      annotated schema ready for use as a dataset: YAML block.
+
+      The five steps to document:
+
+      (a) DOMAIN IDENTIFICATION
+        - Infer business domain from database name, label names, and property names
+        - Choose terminology and annotation language appropriate to the likely user
+          (e.g., "fraud ring investigation" for ucfraud, "content knowledge graph" for companies)
+        - Assess user expertise level (technical analyst vs business user) and calibrate
+          annotation vocabulary accordingly
+
+      (b) LABEL AND RELATIONSHIP TRANSLATION
+        - For each node label: write a plain-English annotation in parentheses
+          e.g.: :Article → "news article or press release" (do NOT use schema technical name in business output)
+        - For each relationship type: describe what it means in business terms and direction
+          e.g.: :HAS_CHUNK → "is broken into text paragraphs for vector search (Article → Chunk)"
+        - Identify and flag empty relationships (0 edges — do NOT use in MATCH patterns)
+
+      (c) PROPERTY ANNOTATION
+        - For each property: note the business concept, data type, and observed range/values
+          from Step 4 sampling
+          e.g.: sentiment → "article sentiment score, float -1.0 to 1.0 (negative = bad news, 0 = neutral)"
+        - Flag data type gotchas: DATETIME vs DATE, string-encoded booleans ("true"/"false"),
+          Unix epoch integers stored where datetime functions are expected, sparse properties
+          (> 70% null rate from sampling)
+        - Flag implicit foreign key properties (IDs that join to another label)
+
+      (d) GOTCHA FLAGGING (explicit subsection)
+        Produce a "⚠ Gotchas" list covering:
+        - Empty relationships (0 edges confirmed from db.schema.visualization)
+        - DATETIME vs DATE type differences (affects temporal functions used)
+        - String-encoded booleans (must use = 'true', not = true)
+        - Sparse properties (add IS NOT NULL guard before predicating on them)
+        - Properties used as implicit join keys (note which labels they link)
+
+      (e) INDEX ANNOTATION
+        - For each ONLINE index from Step 5: note which properties it covers and which
+          query predicates it accelerates (mapped from the index type selection table in
+          cypher25-indexes.md: RANGE→equality/range, TEXT→STARTS WITH/CONTAINS/ENDS WITH,
+          FULLTEXT→SEARCH USING FULLTEXT, VECTOR→SEARCH USING VECTOR)
+        - Note that the existence of an index is required for the SEARCH clause to work —
+          queries using SEARCH must reference a named index that exists in Step 5 output
+
+      OUTPUT FORMAT:
+        The annotated schema must be output as a compact dataset: YAML block conforming to
+        the schema defined in REQ-F-030 (name, database, connection stub, description,
+        schema.nodes with typed properties, schema.relationships with from/to direction,
+        schema.indexes, notes). This output is directly usable as the dataset: section of
+        a domain YAML case file.
+
+      The Annotation Workflow section must fit within the ≤ 2,000 token budget of the file
+      (which is shared with the discovery queries from task-083). If needed, condense the
+      workflow into a numbered checklist referencing examples, rather than inline prose.
+    status: pending
+    dependencies:
+      - task-083
+      - task-030
+    priority: high
+    acceptance_criteria:
+      - "schema-retrieval.md contains a Schema Annotation Workflow section with all five named steps"
+      - "Step (b) includes an example: :Article → 'news article or press release'"
+      - "Step (c) includes an example: sentiment → 'float -1.0 to 1.0, negative = bad news'"
+      - "Step (d) explicitly lists all five gotcha categories with detection instructions"
+      - "Step (e) maps index types to query predicates using the same table as cypher25-indexes.md"
+      - "Output format section shows a compact dataset: YAML block example (can be abbreviated)"
+      - "schema-retrieval.md remains ≤ 2,000 tokens after adding the Annotation Workflow"
+      - "Output YAML format is compatible with the test harness dataset: block schema (REQ-F-030)"
+
+  - id: task-085
+    title: "Update SKILL.md Schema-First Protocol to reference schema-retrieval.md (REQ-F-055)"
+    description: |
+      Update the Schema-First Protocol section of SKILL.md (currently lines ~57–76)
+      to reference the schema retrieval sub-skill when the agent has direct Cypher
+      execution capability.
+
+      Required changes:
+
+      1. ADD SUB-SKILL REFERENCE for direct execution context:
+         When the agent has a Cypher execution tool available (Neo4j MCP server with
+         run_cypher / query tool, Neo4j Browser, cypher-shell, or driver REPL), add a
+         note before the inline inspection queries:
+
+         "If you have direct Cypher execution access (MCP server, REPL, or shell):
+          → Run the 6-step discovery sequence in references/schema/schema-retrieval.md
+          → Then apply the Schema Annotation Workflow from the same file to produce a
+            domain-language annotated schema before writing any MATCH clause."
+
+      2. MCP SERVER CALLOUT:
+         The instruction must explicitly name the Neo4j MCP server case — when operating
+         via an MCP server that exposes a run_cypher or query tool, the agent MUST run the
+         sub-skill before writing any MATCH clause. This is a non-negotiable protocol step
+         equivalent to the existing schema-first discipline.
+
+      3. CONDENSATION (to stay within budget):
+         The Schema-First Protocol section must remain within its ~30-line budget.
+         If the addition pushes over budget, replace the inline inspection query list
+         (which is now fully documented in schema-retrieval.md) with a single condensed
+         reference line, keeping only the APOC detection one-liner as an inline example.
+
+      The SKILL.md total line count must remain ≤ 300 lines (REQ-NF-001).
+    status: pending
+    dependencies:
+      - task-083
+      - task-010
+    priority: high
+    acceptance_criteria:
+      - "SKILL.md Schema-First Protocol section contains a reference to references/schema/schema-retrieval.md"
+      - "The reference explicitly covers the MCP server case (neo4j MCP server with run_cypher/query tool)"
+      - "The instruction is framed as non-negotiable: must run before writing any MATCH clause"
+      - "SKILL.md total line count is ≤ 300 lines after the update"
+      - "The sub-skill reference is in the Protocol section, not buried in WebFetch Escalation"
+      - "Schema Annotation Workflow is referenced as the next step after running the discovery queries"
+
+  - id: task-086
+    title: "Validate schema-retrieval.md against live databases and add to harness dry-run (REQ-F-053)"
+    description: |
+      After task-083 and task-084 create schema-retrieval.md, validate all six
+      discovery Cypher blocks against at least two live databases (companies demo
+      and ucfraud local) to confirm syntactic correctness and reasonable output.
+
+      Validation steps:
+      1. Run each of the 6 discovery queries against companies DB (demo.neo4jlabs.com)
+         and confirm: no syntax errors, expected output shape (version string, procedure
+         list, schema map, property samples, index rows, constraint rows)
+      2. Run the same 6 queries against ucfraud local (bolt://localhost:7687)
+         and confirm: same result shapes, APOC available path works correctly
+      3. For property sampling (Step 4): verify the LIMIT 20 pattern works for at least
+         3 label×property combinations per database
+      4. Confirm that running the Schema Annotation Workflow on companies output produces
+         a dataset: YAML block that matches (or closely approximates) the existing
+         companies.yml dataset: block
+
+      Also: add a make target `make validate-schema-retrieval` that runs the 6 discovery
+      queries against DB_URI/DB_USER/DB_PASS and prints the output, so future maintainers
+      can verify the sub-skill against new database versions.
+
+      The harness dry-run (make dry-run) must not be broken by the addition of the new file.
+    status: pending
+    dependencies:
+      - task-084
+    priority: medium
+    acceptance_criteria:
+      - "All 6 discovery queries confirmed valid against companies DB (no syntax errors)"
+      - "All 6 discovery queries confirmed valid against ucfraud local DB"
+      - "Property sampling query validated for ≥ 3 label×property pairs"
+      - "Schema Annotation Workflow output for companies produces a dataset: YAML block compatible with harness"
+      - "make validate-schema-retrieval target added to Makefile"
+      - "make dry-run passes after all schema-retrieval.md changes committed"
