@@ -1,523 +1,1693 @@
-# twitter.yml — Test cases for neo4j-cypher-authoring-skill
-# NOTE: twitter-generated.yml (generator output) is gitignored.
-# Promote stubs from generated → this file after human review.
-# Thresholds: max_db_hits = observed × 3, max_allocated_memory_bytes = observed × 3,
-#             max_runtime_ms = observed × 5.
-
 database:
-  uri: bolt://localhost:7687
-  username: neo4j
+  uri: neo4j+s://demo.neo4jlabs.com:7687
+  username: twitter
+  password: twitter
   database: twitter
-  neo4j_version: "2026.02"
-  cypher_version: "25"
-  capabilities: [gds, apoc, apoc-extended, genai]
-  read_only: false
-
+  neo4j_version: '2026.01'
+  cypher_version: '25'
+  capabilities:
+  - gds
+  - apoc
+  - apoc-extended
+  - genai
+  read_only: true
 dataset:
   name: twitter
-  description: |
-    A social media knowledge graph based on Twitter/X activity. Contains users, tweets, hashtags,
+  description: 'A social media knowledge graph based on Twitter/X activity. Contains users, tweets, hashtags,
+
     URLs, sources, and a special Troll label for identified troll accounts. Use to explore
+
     influencer networks, hashtag trends, retweet patterns, and follower graph topology.
+
     Contains 232,061 Tweets, 14,273 Users, 18 Sources, 12,919 Hashtags, 21,865 URLs, 453 Trolls.
+
+    '
   schema:
     nodes:
       Tweet:
-        description: "A tweet post"
+        description: A tweet post
         properties:
-          id:          {type: STRING, description: "Tweet ID string — RANGE index exists on Tweet.id"}
-          text:        {type: STRING, description: "Tweet content"}
-          created_at:  {type: INTEGER, description: "Unix timestamp of when tweet was created"}
-          created_str: {type: STRING, description: "Human-readable datetime string"}
+          id:
+            type: STRING
+            description: Tweet ID string — RANGE index exists on Tweet.id
+          id_str:
+            type: STRING
+            description: Tweet ID as string (duplicate of id)
+          text:
+            type: STRING
+            description: Tweet content
+          created_at:
+            type: INTEGER
+            description: Unix timestamp (seconds) of when tweet was created — RANGE index on Tweet.created_at
+          favorites:
+            type: INTEGER
+            description: Number of times this tweet was favorited/liked
+          import_method:
+            type: STRING
+            description: How the tweet was imported into the graph
       User:
-        description: "A Twitter/X user account"
+        description: A Twitter/X user account
         properties:
-          id:               {type: STRING, description: "User ID — RANGE index exists on User.id"}
-          user_key:         {type: STRING, description: "Unique user key — RANGE index exists on User.user_key"}
-          screen_name:      {type: STRING, description: "Twitter handle (no @)"}
-          name:             {type: STRING, description: "Display name"}
-          followers_count:  {type: INTEGER, description: "Number of followers"}
-          friends_count:    {type: INTEGER, description: "Number of accounts this user follows"}
-          statuses_count:   {type: INTEGER, description: "Total tweets/statuses posted"}
-          favourites_count: {type: INTEGER, description: "Number of tweets this user has liked"}
-          listed_count:     {type: INTEGER, description: "Number of lists this user appears in"}
-          verified:         {type: BOOLEAN, description: "Whether the account is verified"}
-          lang:             {type: STRING, description: "Account language setting"}
-          location:         {type: STRING, description: "Self-reported location (sparse)"}
-          description:      {type: STRING, description: "User bio (sparse)"}
-          time_zone:        {type: STRING, description: "Account time zone (sparse)"}
-      Troll:
-        description: "A user identified as a troll account — has same properties as User. 453 Troll nodes."
-        note: "Troll nodes have the same properties as User nodes but are labeled :Troll instead of :User."
+          screen_name:
+            type: STRING
+            description: Twitter handle (no @)
+          name:
+            type: STRING
+            description: Display name
+          followers:
+            type: INTEGER
+            description: Number of followers — use u.followers (NOT followers_count)
+          following:
+            type: INTEGER
+            description: Number of accounts this user follows — use u.following (NOT friends_count)
+          location:
+            type: STRING
+            description: Self-reported location (sparse)
+          url:
+            type: STRING
+            description: Profile URL
+          profile_image_url:
+            type: STRING
+            description: Profile image URL
+          betweenness:
+            type: FLOAT
+            description: Betweenness centrality score for network analysis
       Source:
-        description: "The Twitter client app used to post (e.g. 'Twitter for iPhone')"
+        description: The Twitter client app used to post (e.g. 'Twitter for iPhone')
         properties:
-          name: {type: STRING, sample: ["Twitter for iPhone", "Twitter Web App", "TweetDeck"], description: "Client app name — RANGE index on Source.name"}
+          name:
+            type: STRING
+            sample:
+            - Twitter for iPhone
+            - Twitter Web App
+            - TweetDeck
+            description: Client app name — RANGE index on Source.name
       Hashtag:
-        description: "A Twitter hashtag"
+        description: A Twitter hashtag
         properties:
-          tag: {type: STRING, description: "Hashtag text — RANGE index on Hashtag.tag"}
-      URL:
-        description: "A URL shared in a tweet"
+          name:
+            type: STRING
+            description: Hashtag text — RANGE index on Hashtag.name (use h.name NOT h.tag)
+      Link:
+        description: A URL link shared in a tweet
         properties:
-          expanded_url: {type: STRING, description: "Full expanded URL — RANGE index on URL.expanded_url"}
+          url:
+            type: STRING
+            description: URL link text
     relationships:
-      - type: POSTED
-        from: User
-        to: Tweet
-        description: "User posted this tweet"
-      - type: RETWEETED
-        from: Tweet
-        to: Tweet
-        description: "This tweet is a retweet of another tweet (retweetingTweet)-[:RETWEETED]->(originalTweet)"
-      - type: IN_REPLY_TO
-        from: Tweet
-        to: Tweet
-        description: "This tweet is a reply to another tweet"
-      - type: POSTED_VIA
-        from: Tweet
-        to: Source
-        description: "Tweet was posted using this client app"
-      - type: MENTIONS
-        from: Tweet
-        to: User
-        description: "Tweet mentions this user with @handle"
-      - type: HAS_TAG
-        from: Tweet
-        to: Hashtag
-        description: "Tweet uses this hashtag"
-      - type: HAS_LINK
-        from: Tweet
-        to: URL
-        description: "Tweet contains this URL link"
+    - type: POSTS
+      from: User
+      to: Tweet
+      description: User posted this tweet (2338 edges)
+    - type: RETWEETS
+      from: Tweet
+      to: Tweet
+      description: This tweet is a retweet of another tweet — (retweetTweet)-[:RETWEETS]->(originalTweet) (268 edges)
+    - type: REPLY_TO
+      from: Tweet
+      to: Tweet
+      description: This tweet is a reply to another tweet (504 edges)
+    - type: USING
+      from: Tweet
+      to: Source
+      description: Tweet was posted using this client app (2146 edges)
+    - type: MENTIONS
+      from: Tweet
+      to: User
+      description: Tweet mentions this user with @handle (3459 edges)
+    - type: TAGS
+      from: Tweet
+      to: Hashtag
+      description: Tweet uses this hashtag (1493 edges)
+    - type: CONTAINS
+      from: Tweet
+      to: Link
+      description: Tweet contains this URL link (1757 edges)
+    - type: FOLLOWS
+      from: User
+      to: User
+      description: User follows another user (44630 edges)
+    - type: AMPLIFIES
+      from: User
+      to: User
+      description: User amplifies another user's content (145 edges)
+    - type: INTERACTS_WITH
+      from: User
+      to: User
+      description: User has social interaction with another user (901 edges)
+    - type: RT_MENTIONS
+      from: User
+      to: User
+      description: User mentions another user in a retweet context (45 edges)
+    - type: SIMILAR_TO
+      from: User
+      to: User
+      description: User is similar to another user (210 edges)
     indexes:
-      - {name: "Tweet.id", type: RANGE, on: "Tweet(id)"}
-      - {name: "User.user_key", type: RANGE, on: "User(user_key)"}
-      - {name: "User.id", type: RANGE, on: "User(id)"}
-      - {name: "Source.name", type: RANGE, on: "Source(name)"}
-      - {name: "Hashtag.tag", type: RANGE, on: "Hashtag(tag)"}
-      - {name: "URL.expanded_url", type: RANGE, on: "URL(expanded_url)"}
+    - name: Tweet.id
+      type: RANGE
+      label: Tweet
+      property: id
+    - name: Tweet.created_at
+      type: RANGE
+      label: Tweet
+      property: created_at
+    - name: User.screen_name
+      type: RANGE
+      label: User
+      property: screen_name
+    - name: Source.name
+      type: RANGE
+      label: Source
+      property: name
+    - name: Hashtag.name
+      type: RANGE
+      label: Hashtag
+      property: name
+    - name: Link.url
+      type: RANGE
+      label: Link
+      property: url
   notes:
-    - "Hashtag property is 'tag' (not 'name') — use h.tag for hashtag text"
-    - "URL property is 'expanded_url' (not 'url') — use u.expanded_url"
-    - "User property for followers is 'followers_count' (not 'followers')"
-    - "Tweet timestamps: created_at is INTEGER (Unix epoch milliseconds), created_str is human-readable STRING — use created_str for display, created_at for numeric range comparisons"
-    - "Relationship for posting is POSTED (not POSTS); for client app is POSTED_VIA (not USING)"
-    - "Relationship for hashtags is HAS_TAG (not TAGS); for URLs is HAS_LINK (not CONTAINS)"
-    - "Troll nodes are labeled :Troll (not :User) — 453 troll accounts in dataset. Troll and User are separate labels — use UNION or (u:User|Troll) to include both"
-    - "No FOLLOWS relationship in this dataset — social graph uses POSTED/RETWEETED/MENTIONS"
-    - "RETWEETED is Tweet→Tweet (NOT User→Tweet): (retweetTweet)-[:RETWEETED]->(originalTweet). To find 'users who retweeted': MATCH (poster:User)-[:POSTED]->(rt:Tweet)-[:RETWEETED]->(orig:Tweet). To find 'most retweeted users': MATCH (rt:Tweet)-[:RETWEETED]->(orig:Tweet)<-[:POSTED]-(author:User)"
-    - "No vector or fulltext indexes — use string matching with RANGE index lookups"
-    - "Write queries ARE ALLOWED on this local database (MERGE, SET, CALL IN TRANSACTIONS)"
-    - "User.verified is BOOLEAN (true/false) — use WHERE u.verified = true (not = 'true')"
-    - "To find troll retweet amplification: MATCH (t:Troll)-[:POSTED]->(rt:Tweet)-[:RETWEETED]->(orig:Tweet)<-[:POSTED]-(author:User)"
-    - "Tweet.id and User.id are STRING type — always quote in comparisons: WHERE t.id = '123456789'"
-
+  - 'CRITICAL: Relationship names on demo server differ from local copy — use POSTS (not POSTED), RETWEETS (not RETWEETED),
+    REPLY_TO (not IN_REPLY_TO), USING (not POSTED_VIA), TAGS (not HAS_TAG), CONTAINS (not HAS_LINK)'
+  - 'CRITICAL: URL label is Link (not URL) — use (l:Link) with l.url property'
+  - 'Hashtag property is ''name'' (not ''tag'') — use h.name for hashtag text, e.g. MATCH (h:Hashtag {name: ''neo4j''})'
+  - 'Tweet.created_at is INTEGER (Unix epoch seconds) — use numeric range comparisons: WHERE t.created_at > 1500000000'
+  - 'CRITICAL: User follower count is ''followers'' (not ''followers_count''), following count is ''following'' (not ''friends_count'')'
+  - 'User.screen_name has RANGE index — use MATCH (u:User {screen_name: ''username''}) for efficient lookups'
+  - FOLLOWS relationship exists (User→User, 44,630 edges) — use for social graph traversal
+  - 'To find retweet authors: MATCH (rt:Tweet)-[:RETWEETS]->(orig:Tweet)<-[:POSTS]-(author:User)'
+  - 'No Troll label on demo server — do not use :Troll in queries'
+  - Demo DB is read-only — write cases SKIP
+  - No vector or fulltext indexes — use string matching with RANGE index lookups
+  - 'Tweet.id is STRING type — always quote in comparisons: WHERE t.id = ''123456789'''
+  - QPE + quantifier NOT supported on demo server — use {1,} instead
 cases:
-
-  # ─── BASIC (6 cases) ─────────────────────────────────────────────────────────
-
-  - id: twitter-basic-001
-    question: "How many users are in the social network?"
-    database: twitter
-    difficulty: basic
-    tags: [count, nodes]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 5000
-    max_allocated_memory_bytes: 2097152
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  - id: twitter-basic-002
-    question: "What are the 10 most used hashtags in the dataset? Show hashtag name and the number of tweets using each."
-    database: twitter
-    difficulty: basic
-    tags: [aggregation, relationship, order, limit]
-    domain: twitter
-    min_results: 10
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  - id: twitter-basic-003
-    question: "Who are the top 10 users with the most followers? Show screen name and follower count."
-    database: twitter
-    difficulty: basic
-    tags: [match, order, limit]
-    domain: twitter
-    min_results: 10
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  - id: twitter-basic-004
-    question: "How many tweets mention the hashtag 'neo4j'?"
-    database: twitter
-    difficulty: basic
-    tags: [count, relationship, filter]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 5000
-    max_allocated_memory_bytes: 2097152
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  - id: twitter-basic-005
-    question: "Which Twitter client apps were used to post tweets? Show the app name and how many tweets were posted with it."
-    database: twitter
-    difficulty: basic
-    tags: [aggregation, relationship, group-by]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  - id: twitter-basic-006
-    question: "Which users have posted tweets in the dataset? Show the top 10 users by number of tweets posted."
-    database: twitter
-    difficulty: basic
-    tags: [match, relationship, aggregation, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 20000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 5000
-    is_write_query: false
-
-  # ─── INTERMEDIATE (6 cases) ──────────────────────────────────────────────────
-
-  - id: twitter-intermediate-001
-    question: "Which users have been mentioned in tweets AND have also posted their own tweets? Show their screen names."
-    database: twitter
-    difficulty: intermediate
-    tags: [match, multiple-relationships, filter]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 30000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-intermediate-002
-    question: "Which users have posted the most tweets in the dataset? Show top 10 by tweet count."
-    database: twitter
-    difficulty: intermediate
-    tags: [aggregation, relationship, order, limit]
-    domain: twitter
-    min_results: 10
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 8000
-    is_write_query: false
-
-  - id: twitter-intermediate-003
-    question: "Which hashtags are used together with 'politics' in the same tweets? Show the co-occurring hashtag and how many tweets they share."
-    database: twitter
-    difficulty: intermediate
-    tags: [aggregation, relationship, co-occurrence, order]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 15000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-intermediate-004
-    question: "Which users have more than 10,000 followers and have posted at least one tweet? Show their screen names and follower counts."
-    database: twitter
-    difficulty: intermediate
-    tags: [match, relationship, filter, influencers]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 30000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-intermediate-005
-    question: "Find all tweets that contain a web link and use the hashtag 'trump'. Show the tweet text and the full web address."
-    database: twitter
-    difficulty: intermediate
-    tags: [match, multiple-relationships, filter]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 15000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 8000
-    is_write_query: false
-
-  - id: twitter-intermediate-006
-    question: "Which users have been mentioned in tweets but are not themselves in the main user list as active posters? Show up to 20 such user screen names."
-    database: twitter
-    difficulty: intermediate
-    tags: [optional-match, not-exists, filter, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 15000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  # ─── ADVANCED (6 cases) ──────────────────────────────────────────────────────
-
-  - id: twitter-advanced-001
-    question: "Find pairs of users who have mutually mentioned each other — user A posted a tweet mentioning user B, AND user B posted a tweet mentioning user A. Show pairs of screen names. Limit to 20 pairs."
-    database: twitter
-    difficulty: advanced
-    tags: [bidirectional, mutual-mentions, filter, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 100000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 15000
-    is_write_query: false
-
-  - id: twitter-advanced-002
-    question: "For each user whose tweets have been retweeted, how many times total have their tweets been retweeted? Show the top 10 most retweeted authors."
-    database: twitter
-    difficulty: advanced
-    tags: [aggregation, relationship-chain, order, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-advanced-003
-    question: "Find users who serve as bridges in the mention network: users who are mentioned by many distinct other users but who themselves also mention many other users. Show the top 10 such 'connector' users by the product of (distinct users who mention them) × (distinct users they mention)."
-    database: twitter
-    difficulty: advanced
-    tags: [match, filter, order, graph-analytics, mentions]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-advanced-004
-    question: "Which hashtags have been used in reply tweets (as opposed to original posts)? Show hashtag name and count of reply tweets using it."
-    database: twitter
-    difficulty: advanced
-    tags: [aggregation, multiple-relationships, filter]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-advanced-005
-    question: "Find users whose tweets have been retweeted and who have more than 50,000 followers. Show their screen name and follower count."
-    database: twitter
-    difficulty: advanced
-    tags: [match, comparison, relationship, filter]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  - id: twitter-advanced-006
-    question: "Which users have been mentioned the most across all tweets? Show the top 10 mentioned users by mention count."
-    database: twitter
-    difficulty: advanced
-    tags: [aggregation, relationship, order, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 10000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 10000
-    is_write_query: false
-
-  # ─── COMPLEX (4 cases) ───────────────────────────────────────────────────────
-
-  - id: twitter-complex-001
-    question: "Find users who are mentioned in tweets posted by users who retweeted someone else's content. Show up to 20 distinct screen names of those mentioned users."
-    database: twitter
-    difficulty: complex
-    tags: [graph-traversal, two-hop, not-exists, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 100000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 20000
-    is_write_query: false
-
-  - id: twitter-complex-002
-    question: "For the top 5 most popular hashtags, show the hashtag, how many unique users tweeted with it, and a list of those users' screen names."
-    database: twitter
-    difficulty: complex
-    tags: [aggregation, collect, relationship-chain, order]
-    domain: twitter
-    min_results: 5
-    max_db_hits: 30000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 20000
-    is_write_query: false
-
-  - id: twitter-complex-003
-    question: "Find all direct retweet pairs — where tweet A retweets tweet B. Show both tweet IDs, their text snippets, and the screen name of the user who posted the retweeting tweet. Limit to 20 results."
-    database: twitter
-    difficulty: complex
-    tags: [graph-traversal, chained-relationships, retweet-chain]
-    domain: twitter
-    min_results: 20
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 15000
-    is_write_query: false
-
-  - id: twitter-complex-004
-    question: "For each hashtag used in retweets, show how many unique users posted those retweet-tweets. Show the top 10 hashtags by unique poster count."
-    database: twitter
-    difficulty: complex
-    tags: [aggregation, relationship, order, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 200000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 30000
-    is_write_query: false
-
-  # ─── EXPERT (5 cases) ────────────────────────────────────────────────────────
-
-  - id: twitter-expert-001
-    question: "Find the shortest retweet chain path between two users: find a user who retweeted content originally posted by another user. Show the shortest path and all intermediate tweets."
-    database: twitter
-    difficulty: expert
-    tags: [shortest-path, qpe, graph-traversal]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 100000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 30000
-    is_write_query: false
-
-  - id: twitter-expert-002
-    question: "Identify users who appear as influential hubs in the mention network — users who are mentioned by many distinct other users. Show top 10 by number of distinct users who mentioned them."
-    database: twitter
-    difficulty: expert
-    tags: [graph-analytics, aggregation, filter, order]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 100000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 30000
-    is_write_query: false
-
-  - id: twitter-expert-003
-    question: "Find all regular users reachable from identified troll accounts through a retweet chain of up to 2 hops — trolls posting retweets of content originally posted by non-troll users. Show the count of distinct reachable users and the count of distinct trolls reaching them."
-    database: twitter
-    difficulty: expert
-    tags: [qpe, quantified-path, graph-traversal, aggregation]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 500000
-    max_allocated_memory_bytes: 52428800
-    max_runtime_ms: 60000
-    is_write_query: false
-
-  - id: twitter-expert-004
-    question: "For each pair of hashtags that co-occur in at least 3 tweets, compute a co-occurrence score. Show top 15 pairs by co-occurrence count."
-    database: twitter
-    difficulty: expert
-    tags: [co-occurrence, aggregation, relationship-chain, order, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 30000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 30000
-    is_write_query: false
-
-  - id: twitter-expert-005
-    question: "Find influential amplifiers: users whose tweets have been retweeted multiple times and who have a large following. Score each user as follower count × retweet count and show the top 10."
-    database: twitter
-    difficulty: expert
-    tags: [aggregation, math, relationship-chain, scoring, order, limit]
-    domain: twitter
-    min_results: 1
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 20971520
-    max_runtime_ms: 30000
-    is_write_query: false
-
-  # ─── WRITE CASES (5 cases) ────────────────────────────────────────────────────
-  # Write queries are allowed on local bolt://localhost:7687 (read_only: false)
-  # CRITICAL MERGE RULES (from skill):
-  #   - ALWAYS MERGE each node separately by its unique key property ONLY
-  #   - THEN MERGE the relationship between the already-bound node variables
-  #   - NEVER: MERGE (u:User {user_key: $k, name: $n}) — multi-property = duplicates
-  #   - NEVER: MERGE (:User {user_key: $a})-[:HAS_TAG]->(:Hashtag {tag: $t}) — ghost nodes
-
-  - id: twitter-write-001
-    question: "Add a new hashtag 'graphsummit' if it doesn't exist, then link it to an existing tweet with id '1234567890'. Make sure to create the hashtag and the link to the tweet as separate operations."
-    database: twitter
-    difficulty: intermediate
-    tags: [merge, relationship, write, hashtag]
-    domain: twitter
-    min_results: 0
-    max_db_hits: 1000
-    max_allocated_memory_bytes: 5242880
-    max_runtime_ms: 10000
-    is_write_query: true
-    notes: "CRITICAL: Three separate MERGE statements — (1) MERGE (t:Tweet {id: $tweetId}), (2) MERGE (h:Hashtag {tag: $tag}), (3) MERGE (t)-[:HAS_TAG]->(h). NEVER merge nodes and relationship together."
-
-  - id: twitter-write-002
-    question: "Upsert an account with user_key 'u_99999': if new, set name='Test Account' and screen_name='testuser99'; if already exists, update their followers_count to 500."
-    database: twitter
-    difficulty: intermediate
-    tags: [merge, on-create-set, on-match-set, write]
-    domain: twitter
-    min_results: 0
-    max_db_hits: 500
-    max_allocated_memory_bytes: 2097152
-    max_runtime_ms: 5000
-    is_write_query: true
-    notes: "MERGE on user_key only (the lookup key). Set other properties via ON CREATE SET / ON MATCH SET. Never include name or screen_name in the MERGE pattern itself."
-
-  - id: twitter-write-003
-    question: "Add a new client app source 'Claude Code Bot' if it doesn't exist, then link it to the tweet with id '1234567890' as the source app that posted it."
-    database: twitter
-    difficulty: intermediate
-    tags: [merge, relationship, write, source]
-    domain: twitter
-    min_results: 0
-    max_db_hits: 500
-    max_allocated_memory_bytes: 2097152
-    max_runtime_ms: 5000
-    is_write_query: true
-    notes: "MERGE Source by name (RANGE index). MERGE Tweet by id. Then MERGE the POSTED_VIA relationship between bound variables."
-
-  - id: twitter-write-004
-    question: "Update the text of the tweet with id '1234567890' to append '[UPDATED]' at the end of its existing text."
-    database: twitter
-    difficulty: basic
-    tags: [set, write, property-update]
-    domain: twitter
-    min_results: 0
-    max_db_hits: 500
-    max_allocated_memory_bytes: 2097152
-    max_runtime_ms: 5000
-    is_write_query: true
-    notes: "Simple MATCH by Tweet.id (RANGE index) then SET t.text = t.text + ' [UPDATED]'."
-
-  - id: twitter-write-005
-    question: "Clean up orphaned retweet links: delete all retweet connections where the original tweet being retweeted has no user who posted it — i.e., the original tweet is not connected to any author."
-    database: twitter
-    difficulty: expert
-    tags: [delete, batch-write, not-exists, write]
-    domain: twitter
-    min_results: 0
-    max_db_hits: 50000
-    max_allocated_memory_bytes: 10485760
-    max_runtime_ms: 30000
-    is_write_query: true
-    notes: "RETWEETED is Tweet->Tweet. Pattern: MATCH (rt:Tweet)-[r:RETWEETED]->(orig:Tweet) WHERE NOT EXISTS { ()-[:POSTED]->(orig) } DELETE r. Do NOT use CALL IN TRANSACTIONS here — harness runs in explicit transaction."
+- id: twitter-basic-001
+  question: How many users are in the social network?
+  database: twitter
+  difficulty: basic
+  tags:
+  - count
+  - nodes
+  domain: twitter
+  min_results: 1
+  max_db_hits: 5000
+  max_allocated_memory_bytes: 2097152
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-basic-002
+  question: What are the 10 most used hashtags in the dataset? Show hashtag name and the number of tweets using each.
+  database: twitter
+  difficulty: basic
+  tags:
+  - aggregation
+  - relationship
+  - order
+  - limit
+  domain: twitter
+  min_results: 10
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-basic-003
+  question: Who are the top 10 users with the most followers? Show screen name and follower count.
+  database: twitter
+  difficulty: basic
+  tags:
+  - match
+  - order
+  - limit
+  domain: twitter
+  min_results: 10
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-basic-004
+  question: How many tweets mention the hashtag 'neo4j'?
+  database: twitter
+  difficulty: basic
+  tags:
+  - count
+  - relationship
+  - filter
+  domain: twitter
+  min_results: 1
+  max_db_hits: 5000
+  max_allocated_memory_bytes: 2097152
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-basic-005
+  question: Which Twitter client apps were used to post tweets? Show the app name and how many tweets were posted with it.
+  database: twitter
+  difficulty: basic
+  tags:
+  - aggregation
+  - relationship
+  - group-by
+  domain: twitter
+  min_results: 1
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-basic-006
+  question: Which users have posted tweets in the dataset? Show the top 10 users by number of tweets posted.
+  database: twitter
+  difficulty: basic
+  tags:
+  - match
+  - relationship
+  - aggregation
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 20000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 5000
+  is_write_query: false
+- id: twitter-intermediate-001
+  question: Which users have been mentioned in tweets AND have also posted their own tweets? Show their screen names.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - match
+  - multiple-relationships
+  - filter
+  domain: twitter
+  min_results: 1
+  max_db_hits: 30000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-intermediate-002
+  question: Which users have posted the most tweets in the dataset? Show top 10 by tweet count.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - aggregation
+  - relationship
+  - order
+  - limit
+  domain: twitter
+  min_results: 10
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 8000
+  is_write_query: false
+- id: twitter-intermediate-003
+  question: Which hashtags are used together with 'neo4j' in the same tweets? Show the co-occurring hashtag and how many
+    tweets they share.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - aggregation
+  - relationship
+  - co-occurrence
+  - order
+  domain: twitter
+  min_results: 1
+  max_db_hits: 15000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-intermediate-004
+  question: Which users have more than 10,000 followers and have posted at least one tweet? Show their screen names and follower
+    counts.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - match
+  - relationship
+  - filter
+  - influencers
+  domain: twitter
+  min_results: 1
+  max_db_hits: 30000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-intermediate-005
+  question: Find all tweets that contain a web link and use the hashtag 'neo4j'. Show the tweet text and the full web address.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - match
+  - multiple-relationships
+  - filter
+  domain: twitter
+  min_results: 1
+  max_db_hits: 15000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 8000
+  is_write_query: false
+- id: twitter-intermediate-006
+  question: Which users have been mentioned in tweets but are not themselves in the main user list as active posters? Show
+    up to 20 such user screen names.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - optional-match
+  - not-exists
+  - filter
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 15000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-advanced-001
+  question: Find pairs of users who have mutually mentioned each other — user A posted a tweet mentioning user B, AND user
+    B posted a tweet mentioning user A. Show pairs of screen names. Limit to 20 pairs.
+  database: twitter
+  difficulty: advanced
+  tags:
+  - bidirectional
+  - mutual-mentions
+  - filter
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 100000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 15000
+  is_write_query: false
+- id: twitter-advanced-002
+  question: For each user whose tweets have been retweeted, how many times total have their tweets been retweeted? Show the
+    top 10 most retweeted authors.
+  database: twitter
+  difficulty: advanced
+  tags:
+  - aggregation
+  - relationship-chain
+  - order
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-advanced-003
+  question: 'Find users who serve as bridges in the mention network: users who are mentioned by many distinct other users
+    but who themselves also mention many other users. Show the top 10 such ''connector'' users by the product of (distinct
+    users who mention them) × (distinct users they mention).'
+  database: twitter
+  difficulty: advanced
+  tags:
+  - match
+  - filter
+  - order
+  - graph-analytics
+  - mentions
+  domain: twitter
+  min_results: 1
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-advanced-004
+  question: Which hashtags have been used in reply tweets (as opposed to original posts)? Show hashtag name and count of reply
+    tweets using it.
+  database: twitter
+  difficulty: advanced
+  tags:
+  - aggregation
+  - multiple-relationships
+  - filter
+  domain: twitter
+  min_results: 1
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-advanced-005
+  question: Find users whose tweets have been retweeted and who have more than 50,000 followers. Show their screen name and
+    follower count.
+  database: twitter
+  difficulty: advanced
+  tags:
+  - match
+  - comparison
+  - relationship
+  - filter
+  domain: twitter
+  min_results: 1
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-advanced-006
+  question: Which users have been mentioned the most across all tweets? Show the top 10 mentioned users by mention count.
+  database: twitter
+  difficulty: advanced
+  tags:
+  - aggregation
+  - relationship
+  - order
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 10000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 10000
+  is_write_query: false
+- id: twitter-complex-001
+  question: Find users who are mentioned in tweets posted by users who retweeted someone else's content. Show up to 20 distinct
+    screen names of those mentioned users.
+  database: twitter
+  difficulty: complex
+  tags:
+  - graph-traversal
+  - two-hop
+  - not-exists
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 100000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 20000
+  is_write_query: false
+- id: twitter-complex-002
+  question: For the top 5 most popular hashtags, show the hashtag, how many unique users tweeted with it, and a list of those
+    users' screen names.
+  database: twitter
+  difficulty: complex
+  tags:
+  - aggregation
+  - collect
+  - relationship-chain
+  - order
+  domain: twitter
+  min_results: 5
+  max_db_hits: 30000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 20000
+  is_write_query: false
+- id: twitter-complex-003
+  question: Find all direct retweet pairs — where tweet A retweets tweet B. Show both tweet IDs, their text snippets, and
+    the screen name of the user who posted the retweeting tweet. Limit to 20 results.
+  database: twitter
+  difficulty: complex
+  tags:
+  - graph-traversal
+  - chained-relationships
+  - retweet-chain
+  domain: twitter
+  min_results: 20
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 15000
+  is_write_query: false
+- id: twitter-complex-004
+  question: For each hashtag used in retweets, show how many unique users posted those retweet-tweets. Show the top 10 hashtags
+    by unique poster count.
+  database: twitter
+  difficulty: complex
+  tags:
+  - aggregation
+  - relationship
+  - order
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 200000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 30000
+  is_write_query: false
+- id: twitter-expert-001
+  question: Find two users connected by a retweet chain of at most 3 hops. Match tweets connected by RETWEETS relationships
+    up to depth 3 and return the source user, target user, and number of hops. Limit to 5 results.
+  database: twitter
+  difficulty: expert
+  tags:
+  - qpe
+  - graph-traversal
+  - retweet
+  domain: twitter
+  min_results: 1
+  max_db_hits: 500000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 30000
+  is_write_query: false
+  skip_if_empty: true
+- id: twitter-expert-002
+  question: Identify users who appear as influential hubs in the mention network — users who are mentioned by many distinct
+    other users. Show top 10 by number of distinct users who mentioned them.
+  database: twitter
+  difficulty: expert
+  tags:
+  - graph-analytics
+  - aggregation
+  - filter
+  - order
+  domain: twitter
+  min_results: 1
+  max_db_hits: 100000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 30000
+  is_write_query: false
+- id: twitter-expert-003
+  question: Find all regular users reachable from identified troll accounts through a retweet chain of up to 2 hops — trolls
+    posting retweets of content originally posted by non-troll users. Show the count of distinct reachable users and the count
+    of distinct trolls reaching them.
+  database: twitter
+  difficulty: expert
+  tags:
+  - qpe
+  - quantified-path
+  - graph-traversal
+  - aggregation
+  domain: twitter
+  min_results: 1
+  max_db_hits: 500000
+  max_allocated_memory_bytes: 52428800
+  max_runtime_ms: 60000
+  is_write_query: false
+- id: twitter-expert-004
+  question: For each pair of hashtags that co-occur in at least 3 tweets, compute a co-occurrence score. Show top 15 pairs
+    by co-occurrence count.
+  database: twitter
+  difficulty: expert
+  tags:
+  - co-occurrence
+  - aggregation
+  - relationship-chain
+  - order
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 30000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 30000
+  is_write_query: false
+- id: twitter-expert-005
+  question: 'Find influential amplifiers: users whose tweets have been retweeted multiple times and who have a large following.
+    Score each user as follower count × retweet count and show the top 10.'
+  database: twitter
+  difficulty: expert
+  tags:
+  - aggregation
+  - math
+  - relationship-chain
+  - scoring
+  - order
+  - limit
+  domain: twitter
+  min_results: 1
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 20971520
+  max_runtime_ms: 30000
+  is_write_query: false
+- id: twitter-write-001
+  question: Add a new hashtag 'graphsummit' if it doesn't exist, then link it to an existing tweet with id '1234567890'. Make
+    sure to create the hashtag and the link to the tweet as separate operations.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - merge
+  - relationship
+  - write
+  - hashtag
+  domain: twitter
+  min_results: 0
+  max_db_hits: 1000
+  max_allocated_memory_bytes: 5242880
+  max_runtime_ms: 10000
+  is_write_query: true
+  notes: 'CRITICAL: Three separate MERGE statements — (1) MERGE (t:Tweet {id: $tweetId}), (2) MERGE (h:Hashtag {tag: $tag}),
+    (3) MERGE (t)-[:HAS_TAG]->(h). NEVER merge nodes and relationship together.'
+- id: twitter-write-002
+  question: 'Upsert an account with user_key ''u_99999'': if new, set name=''Test Account'' and screen_name=''testuser99'';
+    if already exists, update their followers_count to 500.'
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - merge
+  - on-create-set
+  - on-match-set
+  - write
+  domain: twitter
+  min_results: 0
+  max_db_hits: 500
+  max_allocated_memory_bytes: 2097152
+  max_runtime_ms: 5000
+  is_write_query: true
+  notes: MERGE on user_key only (the lookup key). Set other properties via ON CREATE SET / ON MATCH SET. Never include name
+    or screen_name in the MERGE pattern itself.
+- id: twitter-write-003
+  question: Add a new client app source 'Claude Code Bot' if it doesn't exist, then link it to the tweet with id '1234567890'
+    as the source app that posted it.
+  database: twitter
+  difficulty: intermediate
+  tags:
+  - merge
+  - relationship
+  - write
+  - source
+  domain: twitter
+  min_results: 0
+  max_db_hits: 500
+  max_allocated_memory_bytes: 2097152
+  max_runtime_ms: 5000
+  is_write_query: true
+  notes: MERGE Source by name (RANGE index). MERGE Tweet by id. Then MERGE the POSTED_VIA relationship between bound variables.
+- id: twitter-write-004
+  question: Update the text of the tweet with id '1234567890' to append '[UPDATED]' at the end of its existing text.
+  database: twitter
+  difficulty: basic
+  tags:
+  - set
+  - write
+  - property-update
+  domain: twitter
+  min_results: 0
+  max_db_hits: 500
+  max_allocated_memory_bytes: 2097152
+  max_runtime_ms: 5000
+  is_write_query: true
+  notes: Simple MATCH by Tweet.id (RANGE index) then SET t.text = t.text + ' [UPDATED]'.
+- id: twitter-write-005
+  question: 'Clean up orphaned retweet links: delete all retweet connections where the original tweet being retweeted has
+    no user who posted it — i.e., the original tweet is not connected to any author.'
+  database: twitter
+  difficulty: expert
+  tags:
+  - delete
+  - batch-write
+  - not-exists
+  - write
+  domain: twitter
+  min_results: 0
+  max_db_hits: 50000
+  max_allocated_memory_bytes: 10485760
+  max_runtime_ms: 30000
+  is_write_query: true
+  notes: 'RETWEETED is Tweet->Tweet. Pattern: MATCH (rt:Tweet)-[r:RETWEETED]->(orig:Tweet) WHERE NOT EXISTS { ()-[:POSTED]->(orig)
+    } DELETE r. Do NOT use CALL IN TRANSACTIONS here — harness runs in explicit transaction.'
+- id: twitter-basic-007
+  question: How many tweets are in the entire dataset?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Simple count of all Tweet nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-008
+  question: How many unique URLs have been shared across all tweets?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count distinct URL nodes in dataset
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-009
+  question: What is the total number of identified troll accounts?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count all Troll label nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-010
+  question: How many unique hashtags are used in the dataset?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count distinct Hashtag nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-011
+  question: What is the maximum number of followers any single user has?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Return max value of followers_count property
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-012
+  question: How many Twitter client apps are represented in the dataset?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count distinct Source nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-013
+  question: What is the average follower count across all users?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Calculate mean of followers_count property
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-014
+  question: How many users in the dataset have provided a location in their profile?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count users where location is not null
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-015
+  question: What is the minimum number of followers a user has?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Return min value of followers_count property
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-016
+  question: How many users have more than 100,000 followers?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count users with followers_count > 100000
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-017
+  question: What is the average number of tweets posted per user?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Calculate mean of statuses_count property
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 100000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-018
+  question: How many users in the dataset have at least 1,000 followers but are following fewer than 1,000 accounts?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count users where followers >= 1000 AND following < 1000
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 250000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-019
+  question: How many users in the dataset have posted at least one tweet?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Count distinct users who have outgoing POSTS relationships
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 100000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-020
+  question: What is the range of tweet timestamps in the dataset?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Find minimum and maximum created_at values
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 10000
+  max_runtime_ms: 5000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-007
+  question: Who posted the most retweets in the dataset? Show top 10 users by count of retweets they made.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count outgoing RETWEETED per user, aggregate
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-008
+  question: For each Twitter client app, what is the average follower count of users who post with it?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Source ← POSTED_VIA ← Tweet ← POSTED ← User, aggregate followers_count by source
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-009
+  question: What is the average number of replies each tweet receives?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count incoming IN_REPLY_TO relationships per tweet and calculate mean
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-010
+  question: Which users have mentioned the most other users in their tweets? Show top 15.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count distinct targets of outgoing MENTIONS per user
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-011
+  question: For tweets posted from mobile clients, what is the average retweet count compared to desktop?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Group tweets by source client type, count RETWEETED relationships, calculate averages
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-012
+  question: What is the average number of URLs included per tweet?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count HAS_LINK relationships and divide by tweet count
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-013
+  question: How many tweets are part of a conversation thread (replies or reply chains)?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count tweets with IN_REPLY_TO relationships
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-014
+  question: For unverified users, what is their average retweet rate on their posted tweets?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Filter users by verified = false, count RETWEETED incoming to their tweets
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-015
+  question: Which hashtags are used by the most unique users? Show top 25.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet ← POSTED ← User, count distinct users per hashtag
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-016
+  question: What percentage of tweets contain at least one hashtag?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count tweets with outgoing HAS_TAG divided by total tweets
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-017
+  question: For users who have been mentioned multiple times, what is their average follower count?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count incoming MENTIONS per user, filter by mentions > 1, calculate mean followers_count
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-018
+  question: How many tweets by troll accounts have been retweeted at least once?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Troll → POSTED → Tweet ← RETWEETED, count distinct tweets
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-019
+  question: What is the median follower count for users who created tweets?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet (distinct), calculate median followers_count
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-020
+  question: How many unique user-to-user mention pairs exist in the dataset?
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Count distinct pairs of users connected by MENTIONS relationship
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-021
+  question: For each major hashtag, how many distinct accounts posted with it? Show top 12.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet ← POSTED ← distinct User, count per hashtag
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-007
+  question: 'Show retweet chains of length 3 or more: original tweet, first retweet, second retweet. Include tweet authors.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: 'Multi-hop: Tweet ← RETWEETED ← Tweet ← RETWEETED ← Tweet, chain 2+ times with authors'
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-008
+  question: For each user, calculate their 'reach' as the sum of follower counts of all users who retweeted any of their tweets.
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet ← RETWEETED ← User, sum followers_count of retweet posters
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-009
+  question: 'Find users who engage in cross-posting: they mention topic X on app Y and also mention topic X on app Z within
+    24 hours.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet via Source, group by hashtag and time window
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-010
+  question: 'Show hashtag networks: for each pair of hashtags that co-occur in 10+ tweets, calculate co-occurrence score.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Tweet with 2+ HAS_TAG relationships, collect distinct pairs, count occurrences
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-011
+  question: 'Analyze mention depth: for each user, how many unique users mention them, and how many of those mentions come
+    from users with 50k+ followers?'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Count incoming MENTIONS to user, filter source users by followers_count
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-012
+  question: 'Find conversation initiators: users whose tweets are most frequently replied to by others. Show top 15.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet, count incoming IN_REPLY_TO relationships per user
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-013
+  question: 'Show the lifecycle of top 5 hashtags: for each, display week-by-week tweet volume over the dataset period.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet, temporal bucketing by week, count per bucket
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-014
+  question: 'Find users who are amplifiers: their tweets have high retweet rates but they themselves don''t retweet much.
+    Show top 20.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet count inbound RETWEETED, User ← POSTED ← Tweet with outgoing RETWEETED ratio
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-015
+  question: 'For tweets with multiple hashtags, analyze engagement: which hashtag combinations drive the most retweets?'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Tweet with 2+ HAS_TAG, group by hashtag set, count RETWEETED per set
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-016
+  question: 'Show ''mention bridges'': users who are mentioned by very different user groups (e.g., tech users and political
+    users). Identify top 10.'
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: User with many incoming MENTIONS, analyze source users by their own mention patterns for clustering
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-017
+  question: Which users have both mentioned others in their tweets AND been mentioned by others, but have never followed anyone?
+    Show up to 20 such users with their screen names.
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Users active in mention network but with 0 outgoing FOLLOWS edges; scope via MENTIONS/POSTS traversal
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-005
+  question: 'Identify retweet cascades: show tweets with 50+ retweets, and for each, list the ''depth'' of the retweet tree
+    (how many hops from original to furthest retweet).'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Tweet ← RETWEETED at multiple hops, measure maximum hop depth per original tweet
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-006
+  question: 'Analyze user influence trajectories: for users who posted over 6+ months, show how their follower count correlates
+    with their retweet volume over time.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: User with POSTED tweets across time buckets, correlate followers_count evolution with RETWEETED counts
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-007
+  question: 'Find troll amplification networks: identify chains where a troll account posts a retweet, that gets retweeted
+    by a non-troll, which reaches high-follower users.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Troll → POSTED → Tweet ← RETWEETED ← Tweet ← POSTED ← high-follower User, trace amplification chain
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-008
+  question: 'Measure hashtag influence: for each top 20 hashtag, calculate the average follower count of users posting with
+    it, and correlate with average retweet count of those tweets.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet ← POSTED ← User, aggregate followers_count and RETWEETED counts per hashtag
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-009
+  question: 'Identify resilient tweets: tweets that received retweets from users of very different follower counts (high variance
+    in retweet-poster follower distribution).'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Tweet ← RETWEETED ← User, calculate followers_count variance for retweet posters per tweet
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-010
+  question: 'Show multi-platform posting patterns: users whose tweets are posted via 4+ different client apps, with a timeline
+    of app adoption.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet → POSTED_VIA → Source, collect and rank by source diversity, show timeline
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-011
+  question: 'Analyze hashtag sentiment trajectories: for political hashtags, show which ones grow vs decline over the dataset
+    period, and which users drive the shift.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet temporal bucketing, identify users who switch between hashtag clusters
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-012
+  question: 'Find coordinated inauthentic behavior: groups of accounts that mention the same users in short time windows with
+    high frequency, suggesting coordination.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Temporal clustering of MENTIONS, identify user groups with synchronized mention patterns
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-013
+  question: 'Measure tweet virality prediction: for tweets from the first 24 hours, use early retweet rate and mention rate
+    to predict final virality rank.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Temporal windowing RETWEETED/MENTIONS, regression analysis on early vs final metrics
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-014
+  question: 'Show information gatekeepers in retweet networks: users whose retweets are themselves frequently retweeted, acting
+    as amplification nodes.'
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: User ← POSTED ← retweet-Tweet ← RETWEETED, rank by retweet-of-retweet frequency
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-006
+  question: 'Calculate graph centrality metrics for mention network: find top 15 users by betweenness centrality (users connecting
+    disparate mention clusters).'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Build mention graph from MENTIONS, compute betweenness centrality for all nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-007
+  question: 'Find the shortest retweet distance between any two authors: for authors with 1k-100k followers, what is the average
+    shortest path of retweets connecting them?'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Author ← POSTED ← Tweet ← RETWEETED chain ← POSTED ← Author, compute shortest paths
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-008
+  question: 'Detect echo chambers: identify clusters in the mention network where internal mention density is 5x+ higher than
+    external mentions.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Community detection on MENTIONS graph, calculate modularity and internal/external edge ratios
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-009
+  question: 'Analyze information diffusion speed: for top 10 viral hashtags, measure how fast they reach different user tiers
+    (10k, 100k, 1M followers) through retweets.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Hashtag ← HAS_TAG ← Tweet ← RETWEETED chain with follower-count bucketing per hop
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-010
+  question: 'Calculate troll influence amplification: for each troll, measure how many steps to reach a 100k+ follower user
+    through retweet chains.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Troll → POSTED → Tweet ← RETWEETED chain ← POSTED ← User with follower threshold, count hops
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-011
+  question: 'Predict tweet virality: build a model using early signals (first 100 retweets within 1 hour, mention count, author
+    follower count) to predict final virality rank.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Temporal windowing of RETWEETED/MENTIONS, multi-variable regression vs final retweet count
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-012
+  question: 'Identify semantic hashtag clusters: group hashtags that frequently co-occur into themes, then detect theme transitions
+    in the network over time.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Co-occurrence aggregation → clustering → temporal tracking of cluster memberships
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-013
+  question: 'Analyze cross-platform messaging: identify accounts that use different client apps in coordinated patterns (e.g.,
+    alternating tweet-retweet-tweet sequences on different apps).'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: User → POSTED → Tweet → POSTED_VIA, temporal sequencing analysis with platform constraints
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-014
+  question: 'Detect anomalous user accounts: identify accounts with unusual combinations of low follower count + high retweet
+    volume + many mentions from high-follower users, suggesting inauthenticity.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: 'Multi-metric profiling: followers_count, RETWEETED in/out, MENTIONS in/out, statistical anomaly detection'
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-021
+  question: How many tweets were posted from the most popular Twitter client app?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Find Source with most USING relationships, count those tweets
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-basic-022
+  question: What is the average number of favorites (likes) that tweets in the dataset have received?
+  database: twitter
+  domain: twitter
+  difficulty: basic
+  tags: []
+  is_write_query: false
+  notes: Calculate avg(t.favorites) across all Tweet nodes
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 1000000
+  max_runtime_ms: 15000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-022
+  question: Show the top 20 tweets by number of distinct hashtags used in each tweet. Include the tweet author's screen name,
+    a snippet of the tweet text, and the hashtag count.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Tests aggregation across relationships, group by source entity, sorting and limiting results
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-intermediate-023
+  question: Which users have posted tweets using more than one Twitter client app? Show their screen name and the count of
+    distinct apps they have used.
+  database: twitter
+  domain: twitter
+  difficulty: intermediate
+  tags: []
+  is_write_query: false
+  notes: Tests distinct counting across relationship paths for each user
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 50000
+  max_runtime_ms: 10000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-018
+  question: For users who have both posted tweets and been mentioned in other tweets, calculate the percentage of their own
+    tweets that were subsequently retweeted. Show the top 20 users by this retweet adoption rate.
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: 'Tests multi-path ratio calculation: retweet count on their tweets divided by total tweets posted'
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-advanced-019
+  question: Find tweets that were retweeted only by users with fewer than 1,000 followers. Show the original tweet author's
+    screen name, a text snippet of the tweet, and the count of such low-follower retweets.
+  database: twitter
+  domain: twitter
+  difficulty: advanced
+  tags: []
+  is_write_query: false
+  notes: Tests filtering relationships based on endpoint node properties and aggregating matches
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 200000
+  max_runtime_ms: 20000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-015
+  question: Show users whose tweets were retweeted at least 3 times in a chain (an original tweet retweeted multiple times,
+    those retweets also being retweeted). For each user, count how many of their original tweets started such chains.
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Tests bounded depth traversal (3-hop retweet paths) and counting cascades per originator
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-complex-016
+  question: For users who have been mentioned in tweets posted from multiple different client apps, calculate their 'cross-platform
+    mention score' as the number of distinct apps from which tweets mentioned them. Show the top 20 users by this score.
+  database: twitter
+  domain: twitter
+  difficulty: complex
+  tags: []
+  is_write_query: false
+  notes: Tests distinct counting across multi-relationship paths and detecting mentions across different sources
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 500000
+  max_runtime_ms: 30000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-015
+  question: 'Identify tweets with high viral potential: posted from a mobile client app, use 2 or more hashtags, mention 3
+    or more users, AND have been retweeted by accounts whose combined follower count exceeds 1 million. Show the count of
+    such tweets and their authors'' screen names.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Tests multiple independent AND conditions across several relationship types and properties, with sum aggregation
+    on endpoint properties
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
+- id: twitter-expert-016
+  question: 'Identify key connectors in the mention network: users who mention many other users but are themselves rarely
+    mentioned, yet whose tweets are frequently retweeted. For each user, score them as (distinct users they mention minus
+    distinct users who mention them) multiplied by their total retweet count. Show the top 10 connectors.'
+  database: twitter
+  domain: twitter
+  difficulty: expert
+  tags: []
+  is_write_query: false
+  notes: Tests complex derived metrics combining counts from opposing path directions (outgoing vs incoming mentions) multiplied
+    by a third metric (retweet volume)
+  status: needs_review
+  skip_if_empty: true
+  min_results: 0
+  max_db_hits: 2000000
+  max_runtime_ms: 60000
+  max_allocated_memory_bytes: 52428800
