@@ -31,14 +31,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Path setup
@@ -538,12 +542,170 @@ RULES:
 - Do NOT use GQL-only clauses: LET, FINISH, FILTER, NEXT, INSERT.
 - Use toFloatOrNull(), toIntegerOrNull() for type-unsafe conversions.
 
+SUBQUERIES — prefer these Cypher 25 forms:
+- Existence check: WHERE EXISTS { (n)-[:R]->(m) WHERE m.prop = x }  (not pattern predicates)
+- Counting degree: COUNT { (n)-[:R]->(:Label) }  (not MATCH + count(x) which triggers deprecated NodeCountFromCountStore)
+- Collecting: COLLECT { MATCH (n)-[:R]->(m) RETURN m.name ORDER BY m.name LIMIT 10 }  (LIMIT inside COLLECT {} minimizes data retrieved)
+- COUNT {} and EXISTS {} accept a bare pattern or full MATCH...RETURN statement.
+- COLLECT {} requires a full MATCH...RETURN statement — bare pattern is a syntax error.
+
+PARALLEL RUNTIME — if the schema notes recommend runtime=parallel for global analytics
+on a large database, use: CYPHER 25 runtime=parallel  as the first line for aggregate
+queries that scan a large fraction of nodes (e.g. avg/count over all nodes of a label).
+
 Return ONLY a JSON object:
 {
   "cypher": "CYPHER 25\\nMATCH ...",
   "is_write_query": false
 }
 """
+
+
+BATCH_SYSTEM_PROMPT = """For each question listed, write exactly one JSON line to the output file.
+Format: {"id": "<id>", "cypher": "CYPHER 25\\n<query>", "is_write_query": <bool>}
+Write each line as soon as it is ready. Do not output anything else."""
+
+
+def _resolve_test_plugin_dir(skill: str) -> Optional[Path]:
+    """
+    Locate the test-plugin directory that wraps the local dev skill via symlink.
+
+    The test-plugin structure mirrors a real plugin: skills/<skill-name> -> skill dir.
+    This allows --plugin-dir to load the skill properly including WebFetch for L2/L3.
+    """
+    candidates = [
+        Path(__file__).parent.parent / "test-plugin",
+        Path(__file__).parent.parent.parent / "skill-generation-validation-tools" / "test-plugin",
+    ]
+    for p in candidates:
+        skill_link = p / "skills" / skill
+        if (p / "package.json").exists() and (skill_link.exists() or skill_link.is_symlink()):
+            return p
+    return None
+
+
+def _generate_batch_cypher(
+    questions: list[dict[str, Any]],
+    schema_text: str,
+    domain: str,
+    db_config: dict[str, Any],
+    plugin_dir: Optional[Path],
+    *,
+    model_id: str = _DEFAULT_MODEL_ID,
+    skill: str = "neo4j-cypher-authoring-skill",
+    timeout_s: int = 600,
+) -> list[dict[str, Any]]:
+    """
+    Generate Cypher for all questions in a single Claude invocation (batch mode).
+
+    Builds one prompt containing the skill slash command, full schema, and all
+    question specs. Claude writes one JSONL line per question to a temp file via
+    the Write tool. After claude exits, the temp file is read back and parsed.
+
+    Returns a list of dicts with keys: id, cypher, is_write_query.
+    Missing or unparseable lines are omitted — callers should fall back to
+    _generate_cypher() for any question ID that is absent from the result.
+    """
+    plugin_name = "neo4j-skills-test-plugin"
+    skill_invocation = f"/{plugin_name}:{skill}" if plugin_dir else ""
+
+    # Create a temp file for JSONL output; claude will write to this path
+    tmp_path = tempfile.mktemp(suffix=".jsonl")
+
+    # Build the batch prompt
+    database = db_config.get("database", domain)
+    lines: list[str] = []
+    if skill_invocation:
+        lines.append(skill_invocation)
+        lines.append("")
+    lines.append("## Schema")
+    lines.append(schema_text)
+    lines.append("")
+    lines.append("## Task")
+    lines.append(
+        f"Generate a valid Cypher 25 query for each question listed below. "
+        f"For each question, write exactly one JSON line to the file at: {tmp_path}"
+    )
+    lines.append(
+        'Format per line: {"id": "<id>", "cypher": "CYPHER 25\\n<query>", "is_write_query": <bool>}'
+    )
+    lines.append(f"Database: {database}")
+    lines.append("")
+    lines.append("## Questions")
+    for i, q in enumerate(questions, 1):
+        qid = q.get("_batch_id", "")
+        difficulty = q.get("difficulty", "basic")
+        question_text = q.get("question", "")
+        lines.append(f"{i}. [{qid}] ({difficulty}) {question_text}")
+    lines.append("")
+
+    user_prompt = "\n".join(lines)
+
+    cmd = [
+        "claude", "--model", model_id,
+        "--print", "--output-format", "text",
+        "--allowedTools", "Write",
+    ]
+    if plugin_dir:
+        cmd += ["--plugin-dir", str(plugin_dir)]
+    cmd += ["--append-system-prompt", BATCH_SYSTEM_PROMPT]
+
+    n = len(questions)
+    logger.info(f"batch mode: {n} questions → 1 claude invocation")
+    print(f"[batch-cypher] {n} questions → 1 claude invocation (model={model_id})", flush=True)
+
+    try:
+        result = subprocess.run(
+            cmd,
+            input=user_prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env={**os.environ},
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip() or f"claude exited {result.returncode}"
+            print(f"[batch-cypher] ERROR: claude returned non-zero: {err[:200]}", file=sys.stderr, flush=True)
+            return []
+    except subprocess.TimeoutExpired:
+        print(f"[batch-cypher] ERROR: timed out after {timeout_s}s", file=sys.stderr, flush=True)
+        return []
+    except FileNotFoundError:
+        print("[batch-cypher] ERROR: claude CLI not found", file=sys.stderr, flush=True)
+        return []
+    except Exception as exc:
+        print(f"[batch-cypher] ERROR: {exc}", file=sys.stderr, flush=True)
+        return []
+
+    # Read back the JSONL file
+    results: list[dict[str, Any]] = []
+    try:
+        with open(tmp_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict) and obj.get("id") and obj.get("cypher"):
+                        results.append(obj)
+                except json.JSONDecodeError:
+                    print(f"[batch-cypher] WARNING: skipping unparseable JSONL line: {line[:100]}", file=sys.stderr)
+    except FileNotFoundError:
+        print(f"[batch-cypher] WARNING: JSONL output file not found: {tmp_path}", file=sys.stderr, flush=True)
+        return []
+    except Exception as exc:
+        print(f"[batch-cypher] ERROR reading JSONL: {exc}", file=sys.stderr, flush=True)
+        return []
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    print(f"[batch-cypher] parsed {len(results)}/{n} lines from JSONL", flush=True)
+    return results
 
 
 def _generate_cypher(
@@ -557,47 +719,65 @@ def _generate_cypher(
     timeout_s: int = 120,
 ) -> tuple[Optional[str], bool, Optional[str]]:
     """
-    Generate Cypher for a question using Claude (with skill loaded).
+    Generate Cypher using Claude with the skill loaded via --plugin-dir (local dev).
+
+    Uses skill-generation-validation-tools/test-plugin which symlinks the local skill
+    directory, allowing --plugin-dir to load it with full WebFetch access for L2/L3
+    reference files. _CYPHER_SYSTEM rules are appended to reinforce JSON output format.
 
     Returns (cypher_string_or_None, is_write_query, error_or_None).
     """
-    prompt = (
+    plugin_dir = _resolve_test_plugin_dir(skill)
+    plugin_name = "neo4j-skills-test-plugin"
+
+    if plugin_dir:
+        skill_invocation = f"/{plugin_name}:{skill}"
+    else:
+        print(
+            f"[WARN] test-plugin not found for '{skill}' — generating without skill context. "
+            "Run: mkdir -p skill-generation-validation-tools/test-plugin/skills && "
+            f"ln -s ../../../../{skill} skill-generation-validation-tools/test-plugin/skills/{skill}",
+            file=sys.stderr,
+            flush=True,
+        )
+        skill_invocation = ""
+
+    user_prompt = (
+        f"{skill_invocation}\n\n" if skill_invocation else ""
+    ) + (
         f"{schema_text}\n\n"
         f"Database: {database}\n"
         f"Difficulty: {difficulty}\n\n"
         f"Question: {question}\n\n"
         "Return a JSON object with 'cypher' and 'is_write_query' fields."
     )
-    full_prompt = _CYPHER_SYSTEM + "\n\n---\n\n" + prompt
 
-    # Try with skill first, fall back to plain claude
-    for use_skill in [True, False]:
-        cmd = ["claude", "--model", model_id, "--print", "--output-format", "text"]
-        if use_skill:
-            cmd.extend(["--skill", skill])
+    cmd = [
+        "claude", "--model", model_id, "--print", "--output-format", "text",
+        "--append-system-prompt", _CYPHER_SYSTEM,
+    ]
+    if plugin_dir:
+        cmd += ["--plugin-dir", str(plugin_dir)]
 
-        try:
-            result = subprocess.run(
-                cmd,
-                input=full_prompt,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-                env={**os.environ},
-            )
-            if result.returncode != 0:
-                if use_skill:
-                    # Skill may not be available; try without
-                    continue
-                err = result.stderr.strip() or f"claude exited {result.returncode}"
-                return None, False, err
-            response = result.stdout
-        except subprocess.TimeoutExpired:
-            return None, False, f"Claude invocation timed out after {timeout_s}s"
-        except FileNotFoundError:
-            return None, False, "claude CLI not found"
-        except Exception as exc:
-            return None, False, str(exc)
+    try:
+        result = subprocess.run(
+            cmd,
+            input=user_prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env={**os.environ},
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip() or f"claude exited {result.returncode}"
+            return None, False, err
+        response = result.stdout
+    except subprocess.TimeoutExpired:
+        return None, False, f"Claude invocation timed out after {timeout_s}s"
+    except FileNotFoundError:
+        return None, False, "claude CLI not found"
+    except Exception as exc:
+        return None, False, str(exc)
 
         # Parse response
         stripped = response.strip()
@@ -621,7 +801,7 @@ def _generate_cypher(
             if m:
                 return m.group(1).strip(), False, None
 
-    return None, False, "Failed to generate Cypher"
+    return None, False, "Failed to parse Cypher from response"
 
 
 # ---------------------------------------------------------------------------
@@ -629,15 +809,73 @@ def _generate_cypher(
 # ---------------------------------------------------------------------------
 
 # Difficulty-based performance defaults for Gate 4 thresholds.
-# Used when PROFILE metrics are unavailable (0-row, error, or write queries).
-_DIFFICULTY_DEFAULTS: dict[str, dict[str, int]] = {
-    "basic":        {"max_db_hits": 10_000,    "max_runtime_ms": 5_000},
-    "intermediate": {"max_db_hits": 50_000,    "max_runtime_ms": 10_000},
-    "advanced":     {"max_db_hits": 200_000,   "max_runtime_ms": 20_000},
-    "complex":      {"max_db_hits": 500_000,   "max_runtime_ms": 30_000},
-    "expert":       {"max_db_hits": 2_000_000, "max_runtime_ms": 60_000},
+# Base values suit small graphs (Northwind, recommendations — ~10K total nodes+rels).
+# Call compute_difficulty_defaults(node_count, rel_count) to get graph-scaled values.
+_BASE_DIFFICULTY_DEFAULTS: dict[str, dict[str, int]] = {
+    "basic":        {"max_db_hits": 10_000,     "max_runtime_ms": 5_000},
+    "intermediate": {"max_db_hits": 50_000,     "max_runtime_ms": 10_000},
+    "advanced":     {"max_db_hits": 200_000,    "max_runtime_ms": 20_000},
+    "complex":      {"max_db_hits": 500_000,    "max_runtime_ms": 30_000},
+    "expert":       {"max_db_hits": 2_000_000,  "max_runtime_ms": 60_000},
 }
-_DEFAULT_MAX_MEMORY_BYTES = 50 * 1024 * 1024  # 50 MB for all tiers
+
+# Max fraction of (nodeCount + relCount) that each difficulty tier may touch.
+_GRAPH_FRACTION: dict[str, float] = {
+    "basic":        0.5,
+    "intermediate": 1.0,
+    "advanced":     2.0,
+    "complex":      5.0,
+    "expert":       10.0,
+}
+
+# Hard caps — no tier should exceed these regardless of graph size.
+# Large graphs like stackoverflow (~100M nodes+rels) produce 260M+ db-hits for
+# reasonable queries that complete in <10s; 500M is the right cap for such graphs.
+_DB_HITS_CAP: dict[str, int] = {
+    "basic":        500_000_000,
+    "intermediate": 500_000_000,
+    "advanced":     500_000_000,
+    "complex":      1_000_000_000,
+    "expert":       2_000_000_000,
+}
+
+_DEFAULT_MAX_MEMORY_BYTES = 1 * 1024 * 1024 * 1024  # 1 GB for all tiers
+
+
+def compute_difficulty_defaults(node_count: int, rel_count: int) -> dict[str, dict[str, int]]:
+    """
+    Return Gate 4 db_hits and runtime thresholds scaled to the graph size.
+
+    Small graphs (Northwind, recommendations) get the base values.
+    Large graphs (stackoverflow, patientjourney) scale proportionally up to the caps.
+    """
+    graph_size = node_count + rel_count
+    result: dict[str, dict[str, int]] = {}
+    for diff, base in _BASE_DIFFICULTY_DEFAULTS.items():
+        scaled_hits = int(graph_size * _GRAPH_FRACTION[diff])
+        max_db_hits = min(_DB_HITS_CAP[diff], max(base["max_db_hits"], scaled_hits))
+        # Runtime scales with graph size but capped at 10x the base
+        rt_scale = min(10.0, max(1.0, graph_size / 10_000))
+        max_runtime_ms = int(base["max_runtime_ms"] * rt_scale)
+        result[diff] = {"max_db_hits": max_db_hits, "max_runtime_ms": max_runtime_ms}
+    return result
+
+
+def _query_graph_size(driver: Any, database: str) -> tuple[int, int]:
+    """
+    Return (node_count, rel_count) for the database using count-store queries (O(1)).
+    Falls back to (0, 0) on any error so callers use base defaults.
+    """
+    try:
+        n_rec, _, _ = driver.execute_query(
+            "MATCH (n) RETURN count(n) AS c", database_=database
+        )
+        r_rec, _, _ = driver.execute_query(
+            "MATCH ()-[r]->() RETURN count(r) AS c", database_=database
+        )
+        return int(n_rec[0]["c"]), int(r_rec[0]["c"])
+    except Exception:
+        return 0, 0
 
 
 def _execute_query(
@@ -735,6 +973,7 @@ def _build_case(
     *,
     needs_review: bool = False,
     validation_failure: Optional[str] = None,
+    difficulty_defaults: Optional[dict[str, dict[str, int]]] = None,
 ) -> dict[str, Any]:
     """Build a case dict for appending to domain YAML."""
     case: dict[str, Any] = {
@@ -773,7 +1012,8 @@ def _build_case(
     # ---- Gate 4 performance thresholds ----
     # Prefer observed metrics (multiplied by tolerance factor) when available;
     # fall back to difficulty-based conservative defaults.
-    defaults = _DIFFICULTY_DEFAULTS.get(difficulty, _DIFFICULTY_DEFAULTS["expert"])
+    _defs = difficulty_defaults if difficulty_defaults is not None else _BASE_DIFFICULTY_DEFAULTS
+    defaults = _defs.get(difficulty, _defs["expert"])
 
     observed_db_hits = execution.get("db_hits")
     if observed_db_hits is not None and observed_db_hits > 0:
@@ -852,6 +1092,7 @@ def run(
 
     # Connect to Neo4j (skip when --no-cypher)
     driver = None
+    _difficulty_defaults: dict[str, dict[str, int]] = _BASE_DIFFICULTY_DEFAULTS.copy()
     if not no_cypher:
         driver = _get_driver(uri, username, password)
         try:
@@ -859,6 +1100,18 @@ def run(
         except Exception as exc:
             print(f"ERROR: Cannot connect to Neo4j at {uri}: {exc}", file=sys.stderr)
             sys.exit(1)
+        node_count, rel_count = _query_graph_size(driver, database)
+        if node_count + rel_count > 0:
+            _difficulty_defaults = compute_difficulty_defaults(node_count, rel_count)
+            print(
+                f"[graph-size] {node_count:,} nodes + {rel_count:,} rels → "
+                f"db_hits caps: "
+                + ", ".join(
+                    f"{d}={_difficulty_defaults[d]['max_db_hits']:,}"
+                    for d in ("basic", "intermediate", "advanced", "complex", "expert")
+                ),
+                flush=True,
+            )
 
     # Import question validator
     try:
@@ -900,6 +1153,30 @@ def run(
     # --- Step 2: Validate, rewrite, generate Cypher, execute ---
     stats = {"total": len(questions), "auto_rewritten": 0, "flagged_needs_review": 0}
     new_cases: list[dict[str, Any]] = []
+
+    # --- Step 2a: Assign batch IDs and pre-generate Cypher in bulk (unless --no-cypher) ---
+    # Each question gets a temporary _batch_id so we can match JSONL results back to it.
+    plugin_dir = _resolve_test_plugin_dir(skill)
+    batch_cypher_by_id: dict[str, dict[str, Any]] = {}
+    if not no_cypher:
+        for i, qdict in enumerate(questions):
+            difficulty_tmp = str(qdict.get("difficulty", difficulties[i % len(difficulties)])).strip()
+            if difficulty_tmp not in _VALID_DIFFICULTIES:
+                difficulty_tmp = difficulties[i % len(difficulties)]
+            batch_id = f"{domain}-{difficulty_tmp}-batch{i+1:03d}"
+            qdict["_batch_id"] = batch_id
+
+        batch_results = _generate_batch_cypher(
+            questions=questions,
+            schema_text=schema_text,
+            domain=domain,
+            db_config=db_block,
+            plugin_dir=plugin_dir,
+            model_id=model_id,
+            skill=skill,
+        )
+        for item in batch_results:
+            batch_cypher_by_id[item["id"]] = item
 
     for i, qdict in enumerate(questions):
         question = str(qdict.get("question", "")).strip()
@@ -952,19 +1229,34 @@ def run(
             if verbose:
                 print(f"  [{i+1}/{len(questions)}] {difficulty}: {question[:70]}")
             else:
-                print(f"  [{i+1}/{len(questions)}] Generating Cypher for: {question[:60]}...", flush=True)
+                print(f"  [{i+1}/{len(questions)}] Validating Cypher for: {question[:60]}...", flush=True)
 
-            cypher, is_write, cypher_err = _generate_cypher(
-                question=question,
-                schema_text=schema_text,
-                database=database,
-                difficulty=difficulty,
-                model_id=model_id,
-                skill=skill,
-            )
+            # Try to use batch result first; fall back to per-question generation
+            batch_id = qdict.get("_batch_id", "")
+            batch_item = batch_cypher_by_id.get(batch_id)
+            if batch_item:
+                cypher = batch_item.get("cypher", "").strip() or None
+                is_write = bool(batch_item.get("is_write_query", False))
+                cypher_err: Optional[str] = None
+                if cypher:
+                    print(f"    [batch] got Cypher from batch result", flush=True)
+                else:
+                    print(f"    [batch] empty cypher in batch result — falling back to per-question", flush=True)
+                    batch_item = None
 
-            if cypher_err:
-                print(f"    WARNING: Cypher generation failed: {cypher_err}", file=sys.stderr)
+            if not batch_item:
+                # Fallback: individual _generate_cypher() call
+                print(f"    [fallback] calling _generate_cypher() for: {question[:60]}...", flush=True)
+                cypher, is_write, cypher_err = _generate_cypher(
+                    question=question,
+                    schema_text=schema_text,
+                    database=database,
+                    difficulty=difficulty,
+                    model_id=model_id,
+                    skill=skill,
+                )
+                if cypher_err:
+                    print(f"    WARNING: Cypher generation failed: {cypher_err}", file=sys.stderr)
 
             # Execute against DB to capture baseline
             if cypher:
@@ -995,6 +1287,7 @@ def run(
             execution=execution,
             needs_review=needs_review,
             validation_failure=validation_failure,
+            difficulty_defaults=_difficulty_defaults,
         )
         new_cases.append(case)
 

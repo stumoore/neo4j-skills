@@ -2370,7 +2370,8 @@ tasks:
       - Fallback to per-question mode if batch JSONL file is empty or missing
       - All generated queries start with CYPHER 25
 
-    status: pending
+    status: completed
+    completed_at: "2026-04-03T00:00:00Z"
     dependencies:
       - task-078
     priority: medium

@@ -2556,3 +2556,41 @@ Key Decisions:
 - SEARCH clause correct syntax: SEARCH var IN (VECTOR INDEX name FOR $vec LIMIT N) SCORE AS score
 
 Next Task: task-088 (batch JSONL generation in generate_questions.py)
+
+================================================================================
+TASK-088: Refactor generate_questions.py to batch JSONL generation
+Date: 2026-04-03T00:00:00Z
+================================================================================
+
+Summary:
+Refactored generate_questions.py to use a single Claude invocation per domain
+for Cypher generation (batch mode) instead of one invocation per question.
+
+Changes:
+- Added `logging` and `tempfile` imports + module-level logger
+- Added `BATCH_SYSTEM_PROMPT` constant defining JSONL output format rules
+- Added `_generate_batch_cypher(questions, schema_text, domain, db_config, plugin_dir, ...)`:
+  - Creates a temp JSONL file path via tempfile.mktemp()
+  - Builds a single prompt: skill slash command + schema + numbered question list
+  - Calls claude once with --allowedTools Write + --append-system-prompt
+  - Reads back JSONL file, parses each line, skips blank/invalid lines
+  - Cleans up temp file in finally block
+  - Returns list of {id, cypher, is_write_query} dicts
+- Modified run() → Step 2a block:
+  - Assigns _batch_id to each question before batch call
+  - Calls _generate_batch_cypher() once for all questions
+  - Stores results in batch_cypher_by_id dict keyed by batch ID
+- Modified per-question loop:
+  - Checks batch_cypher_by_id first for each question's _batch_id
+  - Falls back to _generate_cypher() if batch result missing or empty cypher
+  - Logs [batch] vs [fallback] for each question
+
+Key Design Decisions:
+- Batch IDs use "{domain}-{difficulty}-batch{NNN}" format (separate from final case IDs)
+- Final case IDs are still computed by _next_case_id() after question validation
+- _generate_cypher() is kept fully unchanged as the fallback path
+- Empty batch output (e.g. if claude fails) gracefully falls back to per-question mode
+
+Files Changed:
+- skill-generation-validation-tools/scripts/generate_questions.py
+
