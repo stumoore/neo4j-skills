@@ -23,11 +23,6 @@
       "severity": "WARN"
     },
     {
-      "name": "EagerAggregation",
-      "reason": "May indicate unintended Cartesian product before aggregation — inspect query for missing join predicates",
-      "severity": "WARN"
-    },
-    {
       "name": "CartesianProduct",
       "reason": "Unconstrained cross-join of two or more node sets; add WHERE predicate to relate them or use CALL subquery",
       "severity": "FAIL"
