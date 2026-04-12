@@ -133,9 +133,8 @@ class TestCase:
     # Schema/data facts → move to dataset: notes: section.
     # Syntax rules → move to SKILL.md.
     notes: Optional[str] = None
-    # If set, bypass Claude generation and use this pre-validated Cypher directly.
-    # Use for cases where the generated query reliably fails (APOC forbidden, timeout,
-    # DateTime arithmetic, etc.) and a known-good rewrite exists.
+    # Reference answer for comparison only — does NOT bypass Claude generation.
+    # If the skill cannot generate a valid query, the case should FAIL, not use this.
     cypher_override: Optional[str] = None
     # Source file (set by loader)
     source_file: str = ""
@@ -1166,18 +1165,13 @@ def run_case(
             skip_reason="write query on read-only database",
         )
 
-    # Step 1a: if a cypher_override is set, skip generation entirely
-    if tc.cypher_override:
-        generated_cypher = tc.cypher_override.strip()
-        generation_ms = 0
-    else:
-        # Step 1: invoke Claude Code headless
-        prompt = _build_claude_prompt(tc, schema_text=schema_text, value_hints=value_hints)
-        response_text, invoke_error, generation_ms = invoke_claude(
-            prompt, skill_name, timeout_s=claude_timeout_s, model_id=model_id
-        )
+    # Step 1: invoke Claude Code headless (always — cypher_override does not bypass generation)
+    prompt = _build_claude_prompt(tc, schema_text=schema_text, value_hints=value_hints)
+    response_text, invoke_error, generation_ms = invoke_claude(
+        prompt, skill_name, timeout_s=claude_timeout_s, model_id=model_id
+    )
 
-    if not tc.cypher_override and invoke_error:
+    if invoke_error:
         error = f"Claude invocation failed: {invoke_error}"
         invocation_verdict = SKIPPED if tc.skip_if_empty else FAIL
         invocation_skip_reason = f"skip_if_empty: {invoke_error[:120]}" if tc.skip_if_empty else None
@@ -1199,27 +1193,26 @@ def run_case(
             execution_ms=0,
         )
 
-    if not tc.cypher_override:
-        # Step 2: extract Cypher from response
-        generated_cypher = extract_cypher(response_text) or ""
-        if not generated_cypher:
-            error = "No ```cypher block found in model response"
-            return TestCaseResult(
-                case_id=tc.id,
-                question=tc.question,
-                difficulty=tc.difficulty,
-                tags=tc.tags,
-                verdict=FAIL,
-                failed_gate=None,
-                warned_gate=None,
-                generated_cypher="",
-                metrics={},
-                gate_details=[],
-                error=error,
-                duration_s=round(time.monotonic() - t0, 3),
-                generation_ms=generation_ms,
-                execution_ms=0,
-            )
+    # Step 2: extract Cypher from response
+    generated_cypher = extract_cypher(response_text) or ""
+    if not generated_cypher:
+        error = "No ```cypher block found in model response"
+        return TestCaseResult(
+            case_id=tc.id,
+            question=tc.question,
+            difficulty=tc.difficulty,
+            tags=tc.tags,
+            verdict=FAIL,
+            failed_gate=None,
+            warned_gate=None,
+            generated_cypher="",
+            metrics={},
+            gate_details=[],
+            error=error,
+            duration_s=round(time.monotonic() - t0, 3),
+            generation_ms=generation_ms,
+            execution_ms=0,
+        )
 
     # Step 3: validate through all four gates
     if driver is None:
