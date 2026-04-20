@@ -41,6 +41,15 @@ Assists with upgrading Cypher queries to newer Neo4j versions.
 - Migrating databases from Neo4j 4.x or 5.x to 2025.x or 2026.x
 - Updating Cypher queries to a newer major Neo4j version
 
+### neo4j-cypher-25-skill
+
+Covers the split between Cypher 5 and Cypher 25 introduced in Neo4j 2025.06: version selector, breaking changes, and new features.
+
+**Use this skill when:**
+- Writing queries against Neo4j 2025.06+ and choosing a Cypher version
+- Migrating queries from Cypher 5 to Cypher 25
+- Diagnosing a query that fails after the default language changed
+
 ## Installation
 
 ### Using npx skills (Recommended)
@@ -70,6 +79,7 @@ git clone https://github.com/neo4j-contrib/neo4j-skills.git
 ln -s $(pwd)/neo4j-skills/neo4j-cypher-skill ~/.claude/skills/
 ln -s $(pwd)/neo4j-skills/neo4j-migration-skill ~/.claude/skills/
 ln -s $(pwd)/neo4j-skills/neo4j-cli-tools-skill ~/.claude/skills/
+ln -s $(pwd)/neo4j-skills/neo4j-cypher-25-skill ~/.claude/skills/
 ```
 
 #### For other agents:
