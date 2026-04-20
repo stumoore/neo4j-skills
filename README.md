@@ -41,6 +41,16 @@ Assists with upgrading Cypher queries to newer Neo4j versions.
 - Migrating databases from Neo4j 4.x or 5.x to 2025.x or 2026.x
 - Updating Cypher queries to a newer major Neo4j version
 
+### neo4j-text2cypher-skill
+
+Guidance for LLM-driven Cypher generation: schema-first prompting, the silent-wrong-answer gotchas that text2cypher routinely hits (list equality, string/datetime comparison, directionality, NULL-in-negation, etc.), and picking between Cypher 5 and Cypher 25.
+
+**Use this skill when:**
+- Building an LLM → Cypher pipeline (RAG over a graph, agentic querying, fine-tuning)
+- Reviewing LLM-generated Cypher before it runs
+- Debugging a query that runs but returns the wrong rows
+- Choosing a Cypher version for generated queries
+
 ## Installation
 
 ### Using npx skills (Recommended)
@@ -70,6 +80,7 @@ git clone https://github.com/neo4j-contrib/neo4j-skills.git
 ln -s $(pwd)/neo4j-skills/neo4j-cypher-skill ~/.claude/skills/
 ln -s $(pwd)/neo4j-skills/neo4j-migration-skill ~/.claude/skills/
 ln -s $(pwd)/neo4j-skills/neo4j-cli-tools-skill ~/.claude/skills/
+ln -s $(pwd)/neo4j-skills/neo4j-text2cypher-skill ~/.claude/skills/
 ```
 
 #### For other agents:
