@@ -11,17 +11,17 @@ These three replace the most common contortions in generated Cypher.
 Old way (works, but the generator often gets the scope wrong):
 
 ```cypher
-MATCH (p:Person)
-WHERE size([(p)-[:HAS_CEO]-(:Organization) | 1]) > 0
-RETURN p
+MATCH (u:User)
+WHERE size([(u)-[:AUTHORED]->(:Post) | 1]) > 0
+RETURN u
 ```
 
 Modern:
 
 ```cypher
-MATCH (p:Person)
-WHERE EXISTS { (p)<-[:HAS_CEO]-(:Organization) }
-RETURN p
+MATCH (u:User)
+WHERE EXISTS { (u)-[:AUTHORED]->(:Post) }
+RETURN u
 ```
 
 - Outer variables are automatically in scope — no `WITH` plumbing.
@@ -33,30 +33,30 @@ RETURN p
 Old way:
 
 ```cypher
-MATCH (p:Person)
-OPTIONAL MATCH (p)-[:INVENTED]->(pat:Patent)
-WITH p, count(pat) AS n
+MATCH (u:User)
+OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
+WITH u, count(p) AS n
 WHERE n > 5
-RETURN p
+RETURN u
 ```
 
 Modern:
 
 ```cypher
-MATCH (p:Person)
-WHERE COUNT { (p)-[:INVENTED]->(:Patent) } > 5
-RETURN p
+MATCH (u:User)
+WHERE COUNT { (u)-[:AUTHORED]->(:Post) } > 5
+RETURN u
 ```
 
-The old form also introduces a row-per-person through the `OPTIONAL MATCH`, so memory grows with the people count. `COUNT { }` scopes to the row.
+The old form introduces a row-per-user through the `OPTIONAL MATCH`, so memory grows with the population. `COUNT { }` scopes to the row.
 
 ### `COLLECT { }` — for "list of related things" in `RETURN`
 
 ```cypher
-MATCH (o:Organization {name:'Apple Inc.'})
-RETURN o.name AS company,
-       COLLECT { MATCH (o)-[:HAS_CEO]->(p) RETURN p.name } AS ceos,
-       COLLECT { MATCH (o)-[:HAS_BOARD_MEMBER]->(p) RETURN p.name } AS board
+MATCH (m:Movie {title:$title})
+RETURN m.title,
+       COLLECT { MATCH (m)<-[:DIRECTED]-(p:Person)  RETURN p.name } AS directors,
+       COLLECT { MATCH (m)<-[:ACTED_IN]-(p:Person)  RETURN p.name } AS cast
 ```
 
 - Each subquery is scoped to the outer row, so you don't get the Cartesian blow-up you'd see from two `OPTIONAL MATCH` + `collect()`.
@@ -68,15 +68,15 @@ RETURN o.name AS company,
 For multi-step logic with variable piping, a `CALL { }` subquery is cleaner than a long `WITH` pipeline:
 
 ```cypher
-MATCH (o:Organization)
-CALL (o) {
-  MATCH (o)-[:HAS_CEO]->(p:Person)
-  RETURN p.name AS ceoName
+MATCH (m:Movie)
+CALL (m) {
+  MATCH (m)<-[:DIRECTED]-(d:Person)
+  RETURN d.name AS directorName
 }
-RETURN o.name, ceoName LIMIT 10
+RETURN m.title, directorName LIMIT 10
 ```
 
-Cypher 25's scoped-variable syntax `CALL (o) { … }` replaces the old `WITH o CALL { WITH o … }`. If you need batching, `CALL { … } IN TRANSACTIONS OF 10000 ROWS` lets you split one huge transaction into manageable chunks.
+Cypher 25's scoped-variable syntax `CALL (m) { … }` replaces the old `WITH m CALL { WITH m … }`. If you need batching, `CALL { … } IN TRANSACTIONS OF 10000 ROWS` lets you split one huge transaction into manageable chunks.
 
 ## Quantified path patterns (Cypher 25)
 
@@ -104,7 +104,7 @@ Always set a bound (`{1,3}`, `{0,5}`). Unbounded `(…)+` on a dense graph is a 
 Cypher 25 exposes shortest-path variants cleanly:
 
 ```cypher
-MATCH p = SHORTEST 1 (a:Organization {name:'Apple Inc.'})-[:HAS_CUSTOMER|HAS_SUPPLIER*]-(b:Organization {name:'Samsung'})
+MATCH p = SHORTEST 1 (a:Person {name:$fromName})-[:KNOWS|WORKED_WITH*]-(b:Person {name:$toName})
 RETURN p
 
 MATCH p = SHORTEST 3 GROUPS (a)-[*]-(b) RETURN p  // top 3 groups of equal-length paths
@@ -118,13 +118,13 @@ Prefer `SHORTEST k` over post-hoc `ORDER BY length(p) LIMIT k` — the planner u
 If the graph has a full-text index:
 
 ```cypher
-CALL db.index.fulltext.queryNodes('orgFullText', $q) YIELD node, score
+CALL db.index.fulltext.queryNodes('entityFulltext', $q) YIELD node, score
 WHERE score > 1.5
 RETURN node.name, score
 ORDER BY score DESC LIMIT 10
 ```
 
-`SHOW INDEXES` reveals which indexes exist. A generator should default to this for "companies called X" questions — it handles misspellings, word-order, and tokenization that `CONTAINS` / `=~` cannot.
+`SHOW INDEXES` reveals which indexes exist. A generator should default to this for "entities named X" questions — it handles misspellings, word-order, and tokenization that `CONTAINS` / `=~` cannot.
 
 ## Vector search (Cypher 25)
 

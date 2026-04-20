@@ -1,112 +1,137 @@
 ---
 name: neo4j-text2cypher-skill
-description: Use when generating Cypher from a natural-language question against a Neo4j graph (text2cypher / LLM-driven querying). Covers schema-first prompting, the silent-wrong-answer correctness patterns, performance rules for LLM-generated queries, the modern Cypher subquery/quantified-path/SHORTEST idioms a generator should prefer, and picking between Cypher 5 and Cypher 25.
+description: Use when generating Cypher from natural language via the official Neo4j MCP Cypher server (mcp-neo4j-cypher). Covers the server's three tools (get_neo4j_schema, read_neo4j_cypher, write_neo4j_cypher), the silent-wrong-answer correctness patterns, the performance rules that matter under the server's 30s timeout, and the modern Cypher idioms a generator should prefer.
 allowed-tools: WebFetch
 ---
 
-# Neo4j text2cypher skill
+# Neo4j text2cypher skill (via mcp-neo4j-cypher)
 
-Generating Cypher from a natural-language question is easy; generating Cypher that returns the **right** answer at an acceptable cost is not. Text2cypher failures fall into three buckets:
+This skill is tuned to the **official Neo4j MCP Cypher server** — [`mcp-neo4j-cypher`](https://github.com/neo4j-contrib/mcp-neo4j/tree/main/servers/mcp-neo4j-cypher), distributed on PyPI, Docker Hub, and as part of the Neo4j Labs MCP stack. It is **not** tied to any specific graph; all advice applies whatever schema the server is pointed at.
 
-1. **Correctness** — query runs, no error, wrong rows. The most dangerous class.
-2. **Performance** — query runs, returns rows, but scans the whole graph or blows the heap.
-3. **Staleness** — the LLM emits 2019-era Cypher (list comprehensions for counting, `id()`, `OPTIONAL MATCH` + `collect`) when modern Cypher has cleaner and faster equivalents.
+If the MCP server is namespaced (env `NEO4J_NAMESPACE=mydb`), every tool name is prefixed with that namespace — e.g. `mydb-read_neo4j_cypher`. The rest of this file refers to the unprefixed names.
 
-This skill covers all three, with reference material for each.
+## The three tools
+
+| Tool                    | Purpose                                   | Input                                     | Output                                                |
+|-------------------------|-------------------------------------------|-------------------------------------------|-------------------------------------------------------|
+| `get_neo4j_schema`      | Introspect labels, rel-types, properties  | optional `sample_param` (int)             | JSON — nodes with properties (type + `indexed` flag) and relationships |
+| `read_neo4j_cypher`     | Run a read-only Cypher query              | `query` (string), optional `params` (dict)| JSON array of result rows                             |
+| `write_neo4j_cypher`    | Run a write / schema / admin query        | `query` (string), optional `params` (dict)| Summary counters                                      |
+
+Server-side constraints you must plan around:
+
+- **30-second read timeout by default** (`NEO4J_READ_TIMEOUT`). Queries exceeding it are cancelled.
+- **Response token truncation** when `NEO4J_RESPONSE_TOKEN_LIMIT` is set — a large result can silently return a truncated prefix. Always `LIMIT`.
+- **Schema sampling** via `NEO4J_SCHEMA_SAMPLE_SIZE` (default 1000). Rare properties and long tails may be missed; don't treat `get_neo4j_schema` as ground truth for every property.
+- **Read-only mode** (`NEO4J_READ_ONLY=true`) disables `write_neo4j_cypher` entirely. In this mode the generator cannot create indexes or constraints — plan for the index that's already there.
+- **APOC required** for `get_neo4j_schema`. If APOC is missing, the tool errors; fall back to `CALL db.labels()`, `CALL db.relationshipTypes()`, `CALL db.schema.nodeTypeProperties()`.
+
+## The three failure classes
+
+Text2cypher failures are rarely syntax errors. They fall into three classes, all of which this skill addresses:
+
+1. **Correctness** — query runs, no error, wrong rows. The most dangerous class. See [correctness.md](references/correctness.md).
+2. **Performance** — query runs but scans the whole graph, times out at 30s, or returns a truncated result. See [performance.md](references/performance.md).
+3. **Staleness** — the LLM emits 2019-era Cypher (list comprehensions for counting, `id()`, `OPTIONAL MATCH` + `collect`) when `COUNT { }`, `elementId()`, and `COLLECT { }` are cleaner and faster. See [advanced-patterns.md](references/advanced-patterns.md).
+
+Version-specific items (Cypher 5 vs Cypher 25) live in [cypher-5-vs-25.md](references/cypher-5-vs-25.md).
 
 ## When to use
 
 Use this skill when:
-- building an LLM → Cypher pipeline (RAG over a graph, "chat with your graph", text2cypher fine-tuning data, an agent that queries Neo4j)
-- reviewing LLM-generated Cypher before it runs against production
-- debugging a query that runs but returns the wrong rows or is unexpectedly slow
-- deciding whether to target Cypher 5 or Cypher 25 in the generator
+- wiring an LLM to `mcp-neo4j-cypher` (Claude Desktop, Claude Code, another MCP client)
+- reviewing LLM-generated Cypher before `read_neo4j_cypher` / `write_neo4j_cypher` executes it
+- debugging a query that "works" but returns the wrong rows, gets truncated, or times out
+- picking the Cypher version prefix the generator should emit
 
 ## Ground rules for the generator
 
-1. **Give the LLM the schema, not the data.** `CALL apoc.meta.schema()` or the MCP schema endpoint. Inject node labels, rel types, property **types**, the **indexed** flag, **and relationship properties** — most schema extractors drop the last item, and missing rel-properties is the root cause of several correctness bugs (`IN_CITY.isCurrent`, etc.).
-2. **Read `SHOW INDEXES` and tell the LLM which properties are indexed.** The biggest single lever on performance is whether the anchor filter hits an index.
-3. **Show few-shot examples with intent + Cypher.** Three examples covering aggregation, multi-hop traversal, and a negation pattern remove the most common mistakes. Include at least one undirected relationship example and one `COUNT { }` / `EXISTS { }` example.
-4. **Parameterize, don't interpolate.** User input goes in `$params`, never f-string interpolation. Prevents injection and stabilizes the query plan cache.
-5. **Add `LIMIT` by default.** An LLM-authored 3-hop pattern without a limit on a moderately dense graph is a production incident. Even for "top N", make the generator emit `ORDER BY … LIMIT N` explicitly.
-6. **Validate with `EXPLAIN`, not `PROFILE`.** `EXPLAIN` compiles only. `PROFILE` runs the query. In an LLM review loop, `EXPLAIN` is the safe gate.
-7. **Emit the Cypher version prefix.** `CYPHER 5` or `CYPHER 25` as the first token, so the query returns the same result on any database regardless of that database's default language.
-8. **Prefer modern subquery syntax.** `COUNT { }`, `EXISTS { }`, `COLLECT { }` beat `size([… | …])`, `OPTIONAL MATCH` + `collect()`, and most `WITH` pipelines. See [advanced-patterns.md](references/advanced-patterns.md).
+1. **Always call `get_neo4j_schema` first in a new session** and inject the JSON verbatim into the LLM context. Do not summarize. Property **types** and the **`indexed`** flag are the two most load-bearing hints; rel-properties are the most commonly omitted.
+2. **Also call `SHOW INDEXES`** via `read_neo4j_cypher` — the schema tool reports which properties are indexed but not what kind (range / text / point / vector / fulltext). Full-text and vector indexes enable entirely different query patterns.
+3. **Use the tool's `params` argument for every value.** `read_neo4j_cypher({query: "MATCH (n:Person {name:$name}) RETURN n", params: {name: "Alice"}})`. Never string-interpolate user input into `query`.
+4. **Always emit `LIMIT`.** The 30-second timeout and token-limit truncation both punish unbounded results. Even for "top N", write `ORDER BY … LIMIT N` explicitly.
+5. **Route writes through `write_neo4j_cypher` only.** If the server is in read-only mode this tool won't exist — the generator must be told up-front.
+6. **Emit `CYPHER 5` or `CYPHER 25` as the first token** so results are deterministic across databases with different defaults.
+7. **Prefer modern subquery syntax.** `COUNT { }`, `EXISTS { }`, `COLLECT { }` beat `size([…|…])`, `OPTIONAL MATCH` + `collect()`, and most `WITH` pipelines.
+8. **On an error from `read_neo4j_cypher`, feed the error back to the LLM and retry once.** Don't retry blindly more than that — repeated errors mean the schema or intent needs to be revisited.
 
-## The fourteen correctness patterns
+## The fourteen correctness patterns (summary)
 
-Each was reproduced on a real 76k-organization graph. They do not raise errors; they return the wrong rows.
+These silently return the wrong rows under every version and every driver.
 
-1. **Names are not unique.** `{name:'Google'}` returned three distinct entities. Use `uri` / `elementId()` for single-entity lookup.
-2. **Relationship direction rarely matches semantic symmetry.** `Apple-[:HAS_COMPETITOR]->()` = 26; `()-[:HAS_COMPETITOR]->Apple` = 386. For semantically-symmetric predicates, use undirected `-[:R]-`.
-3. **Equality against a `LIST` property silently returns zero.** Use `'x' IN list` or `any(y IN list WHERE …)`.
-4. **String vs `DATE`/`DATE_TIME` silently returns zero.** Wrap the literal with `date()` / `datetime()`.
-5. **`NOT x = true` drops NULLs.** Use `coalesce(x, false) = false`.
-6. **Aggregations skip NULLs.** `avg(revenueValue)` averaged over 7,904 of 76,102 rows silently. Always return `count(prop)` alongside `count(*)` for coverage visibility.
-7. **Units and currencies are not normalized** — constrain or normalize.
-8. **Multilingual alias lists (`allNames`) are noisy.** `'Apple' IN o.allNames` matched HSBC because Chinese-language blurbs contained "Apple".
-9. **List-of-string "records"** (`"2024: 391B USD"`) need parsing, not direct aggregation.
-10. **Hierarchy properties (`level`, `depth`) cause double-counting** if ignored.
-11. **Multi-hop patterns explode.** 3 hops of `HAS_CUSTOMER` from one node returned 686 paths. Always `LIMIT` and aggregate.
-12. **Relationships carry properties.** `IN_CITY.isCurrent`, `IN_CITY.isPrimary`, etc. — easy to forget.
+1. **Names are not unique** — multiple nodes can share the display name. Use a unique key (`elementId()`, `uri`, `id`).
+2. **Relationship direction ≠ semantic symmetry** — "competitor of" feels symmetric but is stored one-way. Use undirected `-[:R]-`.
+3. **Equality against a `LIST<…>` returns zero** — use `IN` or `any(x IN list WHERE …)`.
+4. **String vs `DATE`/`DATE_TIME` returns zero** — wrap literals with `date()` / `datetime()`.
+5. **`NOT x = true` drops NULLs** — use `coalesce(x, false) = false`.
+6. **Aggregations skip NULLs** — always return `count(prop)` next to `count(*)` to surface coverage.
+7. **Units/currencies are not normalized** — constrain or normalize.
+8. **Alias lists (`allNames`, `aliases`, translations) are noisy** — use the canonical property for filters.
+9. **List-of-string "records"** need parsing, not direct aggregation.
+10. **Hierarchy properties (`level`, `depth`, `tier`)** cause double-counting if ignored.
+11. **Variable-length / multi-hop paths explode** — always `LIMIT` and aggregate.
+12. **Relationships carry properties too** — always inspect via `get_neo4j_schema`.
 13. **`id()` is deprecated** — use `elementId()`.
 14. **Fuzzy match is not `=`** — use `CONTAINS`, `=~`, or a full-text index.
 
-Full copy-paste-ready before/after examples: [correctness.md](references/correctness.md).
+Copy-paste-ready before/after queries with schema-agnostic examples: [correctness.md](references/correctness.md).
 
-## The eight performance rules
+## The eight performance rules (summary)
 
-1. **Always label every node pattern.** `MATCH (n)` is a full scan.
+1. **Label every node pattern.** `MATCH (n)` is a full graph scan.
 2. **Filter on indexed properties at the anchor.** Check `SHOW INDEXES`.
 3. **Cap variable-length patterns.** `[:R*1..5]` not `[:R*]`.
-4. **Project properties, not nodes.** `RETURN o.name, o.revenueValue`, not `RETURN o`.
-5. **Aggregate before collecting.** `WITH c, count(o) AS n ORDER BY n DESC LIMIT 10` runs `ORDER BY`/`LIMIT` on small rows.
-6. **Separate read and write phases** to avoid the `Eager` operator. Big batch updates go through `CALL { … } IN TRANSACTIONS OF 10000 ROWS`.
-7. **Bulk writes: one `UNWIND $rows` call, not a loop.** 10k `MERGE` in a list-param takes one round-trip.
-8. **`MERGE` needs an index/constraint on its key**, else it scans the whole label.
+4. **Project properties, not whole nodes.** Smaller rows, fewer cold reads, less risk of response truncation.
+5. **Aggregate before projecting.** `WITH x, count(y) AS n ORDER BY n DESC LIMIT 10` keeps sort/limit on small rows.
+6. **Separate read and write phases** to avoid the `Eager` operator.
+7. **Bulk writes: one `UNWIND $rows` call.** Pass the list via `params`; do not loop `write_neo4j_cypher`.
+8. **`MERGE` needs a constraint or index** on its key property, otherwise it scans the whole label on every call.
 
-Plan reading, super-node mitigation, index recommendations: [performance.md](references/performance.md).
+Plan reading, super-node mitigation, and MCP-specific timing: [performance.md](references/performance.md).
 
-## Modern patterns a generator should prefer
+## Modern patterns to prefer
 
-- `EXISTS { (x)-[:R]-(:Y) }` instead of `size([…|…]) > 0`
-- `COUNT { (x)-[:R]-(:Y) } > 5` instead of `OPTIONAL MATCH` + `WITH count(...)`
-- `COLLECT { MATCH (x)-[:R]-(y) RETURN y.name }` in `RETURN`, scoped per row
-- `CALL (x) { … }` (Cypher 25) for cleaner scoped subqueries
-- `((n:L)-[r:R WHERE r.active]->(m:L)){1,5}` quantified paths with inline predicates
-- `SHORTEST 1` / `SHORTEST k GROUPS` / `ALL SHORTEST` instead of `ORDER BY length(p) LIMIT`
-- `CALL db.index.fulltext.queryNodes(...)` for approximate-name search
-- `CALL db.index.vector.queryNodes(...)` for embedding similarity
+- `WHERE EXISTS { (x)-[:R]-(:Y) }` instead of `size([…|…]) > 0`
+- `WHERE COUNT { (x)-[:R]-(:Y) } > 5` instead of `OPTIONAL MATCH … WITH count(*)`
+- `RETURN COLLECT { MATCH (x)-[:R]-(y) RETURN y.name } AS ys` instead of `OPTIONAL MATCH` + `collect()`
+- `CALL (x) { … }` scoped subqueries (Cypher 25)
+- `((a)-[r:R WHERE r.active]->(b)){1,5}` quantified paths with inline predicates
+- `SHORTEST 1` / `SHORTEST k GROUPS` / `ALL SHORTEST` for shortest-path queries
+- `CALL db.index.fulltext.queryNodes(name, q)` for approximate-name lookup
+- `CALL db.index.vector.queryNodes(name, k, v)` / `SEARCH … NEAREST $v` (Cypher 25) for semantic similarity
 - GDS procedures for "most central" / "community" / "similar" questions
 
 Full examples plus an NL-intent → Cypher-pattern cheat sheet: [advanced-patterns.md](references/advanced-patterns.md).
 
-## Cypher version for generated queries
+## Instructions (end-to-end loop)
 
-- **Target Cypher 25** if the database is on Neo4j 2025.06+ and defaults to Cypher 25, or if you need the vector type, `$(…)` dynamic labels, or `WHEN/THEN` conditional subqueries.
-- **Target Cypher 5** if the database still defaults to it.
-- **Always emit the prefix.** `CYPHER 25 MATCH …` — deterministic results across databases.
+When invoked to generate Cypher against an `mcp-neo4j-cypher` server:
 
-Full diff: [cypher-5-vs-25.md](references/cypher-5-vs-25.md).
+1. **Session warmup, once per connection:**
+   - Call `get_neo4j_schema` — inject JSON verbatim into LLM context.
+   - Call `read_neo4j_cypher({query: "SHOW INDEXES"})` — include index types (range/text/point/fulltext/vector).
+   - If the graph uses GDS, inspect available procedures (`CALL gds.list()` or the MCP's GDS-procedures tool where exposed).
 
-## Instructions
+2. **Per user question:**
+   - Retrieve 3–5 question/Cypher few-shots that are semantically close to the question (vector similarity over a curated example bank).
+   - Ask the LLM to produce Cypher with `CYPHER 25` (or `CYPHER 5`) as the first token, and every value as `$param` — it must return `{query, params}` shape for the MCP call.
+   - Audit the generated query against the fourteen correctness patterns and eight performance rules. Top three of each in practice:
+     - Correctness: date-vs-string (#4), list equality (#3), directional asymmetry (#2)
+     - Performance: missing label, missing `LIMIT`, unbounded variable-length
+   - Execute via `read_neo4j_cypher` (or `write_neo4j_cypher` for mutations). On error, feed the error back to the LLM and retry once.
 
-When invoked:
+3. **When results look thin or wrong:**
+   - For aggregations, re-run with `count(*)` + `count(prop)` to see coverage.
+   - For name lookups, also run `CALL db.index.fulltext.queryNodes(...)` if a fulltext index exists.
+   - For negations, check whether the query is missing NULL rows (#5).
 
-1. Pull the schema (APOC or MCP) **and** `SHOW INDEXES`. Inject both into the prompt verbatim — don't summarize.
-2. Retrieve 3–5 question/Cypher few-shots that are semantically close to the user's question (vector similarity over a curated example bank).
-3. Generate the Cypher with `CYPHER 25` / `CYPHER 5` as the first token.
-4. Run `EXPLAIN` on the generated query. On syntax error, feed the error back and retry once.
-5. Audit against the fourteen correctness patterns (three highest-hit: date-vs-string, list-equality, direction asymmetry).
-6. Audit against the eight performance rules (three highest-hit: missing label, missing `LIMIT`, unbounded variable-length).
-7. Bias toward modern subquery / quantified-path / `SHORTEST` forms when they fit.
-8. Execute and return results with coverage (`count(*)` + `count(prop)` where applicable).
+4. **Always surface uncertainty.** Report the row count, and for aggregations, report coverage. Do not present an `avg()` over 10% of the corpus as "the average".
 
 ## Resources
 
-- [Text2cypher guide (Neo4j blog)](https://neo4j.com/blog/genai/text2cypher-guide/)
-- [APOC schema inspection](https://neo4j.com/docs/apoc/current/overview/apoc.meta/apoc.meta.schema/)
-- [Execution plans and query tuning](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/)
-- [Neo4j MCP server](https://neo4j.com/docs/mcp/current/)
+- [`mcp-neo4j-cypher` README](https://github.com/neo4j-contrib/mcp-neo4j/blob/main/servers/mcp-neo4j-cypher/README.md)
+- [Neo4j MCP docs](https://neo4j.com/docs/mcp/current/)
+- [Text2Cypher Guide (Neo4j)](https://neo4j.com/blog/genai/text2cypher-guide/)
+- [neo4j-labs/text2cypher — datasets & evals](https://github.com/neo4j-labs/text2cypher)
+- [Cypher execution plans and query tuning](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/)
 - [Cypher version selection](https://neo4j.com/docs/cypher-manual/current/queries/select-version/)
-- [neo4j-labs/text2cypher repo (datasets + evals)](https://github.com/neo4j-labs/text2cypher)

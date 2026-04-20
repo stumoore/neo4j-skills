@@ -43,12 +43,12 @@ Assists with upgrading Cypher queries to newer Neo4j versions.
 
 ### neo4j-text2cypher-skill
 
-Guidance for LLM-driven Cypher generation covering three failure classes: correctness (silent wrong-answer patterns like list equality, string/datetime comparison, directional asymmetry, NULL-in-negation), performance (plan reading, index usage, super-node handling, bulk writes), and staleness (modern subquery, quantified-path, and `SHORTEST` idioms that replace old constructions). Includes a Cypher 5 vs Cypher 25 cheat sheet for generators.
+Guidance for LLM-driven Cypher generation through the official Neo4j MCP server (`mcp-neo4j-cypher`). Covers the three server tools (`get_neo4j_schema`, `read_neo4j_cypher`, `write_neo4j_cypher`), server-specific constraints (30-second read timeout, response-token truncation, namespace prefixing), and three failure classes: correctness (silent wrong-answer patterns), performance (index usage, super-node handling, bulk writes), and staleness (modern subquery, quantified-path, and `SHORTEST` idioms). Includes a Cypher 5 vs Cypher 25 cheat sheet.
 
 **Use this skill when:**
-- Building an LLM → Cypher pipeline (RAG over a graph, agentic querying, fine-tuning)
-- Reviewing LLM-generated Cypher before it runs
-- Debugging a query that runs but returns the wrong rows or is unexpectedly slow
+- Wiring an LLM to `mcp-neo4j-cypher` (Claude Desktop, Claude Code, any MCP client)
+- Reviewing LLM-generated Cypher before `read_neo4j_cypher` / `write_neo4j_cypher` executes it
+- Debugging a query that returns the wrong rows, gets truncated, or times out at 30 s
 - Choosing a Cypher version and modern patterns for generated queries
 
 ## Installation
