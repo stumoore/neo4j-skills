@@ -1,73 +1,112 @@
 ---
 name: neo4j-text2cypher-skill
-description: Use when generating Cypher from a natural-language question against a Neo4j graph (text2cypher / LLM-driven querying). Covers schema-first prompting, the dozen silent-wrong-answer gotchas that LLM-generated Cypher routinely hits, and picking between Cypher 5 and Cypher 25.
+description: Use when generating Cypher from a natural-language question against a Neo4j graph (text2cypher / LLM-driven querying). Covers schema-first prompting, the silent-wrong-answer correctness patterns, performance rules for LLM-generated queries, the modern Cypher subquery/quantified-path/SHORTEST idioms a generator should prefer, and picking between Cypher 5 and Cypher 25.
 allowed-tools: WebFetch
 ---
 
 # Neo4j text2cypher skill
 
-Generating Cypher from a natural-language question is easy; generating Cypher that returns the **right** answer is not. Most text2cypher failures are not syntax errors — they are queries that run fine and quietly return wrong or empty results. This skill lists the gotchas that cause silent-wrong-answer bugs, based on patterns observed on real graphs.
+Generating Cypher from a natural-language question is easy; generating Cypher that returns the **right** answer at an acceptable cost is not. Text2cypher failures fall into three buckets:
+
+1. **Correctness** — query runs, no error, wrong rows. The most dangerous class.
+2. **Performance** — query runs, returns rows, but scans the whole graph or blows the heap.
+3. **Staleness** — the LLM emits 2019-era Cypher (list comprehensions for counting, `id()`, `OPTIONAL MATCH` + `collect`) when modern Cypher has cleaner and faster equivalents.
+
+This skill covers all three, with reference material for each.
 
 ## When to use
 
 Use this skill when:
-- building an LLM → Cypher pipeline (RAG over a graph, a "chat with your graph" feature, text2cypher fine-tuning data, an agent that queries Neo4j)
+- building an LLM → Cypher pipeline (RAG over a graph, "chat with your graph", text2cypher fine-tuning data, an agent that queries Neo4j)
 - reviewing LLM-generated Cypher before it runs against production
-- debugging a query that "works" but returns the wrong number of rows
+- debugging a query that runs but returns the wrong rows or is unexpectedly slow
 - deciding whether to target Cypher 5 or Cypher 25 in the generator
 
 ## Ground rules for the generator
 
-1. **Give the LLM the schema, not the data.** Use `CALL apoc.meta.schema()` (node labels, rel types, properties + types + indexed flag) and inject it verbatim. The two most valuable hints are **property types** (prevents date/string mismatches) and **indexed flag** (steers the LLM toward the cheap lookup path).
-2. **Show few-shot examples with intent + Cypher.** Three examples covering aggregation, multi-hop traversal, and a negation pattern remove 80% of mistakes. Include at least one example that uses an undirected relationship.
-3. **Parameterize, don't interpolate.** User input goes in `$params`, never `f"...{value}..."`. Cypher injection is real and query-plan caching depends on stable query text.
-4. **Add `LIMIT` by default.** LLMs omit it; a 5-hop pattern with no limit on a moderately dense graph is a production outage. If the question is "top N", make the generator emit `ORDER BY … LIMIT N` explicitly.
-5. **Validate with `EXPLAIN`, not `PROFILE`.** `EXPLAIN` compiles without running; `PROFILE` runs the query. For an LLM loop, `EXPLAIN` is the safe syntactic gate.
-6. **Tell the generator which Cypher version to target.** Cypher 5 and Cypher 25 diverge on `SET n = r`, dynamic labels, vector type, and several function names. See [cypher-5-vs-25.md](references/cypher-5-vs-25.md). Emit `CYPHER 5` or `CYPHER 25` as the first token so the query is deterministic across databases.
+1. **Give the LLM the schema, not the data.** `CALL apoc.meta.schema()` or the MCP schema endpoint. Inject node labels, rel types, property **types**, the **indexed** flag, **and relationship properties** — most schema extractors drop the last item, and missing rel-properties is the root cause of several correctness bugs (`IN_CITY.isCurrent`, etc.).
+2. **Read `SHOW INDEXES` and tell the LLM which properties are indexed.** The biggest single lever on performance is whether the anchor filter hits an index.
+3. **Show few-shot examples with intent + Cypher.** Three examples covering aggregation, multi-hop traversal, and a negation pattern remove the most common mistakes. Include at least one undirected relationship example and one `COUNT { }` / `EXISTS { }` example.
+4. **Parameterize, don't interpolate.** User input goes in `$params`, never f-string interpolation. Prevents injection and stabilizes the query plan cache.
+5. **Add `LIMIT` by default.** An LLM-authored 3-hop pattern without a limit on a moderately dense graph is a production incident. Even for "top N", make the generator emit `ORDER BY … LIMIT N` explicitly.
+6. **Validate with `EXPLAIN`, not `PROFILE`.** `EXPLAIN` compiles only. `PROFILE` runs the query. In an LLM review loop, `EXPLAIN` is the safe gate.
+7. **Emit the Cypher version prefix.** `CYPHER 5` or `CYPHER 25` as the first token, so the query returns the same result on any database regardless of that database's default language.
+8. **Prefer modern subquery syntax.** `COUNT { }`, `EXISTS { }`, `COLLECT { }` beat `size([… | …])`, `OPTIONAL MATCH` + `collect()`, and most `WITH` pipelines. See [advanced-patterns.md](references/advanced-patterns.md).
 
-## The gotchas that silently return wrong answers
+## The fourteen correctness patterns
 
-Each of these was observed on a real ~76k-org graph. They do not raise errors; they return the wrong number of rows.
+Each was reproduced on a real 76k-organization graph. They do not raise errors; they return the wrong rows.
 
-1. **Names are not unique.** `MATCH (o:Organization {name: 'Google'})` returned three entities (Google LLC + two others). Prefer `uri` / `id` / `elementId()` for single-entity lookup and use `name` only for discovery (with `LIMIT` + display).
-2. **Relationship direction is rarely symmetric in data.** `(Apple)-[:HAS_COMPETITOR]->()` = 26 rows; `()-[:HAS_COMPETITOR]->(Apple)` = 386. The *meaning* feels symmetric ("competitor of") but the graph stores one direction per source. For semantically-symmetric predicates, use an undirected pattern: `(a)-[:HAS_COMPETITOR]-(b)`.
-3. **Equality against a list silently returns zero.** `WHERE t.name = 'Programming Languages'` returns `[]` when the property is a `LIST<STRING>`. Use `'Programming Languages' IN t.categories` or `any(x IN t.categories WHERE …)`. Check the schema's property type before emitting `=`.
-4. **String compared to date/datetime silently returns zero.** `WHERE a.date > '2024-01-01'` on a `DATE_TIME` property returned **0** rows; `WHERE a.date > datetime('2024-01-01')` returned 4551. Always cast the literal with `date()`, `datetime()`, or `localdatetime()` to match the property type.
-5. **`NOT x = true` drops NULLs.** "Companies that are not public" → `WHERE NOT o.isPublic = true` missed 66,457 rows where `isPublic IS NULL` (only `isPublic = false` came back). Use `coalesce(o.isPublic, false) = false` or `o.isPublic IS NULL OR o.isPublic = false`.
-6. **Aggregations skip NULLs.** `avg(o.revenueValue)` silently averaged over only 7,904 of 76,102 orgs. The answer looks precise but is about 10% of the corpus. Always return `count(prop)` next to `count(*)` so the user sees the coverage.
-7. **Units/currencies are not normalized.** `revenueValue` coexists in USD, EUR, INR, CNY, GBP, JPY, KRW, RUB… Summing or ranking without grouping by `revenueCurrency` is wrong. Either filter to one currency or normalize client-side.
-8. **Denormalized list properties hide matches.** `allNames` contains translations, marketing aliases, unrelated multilingual tokens. `'Apple' IN o.allNames` matched an HSBC node because a Chinese blurb contained the word "Apple". Prefer `name` / `fullName` unless you truly want aliases, and `LIMIT` + human review.
-9. **List-of-string "records" need parsing.** `yearlyRevenues = ["2024: 391035000000.0 USD", ...]` looks queryable but isn't aggregate-friendly. Flag these at schema-inspection time and either join on a dedicated relationship instead, or `UNWIND` + `split()` client-side.
-10. **Hierarchies double-count.** `IndustryCategory` has `level` 1/2/3; an org is attached to all levels it fits. `COUNT(*)` of `Org-[:HAS_CATEGORY]->Cat` grouped by category without filtering on `level` double-counts. Filter `WHERE c.level = 1` for top-level buckets.
-11. **Variable-length / multi-hop paths explode.** `(a)-[:HAS_CUSTOMER]->(b)-[:HAS_CUSTOMER]->(c)` from a single Apple node returned 686 paths. 3-hops on a dense graph is easily 6-figure rows. Always `LIMIT` and aggregate early with `count(DISTINCT c)` — not `count(*)` of the path.
-12. **Relationships have properties too.** `IN_CITY` carries `isCurrent`, `isPrimary`, `address`, `street`. LLMs pattern-match on `(:Organization)-[:IN_CITY]->(:City)` and forget `WHERE r.isCurrent = true`, silently counting historical addresses. Include rel-properties in the schema handed to the LLM.
-13. **`id()` is deprecated.** Use `elementId()` for node/relationship identity. Old LLM training data leans on `id()`; patch prompts and fine-tunes accordingly.
-14. **Fuzzy match is not `=`.** "Companies called Apple" under `=` returns just the literal "Apple" nodes. For discovery use `CONTAINS` / `=~` / full-text index (`db.index.fulltext.queryNodes`). Know which is indexed on your graph.
+1. **Names are not unique.** `{name:'Google'}` returned three distinct entities. Use `uri` / `elementId()` for single-entity lookup.
+2. **Relationship direction rarely matches semantic symmetry.** `Apple-[:HAS_COMPETITOR]->()` = 26; `()-[:HAS_COMPETITOR]->Apple` = 386. For semantically-symmetric predicates, use undirected `-[:R]-`.
+3. **Equality against a `LIST` property silently returns zero.** Use `'x' IN list` or `any(y IN list WHERE …)`.
+4. **String vs `DATE`/`DATE_TIME` silently returns zero.** Wrap the literal with `date()` / `datetime()`.
+5. **`NOT x = true` drops NULLs.** Use `coalesce(x, false) = false`.
+6. **Aggregations skip NULLs.** `avg(revenueValue)` averaged over 7,904 of 76,102 rows silently. Always return `count(prop)` alongside `count(*)` for coverage visibility.
+7. **Units and currencies are not normalized** — constrain or normalize.
+8. **Multilingual alias lists (`allNames`) are noisy.** `'Apple' IN o.allNames` matched HSBC because Chinese-language blurbs contained "Apple".
+9. **List-of-string "records"** (`"2024: 391B USD"`) need parsing, not direct aggregation.
+10. **Hierarchy properties (`level`, `depth`) cause double-counting** if ignored.
+11. **Multi-hop patterns explode.** 3 hops of `HAS_CUSTOMER` from one node returned 686 paths. Always `LIMIT` and aggregate.
+12. **Relationships carry properties.** `IN_CITY.isCurrent`, `IN_CITY.isPrimary`, etc. — easy to forget.
+13. **`id()` is deprecated** — use `elementId()`.
+14. **Fuzzy match is not `=`** — use `CONTAINS`, `=~`, or a full-text index.
 
-Full-length reference with copy-paste fixes: [gotchas.md](references/gotchas.md).
+Full copy-paste-ready before/after examples: [correctness.md](references/correctness.md).
+
+## The eight performance rules
+
+1. **Always label every node pattern.** `MATCH (n)` is a full scan.
+2. **Filter on indexed properties at the anchor.** Check `SHOW INDEXES`.
+3. **Cap variable-length patterns.** `[:R*1..5]` not `[:R*]`.
+4. **Project properties, not nodes.** `RETURN o.name, o.revenueValue`, not `RETURN o`.
+5. **Aggregate before collecting.** `WITH c, count(o) AS n ORDER BY n DESC LIMIT 10` runs `ORDER BY`/`LIMIT` on small rows.
+6. **Separate read and write phases** to avoid the `Eager` operator. Big batch updates go through `CALL { … } IN TRANSACTIONS OF 10000 ROWS`.
+7. **Bulk writes: one `UNWIND $rows` call, not a loop.** 10k `MERGE` in a list-param takes one round-trip.
+8. **`MERGE` needs an index/constraint on its key**, else it scans the whole label.
+
+Plan reading, super-node mitigation, index recommendations: [performance.md](references/performance.md).
+
+## Modern patterns a generator should prefer
+
+- `EXISTS { (x)-[:R]-(:Y) }` instead of `size([…|…]) > 0`
+- `COUNT { (x)-[:R]-(:Y) } > 5` instead of `OPTIONAL MATCH` + `WITH count(...)`
+- `COLLECT { MATCH (x)-[:R]-(y) RETURN y.name }` in `RETURN`, scoped per row
+- `CALL (x) { … }` (Cypher 25) for cleaner scoped subqueries
+- `((n:L)-[r:R WHERE r.active]->(m:L)){1,5}` quantified paths with inline predicates
+- `SHORTEST 1` / `SHORTEST k GROUPS` / `ALL SHORTEST` instead of `ORDER BY length(p) LIMIT`
+- `CALL db.index.fulltext.queryNodes(...)` for approximate-name search
+- `CALL db.index.vector.queryNodes(...)` for embedding similarity
+- GDS procedures for "most central" / "community" / "similar" questions
+
+Full examples plus an NL-intent → Cypher-pattern cheat sheet: [advanced-patterns.md](references/advanced-patterns.md).
 
 ## Cypher version for generated queries
 
-- **Target Cypher 25** if the database is on Neo4j 2025.06+ and has `DEFAULT LANGUAGE CYPHER 25`, or if you want access to the vector type, `$(…)` dynamic labels, or `WHEN/THEN` conditional subqueries.
-- **Target Cypher 5** if the database defaults to Cypher 5 and you need stability, or your training data / prompt library is Cypher-5-shaped.
-- **Always emit the prefix**: put `CYPHER 5` or `CYPHER 25` as the first token of generated queries so the same query gives the same result on any database regardless of its default.
+- **Target Cypher 25** if the database is on Neo4j 2025.06+ and defaults to Cypher 25, or if you need the vector type, `$(…)` dynamic labels, or `WHEN/THEN` conditional subqueries.
+- **Target Cypher 5** if the database still defaults to it.
+- **Always emit the prefix.** `CYPHER 25 MATCH …` — deterministic results across databases.
 
-Detailed language diff: [cypher-5-vs-25.md](references/cypher-5-vs-25.md).
+Full diff: [cypher-5-vs-25.md](references/cypher-5-vs-25.md).
 
 ## Instructions
 
 When invoked:
 
-1. Run `CALL apoc.meta.schema()` (or the MCP `get_neo4j_schema` equivalent). Inject the result into the LLM prompt as plain text — do not summarize. Include property **types** and the **indexed** flag.
-2. Before emitting the final Cypher, pass it through an `EXPLAIN` call. If that errors, feed the error back to the LLM and retry once.
-3. On every generated query, audit it against the 14 gotchas above. The highest-hit three in practice: string/date mismatch (#4), list equality (#3), and directionality (#2).
-4. Always append `LIMIT` to any non-aggregating `RETURN`, and `count(*)` + `count(prop)` to any aggregation.
-5. Emit `CYPHER 5` / `CYPHER 25` as the first token of the query, matching the target database.
+1. Pull the schema (APOC or MCP) **and** `SHOW INDEXES`. Inject both into the prompt verbatim — don't summarize.
+2. Retrieve 3–5 question/Cypher few-shots that are semantically close to the user's question (vector similarity over a curated example bank).
+3. Generate the Cypher with `CYPHER 25` / `CYPHER 5` as the first token.
+4. Run `EXPLAIN` on the generated query. On syntax error, feed the error back and retry once.
+5. Audit against the fourteen correctness patterns (three highest-hit: date-vs-string, list-equality, direction asymmetry).
+6. Audit against the eight performance rules (three highest-hit: missing label, missing `LIMIT`, unbounded variable-length).
+7. Bias toward modern subquery / quantified-path / `SHORTEST` forms when they fit.
+8. Execute and return results with coverage (`count(*)` + `count(prop)` where applicable).
 
 ## Resources
 
+- [Text2cypher guide (Neo4j blog)](https://neo4j.com/blog/genai/text2cypher-guide/)
 - [APOC schema inspection](https://neo4j.com/docs/apoc/current/overview/apoc.meta/apoc.meta.schema/)
-- [Cypher `EXPLAIN` and `PROFILE`](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/execution-plans/)
-- [Neo4j MCP server](https://neo4j.com/docs/mcp/current/) — ready-made read/write/schema tools for an LLM
+- [Execution plans and query tuning](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/)
+- [Neo4j MCP server](https://neo4j.com/docs/mcp/current/)
 - [Cypher version selection](https://neo4j.com/docs/cypher-manual/current/queries/select-version/)
-- [Cypher additions, deprecations, removals](https://neo4j.com/docs/cypher-manual/current/deprecations-additions-removals-compatibility/)
+- [neo4j-labs/text2cypher repo (datasets + evals)](https://github.com/neo4j-labs/text2cypher)

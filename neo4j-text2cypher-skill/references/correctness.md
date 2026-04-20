@@ -1,6 +1,8 @@
-# Text2Cypher gotchas — with verified before/after
+# Correctness patterns — silent-wrong-answer bugs
 
-Each gotcha below was reproduced on a real 76k-organization company/patent graph. The numbers in the examples are real; what changes between the "bad" and "good" query is the one thing an LLM routinely gets wrong.
+These are the query-shape mistakes that do **not** raise an error but return the wrong number of rows. Every pattern below was reproduced against a real 76k-organization graph; the row counts in the examples are the actual numbers returned. If you only fix one class of text2cypher bugs, fix these.
+
+For performance / plan issues (Cartesian product, Eager operator, missing index), see [performance.md](performance.md). For modern Cypher features that replace old patterns (`COUNT { }`, quantified paths, `SHORTEST`), see [advanced-patterns.md](advanced-patterns.md).
 
 ---
 
