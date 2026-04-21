@@ -22,7 +22,7 @@ Use this skill when code:
 2. **Always pass the database name** (`database_="neo4j"`, `{database:'neo4j'}`, `WithDatabase`, etc.). Otherwise the driver makes an extra round-trip per query to resolve the default.
 3. **Always parameterize** with `$name` placeholders. Never string-concatenate values. Parameters enable query-plan caching and prevent Cypher injection.
 4. **One driver per application**, shared across threads/requests. The driver owns a connection pool — do not create it per request. Close on shutdown (or use `with` / `try-with-resources` / `using`).
-5. **Specify routing on read-heavy calls** in a cluster (`routing_="r"`, `routing: 'READ'`, `WithRouting(READ)`, `ExecuteQueryWithReadersRouting()`). It sends reads to follower nodes.
+5. **Specify routing on read-only calls** in a cluster (`routing_="r"`, `routing: 'READ'`, `WithRouting(READ)`, `ExecuteQueryWithReadersRouting()`). It sends reads to follower nodes.
 6. **Bulk writes use `UNWIND $rows AS row`** with a list parameter — one round-trip for thousands of rows. Do not loop over `execute_query`.
 7. **`execute_query` is eager** — it loads all records into memory. For huge result sets, use a session with `execute_read`/`execute_write` and iterate the `Result` without materializing it.
 8. **Prefer `CREATE` over `MERGE`** when you know the data is new. `MERGE` does a match + create; `CREATE` is one step.
