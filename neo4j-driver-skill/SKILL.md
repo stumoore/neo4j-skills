@@ -19,28 +19,22 @@ Use this skill when code:
 ## Core rules (apply to all languages)
 
 1. **`execute_query` is the default.** One call, one transaction, auto-retry on transient errors. Only drop to `session.execute_read/execute_write` when you need to interleave client-side logic between queries in one transaction.
-2. **Always pass the database name** (`database_="neo4j"`, `{database:'neo4j'}`, `WithDatabase`, etc.). Otherwise the driver makes an extra round-trip per query to resolve the default.
+2. **Self-managing transaction queries need `session.run` (auto-commit).** `CALL {...} IN TRANSACTIONS` and `USING PERIODIC COMMIT` manage their own transactions and fail inside a managed transaction — so neither `execute_query` nor `session.execute_read/write` work. Open a session and run them with `session.run(...)`.
 3. **Always parameterize** with `$name` placeholders. Never string-concatenate values. Parameters enable query-plan caching and prevent Cypher injection.
 4. **One driver per application**, shared across threads/requests. The driver owns a connection pool — do not create it per request. Close on shutdown (or use `with` / `try-with-resources` / `using`).
-5. **Specify routing on read-only calls** in a cluster (`routing_="r"`, `routing: 'READ'`, `WithRouting(READ)`, `ExecuteQueryWithReadersRouting()`). It sends reads to follower nodes.
+5. **Specify routing on read-only calls** in a cluster (`routing_=RoutingControl.READ`, `routing: neo4j.routing.READ`, `.withRouting(RoutingControl.READ)`, `ExecuteQueryWithReadersRouting()`). It sends reads to follower nodes.
 6. **Bulk writes use `UNWIND $rows AS row`** with a list parameter — one round-trip for thousands of rows. Do not loop over `execute_query`.
 7. **`execute_query` is eager** — it loads all records into memory. For huge result sets, use a session with `execute_read`/`execute_write` and iterate the `Result` without materializing it.
 8. **Prefer `CREATE` over `MERGE`** when you know the data is new. `MERGE` does a match + create; `CREATE` is one step.
 9. **Dynamic labels, relationship types, and property keys** — supported natively in Cypher 25 via the `$(expr)` syntax: `MATCH (n:$($label) {$($key): $value})` or `MERGE ()-[:$($type)]->()`. On Cypher 5 a plain parameter can only be a value; for dynamic labels/keys there, validate against an allow-list and interpolate, or call `apoc.merge.node` / `apoc.create.relationship`.
 
-## Getting records as dicts/JSON
+## Reading record fields
 
-Each driver has a one-call conversion from a record to a plain map/dict — use it rather than reading fields one by one:
+Read fields by name — `record["name"]`, `record.get("name")`, `record["name"].As<T>()`, etc. — and only pull what you need.
 
-| Language   | Call                    | Returns                  |
-|------------|-------------------------|--------------------------|
-| Python     | `record.data()`         | `dict`                   |
-| JavaScript | `record.toObject()`     | plain object             |
-| Java       | `record.asMap()`        | `Map<String,Object>`     |
-| Go         | `record.AsMap()`        | `map[string]any`         |
-| .NET       | `record.AsObject()` or `record.Values` | `IDictionary<string,object>` |
+Each driver also exposes a whole-record map conversion (`record.data()` in Python, `record.toObject()` in JS, `record.asMap()` in Java, `record.AsMap()` in Go, `record.Values` / `record.AsObject()` in .NET). These are convenient for interactive sessions, logging, and quick prototyping, but they materialize every field even when you only need some.
 
-Neo4j `Node`/`Relationship`/`Path` values inside a record are driver-specific objects. If you need plain JSON, either `RETURN` their properties explicitly (`RETURN n.name, n.age`) or apply a recursive-conversion transformer.
+If you actually need JSON, either `RETURN` the exact primitive fields you want (`RETURN n.name, n.age`) or apply a purpose-built transformer.
 
 ## Per-language references
 

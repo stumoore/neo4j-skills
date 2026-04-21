@@ -18,7 +18,7 @@ try {
   const { records, summary } = await driver.executeQuery(
     'MATCH (p:Person {name: $name}) RETURN p.name AS name, p.age AS age',
     { name: 'Alice' },
-    { database: 'neo4j', routing: neo4j.routing.READ }
+    { routing: neo4j.routing.READ }
   )
 
   const rows = records.map(r => r.toObject())   // array of plain objects
@@ -27,7 +27,7 @@ try {
 }
 ```
 
-Signature: `driver.executeQuery(cypher, params, { database, routing, impersonatedUser, auth, bookmarkManager, resultTransformer })`.
+Signature: `driver.executeQuery(cypher, params, { routing, database, impersonatedUser, auth, bookmarkManager, resultTransformer })`.
 
 ## Accessing fields
 
@@ -40,8 +40,7 @@ Signature: `driver.executeQuery(cypher, params, { database, routing, impersonate
 ```javascript
 await driver.executeQuery(
   'UNWIND $rows AS row MERGE (p:Person {id: row.id}) SET p += row',
-  { rows: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] },
-  { database: 'neo4j' }
+  { rows: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] }
 )
 ```
 
@@ -63,7 +62,7 @@ const { resultTransformers } = neo4j
 const people = await driver.executeQuery(
   'MATCH (p:Person) RETURN p.name AS name',
   {},
-  { database: 'neo4j',
+  {
     resultTransformer: resultTransformers.mappedResultTransformer({
       map: record => record.toObject()
     })
@@ -74,7 +73,7 @@ const people = await driver.executeQuery(
 ## When to drop to a session
 
 ```javascript
-const session = driver.session({ database: 'neo4j' })
+const session = driver.session()
 try {
   await session.executeWrite(async tx => {
     const r = await tx.run('MATCH (a:Account {id:$id}) RETURN a.balance AS b', { id: from })
