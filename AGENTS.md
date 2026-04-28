@@ -1,8 +1,28 @@
 # Writing Skills for this Repository
 
-A `SKILL.md` is not a prompt, not documentation, and not a policy file. It is a **portable, on-demand operational playbook** for an autonomous coding agent — a runbook with judgment, a checklist with decision logic, a guardrail against improvisational mistakes.
+A `SKILL.md` is an on-demand operational playbook for an autonomous coding agent — runbook with judgment, checklist with decision logic, guardrail against improvisational mistakes.
 
-When adding or editing skills in this repository, follow these rules. All skills live in `neo4j-*-skill/` directories. Run `python3 scripts/lint_skills.py` before every commit — all skills must pass.
+All skills live in `neo4j-*-skill/` directories. Run `python3 scripts/lint_skills.py` before every commit.
+
+## Language Style — Write for Agents, Not Humans
+
+Skills are read by agents that execute instructions, not humans that interpret prose. Strip every word that doesn't add information. The [Caveman compression](https://github.com/juliusbrussee/caveman) principle: remove articles, politeness, conjunctions, and explanatory padding. Keep technical content (code, commands, tables) untouched.
+
+```
+❌ You should always make sure to check the schema first before writing any queries.
+✅ Check schema before writing any query.
+
+❌ The following defaults must be applied to every query that you generate.
+✅ Defaults — apply every query:
+
+❌ Don't create a new driver per request — it is important that you create one Driver
+   at startup and share it across goroutines for performance reasons.
+✅ Create one Driver at startup; share across goroutines. Never create per-request.
+```
+
+Every instruction must be answerable with "done" or "not done". Terse is correct; verbose is noise that costs tokens and buries the rule.
+
+**The 500-line budget is for content, not ceremony.** Frontmatter + When to Use/NOT + Entry + Checklist take ~40 lines. Spend the rest on actionable rules, decision tables, and code examples — not on explanatory paragraphs the agent doesn't need.
 
 ## Six Design Principles
 
@@ -93,76 +113,60 @@ Never a bare "Don't" without naming where to go instead. With 20+ skills in this
 
 ## Skill Body Structure
 
-### Write imperatively, not explanatorily
+### Write imperatively
 
-Instructions must be commands, not explanations. Agents execute procedures; they do not reliably interpret prose intent.
-
-```
-❌  You may want to consider writing tests first.
-✅  Write a failing test. Confirm the failure is for the intended reason.
-```
-
-Every instruction should be answerable with "done" or "not done" — not "I think so."
+Commands, not explanations. See Language Style section above for examples.
 
 ### Open with When to Use / When NOT to Use
 
-Always the first two sections. Short-circuits the agent before it reads the whole skill body:
+Always first two sections. Short-circuits agent before it reads the body:
 
 ````markdown
 ## When to Use
 - Running GDS algorithms on Aura BC or VDC
-- Processing graph data from Pandas DataFrames or Spark
 
 ## When NOT to Use
 - **Aura Pro with GDS plugin** → use `neo4j-gds-skill`
 - **Writing Cypher queries** → use `neo4j-cypher-skill`
 ````
 
-### Define entry criteria
+### Entry criteria (operational skills only)
 
-State explicitly when the skill should begin executing, not just when it's relevant. Prevents the agent from starting work before prerequisites are met:
+State prerequisites before execution begins:
 
 ```markdown
 ## Entry criteria
-- A feature request or bug report is present in the conversation
-- The file(s) to be modified have been identified
-- Existing tests (if any) are confirmed passing before changes begin
+- Feature request or bug report present
+- Files to modify identified
+- Existing tests passing
 ```
 
 ### Specify artifacts explicitly
 
-Tell the agent exactly what to produce. Without this, the agent improvises output format — sometimes useful, often not:
+State exact outputs — agent improvises format without this:
 
 ```markdown
 ## Outputs
-- Modified `SKILL.md` with inline description (no block scalar)
-- Updated `README.md` for the skill directory
+- Modified `SKILL.md` with inline description
 - Lint output confirming all checks pass
 ```
 
 ### Handle uncertainty explicitly
 
-Distinct from failure recovery (command failed) — this is what to do when required information is *missing before starting*:
+Missing info before starting (not command failure):
 
 ```markdown
-If required context is missing before starting (e.g., no target file identified, 
-connection credentials not provided):
-1. State exactly what is missing
-2. Explain why it is needed
-3. Ask for the minimum input required to proceed
-Do NOT guess. Do NOT proceed with assumptions that could cause destructive changes.
+If required context missing: state what's missing, ask for minimum input. Do NOT guess.
 ```
 
 ### Narrow Bridge vs Open Field
 
-Calibrate instruction strictness to task risk:
-
-- **Narrow Bridge** (high risk — migrations, schema changes, security patches, bulk writes): provide exact, sequential commands. Leave no room for agent "creativity." Every step is prescribed; every branch condition is explicit.
-- **Open Field** (low risk — code review, refactoring, analysis): provide goals and constraints, then let the agent's reasoning find the implementation path. Over-specifying here produces rigid, brittle skills.
+- **Narrow Bridge** (migrations, schema changes, bulk writes): exact sequential commands, every branch explicit. No room for improvisation.
+- **Open Field** (code review, refactoring, analysis): goals + constraints only; let agent find the path. Over-specifying produces brittle skills.
 
 ### Procedural numbered steps for operational skills
 
-For connect, provision, import, and deploy skills — strict numbered steps, each with a code block and a branch condition. Agents cannot skip or reorder numbered steps:
+Connect/provision/import/deploy skills — numbered steps, each with code block and branch condition:
 
 ````markdown
 ## Step 1 — Verify GDS is available
@@ -171,48 +175,30 @@ For connect, provision, import, and deploy skills — strict numbered steps, eac
 RETURN gds.version() AS gds_version
 ```
 
-If this fails with `Unknown function 'gds.version'`, GDS is not installed. **Stop and inform the user.**
+If fails with `Unknown function 'gds.version'` → GDS not installed. **Stop and inform user.**
 
 ## Step 2 — Estimate memory before projecting
 ````
 
-Evidence: numbered workflows reduced missing wiring from 40% to 10%, +25% correctness, +20% completeness (Augment Code).
+Evidence: numbered workflows +25% correctness, +20% completeness (Augment Code).
 
 ### Decision tables when multiple approaches exist
 
-Force the choice upfront — don't describe all approaches in prose and let the agent guess:
+Force choice upfront — don't describe all approaches in prose:
 
 ````markdown
 | Deployment | Use |
 |---|---|
 | Aura Pro | `neo4j-gds-skill` (embedded plugin) |
-| Aura Business Critical / VDC | `neo4j-aura-graph-analytics-skill` (serverless) |
-| Self-managed with GDS | `neo4j-gds-skill` |
+| Aura BC / VDC | `neo4j-aura-graph-analytics-skill` (serverless) |
+| Self-managed | `neo4j-gds-skill` |
 ````
 
-Evidence: decision tables produce 25% higher best-practice adherence (Augment Code).
+Evidence: +25% best-practice adherence (Augment Code).
 
 ### Real code examples — idiomatic, not toy
 
-Agents copy patterns they see. Show the full production-idiomatic usage, not stripped-down snippets:
-
-```python
-# Toy (bad):
-gds.pageRank.stream(G)
-
-# Idiomatic (good):
-gds = sessions.get_or_create(
-    session_name="prod-analysis",
-    memory=memory,
-    db_connection=DbmsConnectionInfo.from_env(),
-    ttl=timedelta(hours=4),
-)
-gds.verify_connectivity()
-```
-
-Evidence: production code examples improve code reuse by 20% (Augment Code).
-
-For transformation skills, use diff blocks to show exactly how code should change — one diff is worth more than 1,000 words of prose:
+Agents copy patterns. Show production-idiomatic usage; for transformations use diff blocks:
 
 ```diff
 - const driver = neo4j.driver(uri, neo4j.auth.basic(user, password))
@@ -220,23 +206,24 @@ For transformation skills, use diff blocks to show exactly how code should chang
 + await driver.verifyConnectivity()
 ```
 
+Evidence: +20% code reuse (Augment Code).
+
 ### Pair every prohibition with a solution
 
 ```
 ❌  Don't create a new driver per request.
-✅  Don't create a new driver per request — create one Driver at startup and share it across goroutines.
+✅  Create one Driver at startup; share across goroutines.
 ```
 
-15+ sequential warnings without paired solutions cause agents to over-explore and take 2× longer (Augment Code).
+15+ unpaired warnings → agents over-explore, 2× slower (Augment Code).
 
 ### Inter-skill delegation
 
-Name sibling skill delegation explicitly in the body, not just the description:
+Name delegation in the body, not just description:
 
-````markdown
-If `gds.version()` fails, GDS is not available on this deployment.
-For Aura BC/VDC, delegate to `neo4j-aura-graph-analytics-skill` instead.
-````
+```markdown
+If `gds.version()` fails → GDS unavailable. Delegate to `neo4j-aura-graph-analytics-skill`.
+```
 
 ### Structured output templates for review skills
 
@@ -275,48 +262,34 @@ Use especially in GDS algorithm selection and modeling advice.
 
 ### Token-cost guards for MCP/query skills
 
-````markdown
-Before running any traversal query via MCP:
-1. Run `EXPLAIN` or `COUNT(*)` first
-2. Warn if no `LIMIT` on patterns that could match millions of nodes
-3. Default to `LIMIT 25` on exploratory queries
-````
+```markdown
+Before any traversal via MCP: run EXPLAIN or COUNT(*). No LIMIT → warn. Default LIMIT 25.
+```
 
 ### Plan-First for complex skills
 
-For skills covering multi-file changes or non-trivial transformations, instruct the agent to produce a plan before touching code:
+Multi-file or non-trivial transformations:
 
 ```markdown
-Before making any changes:
-1. List all files you will modify and why
-2. State the before/after for each non-trivial change
-3. Identify any risks or unknowns
-
-Only proceed after the plan is visible in the conversation.
+Before changes: list files+reasons, state before/after, identify risks. Proceed only after plan visible.
 ```
 
-### Self-Healing — tell the agent what to do when a command fails
+### Self-Healing — explicit failure paths
 
-Every command that can fail should have an explicit failure path. Don't rely on the agent improvising:
+Every command that can fail needs a failure path:
 
 ```markdown
-Run `npm test`. If tests fail:
-1. Do NOT proceed
-2. Revert all changes with `git checkout .`
-3. Report the exact failing test and error message to the user
+Run `npm test`. If fails: do NOT proceed. Revert with `git checkout .`. Report exact error.
 ```
 
-### Async operations — poll explicitly, don't assume completion
+### Async operations — poll explicitly
 
-For operations that are asynchronous (index builds, schema migrations, Aura instance provisioning, GDS algorithm runs on large graphs), tell the agent to poll for completion rather than moving on:
+Index builds, migrations, Aura provisioning return immediately. Tell agent to poll:
 
 ```markdown
-Run the migration. It returns immediately with an operation ID.
-Call `SHOW INDEXES YIELD name, state WHERE state <> 'ONLINE'` every 5 seconds
-until the result is empty. Do NOT query the index until it reports ONLINE.
+After migration: poll `SHOW INDEXES YIELD name, state WHERE state <> 'ONLINE'` every 5s
+until empty. Do NOT use index until ONLINE.
 ```
-
-Async operations that silently "succeed" but are still running are a common source of hard-to-debug failures. Make the wait explicit.
 
 ### Close with a checklist
 
