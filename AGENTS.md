@@ -92,6 +92,13 @@ Always the first two sections. Short-circuits the agent before it reads the whol
 - **Writing Cypher queries** → use `neo4j-cypher-skill`
 ````
 
+### Narrow Bridge vs Open Field
+
+Calibrate instruction strictness to task risk:
+
+- **Narrow Bridge** (high risk — migrations, schema changes, security patches, bulk writes): provide exact, sequential commands. Leave no room for agent "creativity." Every step is prescribed; every branch condition is explicit.
+- **Open Field** (low risk — code review, refactoring, analysis): provide goals and constraints, then let the agent's reasoning find the implementation path. Over-specifying here produces rigid, brittle skills.
+
 ### Procedural numbered steps for operational skills
 
 For connect, provision, import, and deploy skills — strict numbered steps, each with a code block and a branch condition. Agents cannot skip or reorder numbered steps:
@@ -143,6 +150,14 @@ gds.verify_connectivity()
 ```
 
 Evidence: production code examples improve code reuse by 20% (Augment Code).
+
+For transformation skills, use diff blocks to show exactly how code should change — one diff is worth more than 1,000 words of prose:
+
+```diff
+- const driver = neo4j.driver(uri, neo4j.auth.basic(user, password))
++ const driver = await neo4j.driver(uri, neo4j.auth.basic(user, password))
++ await driver.verifyConnectivity()
+```
 
 ### Pair every prohibition with a solution
 
@@ -197,6 +212,30 @@ Before running any traversal query via MCP:
 2. Warn if no `LIMIT` on patterns that could match millions of nodes
 3. Default to `LIMIT 25` on exploratory queries
 ````
+
+### Plan-First for complex skills
+
+For skills covering multi-file changes or non-trivial transformations, instruct the agent to produce a plan before touching code:
+
+```markdown
+Before making any changes:
+1. List all files you will modify and why
+2. State the before/after for each non-trivial change
+3. Identify any risks or unknowns
+
+Only proceed after the plan is visible in the conversation.
+```
+
+### Self-Healing — tell the agent what to do when a command fails
+
+Every command that can fail should have an explicit failure path. Don't rely on the agent improvising:
+
+```markdown
+Run `npm test`. If tests fail:
+1. Do NOT proceed
+2. Revert all changes with `git checkout .`
+3. Report the exact failing test and error message to the user
+```
 
 ### Close with a checklist
 
@@ -296,3 +335,6 @@ Stage new skills with `git add` before running — the linter only sees tracked 
 - [ ] `SKILL.md` under 500 lines; overflow in `references/` with explicit links
 - [ ] `git add <skill-dir>` then `python3 scripts/lint_skills.py` — all pass
 - [ ] `README.md` in skill directory covers what skill does, availability, install command
+- [ ] **No placeholders** — no `[Insert Repo Path]`, `[TODO]`, or `[Your Value Here]` left in the skill; use relative paths or instruct the agent to discover them with `ls`/`find`
+- [ ] **Dry run test** — could a junior developer with no ability to ask questions complete every step? If not, add the missing branch conditions or context
+- [ ] **Self-healing** — every command that can fail has an explicit failure path (revert, report, stop)
