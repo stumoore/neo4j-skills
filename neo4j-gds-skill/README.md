@@ -44,9 +44,10 @@ Guides agents through the full Neo4j Graph Data Science (GDS) workflow — from 
 
 | Deployment | GDS Available |
 |---|---|
-| Aura Free | ❌ No |
+| Aura Free | ❌ No — upgrade to Aura Pro |
 | Aura Pro | ✅ Yes |
-| Aura Business Critical / VDC | ✅ Yes (verify with account team) |
+| Aura Business Critical (BC) | ❌ No — use Aura Graph Analytics |
+| Aura Virtual Dedicated Cloud (VDC) | ❌ No — use Aura Graph Analytics |
 | Self-managed (Community or Enterprise) | ✅ With GDS plugin installed |
 
 ## What this skill does NOT cover

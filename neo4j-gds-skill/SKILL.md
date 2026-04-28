@@ -44,7 +44,7 @@ allowed-tools: Bash, WebFetch
 - **GraphRAG retrieval pipelines** → use `neo4j-graphrag-skill`
 - **Aura Graph Analytics** (serverless, no Neo4j DB required) → use `neo4j-aura-graph-analytics-skill`
 - **Snowflake Graph Analytics** → use `neo4j-snowflake-graph-analytics-skill`
-- **GDS on Aura Free** — GDS is unavailable; the user must upgrade to Aura Pro
+- **GDS on Aura Free, BC, or VDC** — GDS plugin is unavailable; users on Free must upgrade to Pro; users on BC/VDC should use Aura Graph Analytics instead → `neo4j-aura-graph-analytics-skill`
 
 ---
 
@@ -52,10 +52,10 @@ allowed-tools: Bash, WebFetch
 
 | Deployment | GDS Available |
 |---|---|
-| Aura Free | ❌ No |
+| Aura Free | ❌ No — upgrade to Aura Pro |
 | Aura Pro | ✅ Yes |
-| Aura Business Critical (BC) | ✅ Yes (verify with your account team) |
-| Aura Virtual Dedicated Cloud (VDC) | ✅ Yes (verify with your account team) |
+| Aura Business Critical (BC) | ❌ No — use Aura Graph Analytics |
+| Aura Virtual Dedicated Cloud (VDC) | ❌ No — use Aura Graph Analytics |
 | Self-managed (Community) | ✅ With GDS plugin installed |
 | Self-managed (Enterprise) | ✅ With GDS plugin installed |
 
