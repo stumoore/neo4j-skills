@@ -1,5 +1,5 @@
 ---
-name: neo4j-agent-memory
+name: neo4j-agent-memory-skill
 description: Authoritative reference for the neo4j-agent-memory Python package — a graph-native memory system for AI agents built on Neo4j — and for the hosted service (NAMS) at memory.neo4jlabs.com. Use this skill whenever the user mentions neo4j-agent-memory, agent memory with Neo4j, context graphs, the POLE+O model, MemoryClient/MemorySettings, the memory MCP server, or any of the framework integrations (LangChain, PydanticAI, CrewAI, AWS Strands, Google ADK, Microsoft Agent Framework, OpenAI Agents, LlamaIndex). Also use when the user mentions the hosted service at memory.neo4jlabs.com, NAMS, the Neo4j Agent Memory Service, the `nams_` API key prefix, or the hosted MCP endpoint. Also use when writing documentation, blog posts, tutorials, PRDs, or code samples for the project, when comparing agent memory approaches, or when positioning graph-native memory against vector-only approaches — even if the user doesn't explicitly name the package.
 ---
 
@@ -8,6 +8,22 @@ description: Authoritative reference for the neo4j-agent-memory Python package �
 Authoritative reference for the `neo4j-agent-memory` Python package — a Neo4j Labs project that gives AI agents three distinct memory layers (short-term, long-term, reasoning) in a single knowledge graph.
 
 > ⚠️ **Verify authoritative state before writing.** Version numbers, extras, tool counts, and API surface change between releases. The values in this skill reflect a specific point in time. Before publishing anything version-sensitive, confirm against **PyPI** (`https://pypi.org/project/neo4j-agent-memory/`) and the **GitHub README** (`https://github.com/neo4j-labs/agent-memory`). PyPI is the authoritative source for version numbers — never infer.
+
+## When to Use
+
+- Building AI agents that need persistent memory (short-term, long-term, reasoning traces) backed by Neo4j
+- Using the `neo4j-agent-memory` Python package or the hosted NAMS service at memory.neo4jlabs.com
+- Integrating agent memory with LangChain, PydanticAI, CrewAI, AWS Strands, Google ADK, OpenAI Agents, LlamaIndex, or Microsoft Agent Framework
+- Writing documentation, tutorials, or positioning content about graph-native agent memory
+- Comparing graph-native memory against vector-only approaches
+
+## When NOT to Use
+
+- **Plain Neo4j driver connections** (no memory layer needed) → use `neo4j-driver-python-skill`
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **GraphRAG retrieval pipelines** → use `neo4j-graphrag-skill`
+
+---
 
 ## Project at a Glance
 

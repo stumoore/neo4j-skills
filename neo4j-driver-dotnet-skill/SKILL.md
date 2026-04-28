@@ -1,20 +1,16 @@
 ---
 name: neo4j-driver-dotnet-skill
-description: >
-Comprehensive guide to using the official Neo4j .NET Driver (v6, current stable) — covering
-installation, IDriver lifecycle and DI registration, all three query APIs (ExecutableQuery
-fluent API, managed transactions via ExecuteReadAsync/ExecuteWriteAsync, auto-commit via
-RunAsync), IResultCursor consumption patterns (FetchAsync loop vs ToListAsync), record value
-access and null safety, WithParameters anonymous types and UNWIND batching, temporal type
-mapping, await-using vs using, EagerResult unpacking, object mapping, performance, causal
-consistency, and error handling. Use this skill whenever writing C# or .NET code that talks
-to Neo4j, or when questions arise about sessions, transactions, result handling, data types,
-bookmarks, or driver configuration. Also triggers on Neo4j.Driver, GraphDatabase.Driver,
-ExecutableQuery, ExecuteReadAsync, ExecuteWriteAsync, IAsyncSession, IResultCursor, IRecord,
-WithParameters, AsObject, or any Neo4j Bolt/Aura connection work in .NET or C#.  
-
-Does NOT handle Cypher query authoring — use neo4j-cypher-skill. 
- 
+description: Comprehensive guide to using the official Neo4j .NET Driver (v6, current stable) — covering
+  installation, IDriver lifecycle and DI registration, all three query APIs (ExecutableQuery
+  fluent API, managed transactions via ExecuteReadAsync/ExecuteWriteAsync, auto-commit via
+  RunAsync), IResultCursor consumption patterns (FetchAsync loop vs ToListAsync), record value
+  access and null safety, WithParameters anonymous types and UNWIND batching, temporal type
+  mapping, await-using vs using, EagerResult unpacking, object mapping, performance, causal
+  consistency, and error handling. Use this skill whenever writing C# or .NET code that talks
+  to Neo4j, or when questions arise about sessions, transactions, result handling, data types,
+  bookmarks, or driver configuration. Also triggers on Neo4j.Driver, ExecutableQuery,
+  ExecuteReadAsync, ExecuteWriteAsync, IResultCursor, or any Neo4j Bolt/Aura work in .NET/C#.
+  Does NOT handle Cypher query authoring — use neo4j-cypher-skill.
 status: draft
 version: 0.1.1
 allowed-tools: Bash, WebFetch
@@ -27,6 +23,20 @@ allowed-tools: Bash, WebFetch
 **Supports**: .NET 8, 9, 10  
 **Docs**: https://neo4j.com/docs/dotnet-manual/current/  
 **API ref**: https://neo4j.com/docs/api/dotnet-driver/current/
+
+---
+
+## When to Use
+
+- Writing C# or .NET code that connects to Neo4j
+- Setting up `Neo4j.Driver`, DI registration, or driver lifecycle in a .NET app
+- Questions about `ExecutableQuery`, `IResultCursor`, `ExecuteReadAsync`/`ExecuteWriteAsync`, or async patterns
+- Debugging sessions, transactions, result handling, or data type mapping in .NET
+
+## When NOT to Use
+
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **Upgrading from an older driver version** → use `neo4j-migration-skill`
 
 ---
 
@@ -173,7 +183,14 @@ foreach (var record in result.Result)
 }
 
 Console.WriteLine($"Returned {result.Result.Count} records " +
-                  $"in {result.Summary.ResultConsumedAfter.TotalMilliseconds} ms");
+                  $"in {result.Summary.ResultConsumedAfter.TotalMilliseconds} ms")
+
+// WithMap — project records inline instead of mapping after:
+var names = await driver.ExecutableQuery("MATCH (p:Person) RETURN p.name AS name")
+    .WithConfig(new QueryConfig(database: "neo4j"))
+    .WithMap(r => r["name"].As<string>())
+    .ExecuteAsync();
+// names.Result is IReadOnlyList<string>;
 ```
 
 ### `ResultAvailableAfter` vs `ResultConsumedAfter`

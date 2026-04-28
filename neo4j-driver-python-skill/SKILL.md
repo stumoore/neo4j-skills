@@ -1,7 +1,6 @@
 ---
 name: neo4j-driver-python-skill
-description: >
- Comprehensive guide to using the official Neo4j Python Driver (v6, current stable) — covering
+description: Comprehensive guide to using the official Neo4j Python Driver (v6, current stable) — covering
   installation, driver lifecycle, all three query APIs (execute_query, managed transactions via
   execute_read/write, implicit transactions via session.run), async patterns with AsyncGraphDatabase,
   result handling and consumption, data type mapping (including temporal and graph types), UNWIND
@@ -13,7 +12,6 @@ description: >
   execute_write, AsyncGraphDatabase, neo4j.Result, RoutingControl, or any Neo4j Bolt/Aura
   connection work in Python.
   Does NOT handle Cypher query authoring — use neo4j-cypher-skill.
-  
 status: draft
 version: 0.1.1
 allowed-tools: Bash, WebFetch
@@ -28,10 +26,26 @@ allowed-tools: Bash, WebFetch
 
 ---
 
+## When to Use
+
+- Writing Python code that connects to Neo4j
+- Setting up `GraphDatabase.driver()`, `execute_query()`, or `AsyncGraphDatabase` in a Python app
+- Questions about sessions, transactions, result handling, async patterns, or data type mapping in Python
+- Debugging connection, serialization, or UNWIND batching issues
+
+## When NOT to Use
+
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **Upgrading from an older driver version** → use `neo4j-migration-skill`
+- **GraphRAG pipelines** (`neo4j-graphrag` package) → use `neo4j-graphrag-skill`
+
+---
+
 ## 1. Installation
 
 ```bash
 pip install neo4j
+pip install neo4j-rust-ext   # optional: 3–10× faster serialization, same API
 ```
 
 For async support, no additional packages are needed — `asyncio` is in the standard library. For Pandas integration, install `pandas` separately.

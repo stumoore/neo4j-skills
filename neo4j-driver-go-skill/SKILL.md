@@ -1,7 +1,6 @@
 ---
 name: neo4j-driver-go-skill
-description: >
-  Comprehensive guide to using the official Neo4j Go Driver (v6, current stable) — covering
+description: Comprehensive guide to using the official Neo4j Go Driver (v6, current stable) — covering
   installation, driver lifecycle, all three transaction APIs (ExecuteQuery, managed transactions,
   explicit transactions), error handling, data type mapping, performance tuning, causal
   consistency, and connection configuration. Use this skill whenever writing Go code that talks
@@ -9,9 +8,8 @@ description: >
   arise about sessions, transactions, bookmarks, result handling, or driver configuration.
   Also triggers on neo4j-go-driver, NewDriver, ExecuteQuery, SessionConfig, ManagedTransaction,
   or any Neo4j Bolt/Aura connection work in Go.
-
+  
   Does NOT handle Cypher query authoring — use neo4j-cypher-skill.
-
 status: draft
 version: 0.1.1
 allowed-tools: Bash, WebFetch
@@ -25,6 +23,20 @@ allowed-tools: Bash, WebFetch
 **Docs**: https://neo4j.com/docs/go-manual/current/  
 **API ref**: https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v6/neo4j
  
+## When to Use
+
+- Writing Go code that connects to Neo4j
+- Setting up `neo4j.NewDriver()`, `ExecuteQuery()`, or session/transaction patterns in Go
+- Questions about managed vs explicit transactions, error handling, or data type mapping in Go
+- Debugging connection, result handling, or causal consistency issues
+
+## When NOT to Use
+
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **Upgrading from an older driver version** → use `neo4j-migration-skill`
+
+---
+
 ## Installation
  
 ```bash
@@ -104,6 +116,9 @@ The driver offers three levels of transaction control. Pick the lowest complexit
 | `ExecuteQuery()` | Most queries — simple, safe default | ✅ | ❌ (eager) |
 | `session.ExecuteRead/Write()` | Need lazy streaming, or complex callback logic | ✅ | ✅ |
 | `session.BeginTransaction()` | Spanning multiple functions, external API coordination | ❌ | ✅ |
+| `session.Run()` | Self-managing queries only (see below) | ❌ | ✅ |
+
+> **Self-managing transactions** — `CALL { … } IN TRANSACTIONS` and `USING PERIODIC COMMIT` manage their own transactions internally and **fail** if run inside a managed transaction. Use `session.Run()` (auto-commit) for these queries; neither `ExecuteQuery` nor `ExecuteRead/Write` will work.
  
 ---
  
@@ -285,6 +300,7 @@ Go ↔ Cypher type mapping:
 ```go
 record.Get("name")          // returns (any, bool) — bool is whether key exists
 record.AsMap()              // returns map[string]any for the whole record
+neo4j.GetRecordValue[string](record, "name")   // typed extraction — no manual type assert needed (v6+)
  
 // Type assert after extraction:
 rawAge, ok := record.Get("age")

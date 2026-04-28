@@ -1,7 +1,6 @@
 ---
 name: neo4j-driver-javascript-skill
-description: >
-  Comprehensive guide to using the official Neo4j JavaScript/TypeScript Driver (v6) — covering
+description: Comprehensive guide to using the official Neo4j JavaScript/TypeScript Driver (v6) — covering
   installation, driver lifecycle, all three query APIs (executeQuery, managed transactions via
   executeRead/Write, auto-commit via session.run), Integer handling and JSON serialization,
   temporal and graph types, result consumption, async/Promise error handling and session closure,
@@ -11,7 +10,7 @@ description: >
   or browser/Node.js targeting. Also triggers on neo4j-driver, neo4j.driver, executeQuery,
   executeRead, executeWrite, neo4j.int, record.get, or any Neo4j Bolt/Aura connection work
   in JavaScript or TypeScript.
-
+  
   Does NOT handle Cypher query authoring — use neo4j-cypher-skill.
 status: draft
 version: 0.1.1
@@ -23,6 +22,20 @@ allowed-tools: Bash, WebFetch
 **Current stable**: v6  
 **Docs**: https://neo4j.com/docs/javascript-manual/current/  
 **API ref**: https://neo4j.com/docs/api/javascript-driver/current/
+
+---
+
+## When to Use
+
+- Writing JavaScript or TypeScript code that connects to Neo4j
+- Setting up `neo4j.driver()`, `executeQuery()`, or session patterns in Node.js or the browser
+- Questions about Integer handling (`neo4j.int`), temporal types, async/Promise patterns, or TypeScript typing
+- Debugging result consumption, session closure, or browser/WebSocket usage
+
+## When NOT to Use
+
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **Upgrading from an older driver version** → use `neo4j-migration-skill`
 
 ---
 
@@ -534,8 +547,8 @@ await driver.executeQuery(
   { age: neo4j.int(30) },           // wraps 30 in Integer class
   { database: 'neo4j' }
 )
-// Note: passing a plain JS number as a parameter works too —
-// the driver promotes it safely (integers within safe range are auto-converted)
+// ⚠ plain JS Number is sent as Cypher FLOAT, not INTEGER:
+// { id: 12345 } → server receives 12345.0 — use neo4j.int() for integer parameters
 ```
 
 ### Integer and JSON Serialization

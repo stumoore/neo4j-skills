@@ -1,7 +1,6 @@
 ---
 name: neo4j-driver-java-skill
-description: >
-  Comprehensive guide to using the official Neo4j Java Driver (v6, current stable) — covering
+description: Comprehensive guide to using the official Neo4j Java Driver (v6, current stable) — covering
   installation (Maven/Gradle), driver lifecycle, all three transaction APIs (executableQuery,
   managed transactions via executeRead/Write, explicit transactions), async/reactive patterns,
   error handling, data type mapping, performance tuning, causal consistency/bookmarks, and
@@ -24,6 +23,21 @@ allowed-tools: Bash, WebFetch
 **Current stable**: v6  
 **Docs**: https://neo4j.com/docs/java-manual/current/  
 **API ref**: https://neo4j.com/docs/api/java-driver/current/
+
+---
+
+## When to Use
+
+- Writing Java code that connects to Neo4j
+- Setting up `GraphDatabase.driver()`, `executableQuery()`, or managed transactions in Maven/Gradle projects
+- Questions about async/reactive patterns, `SessionConfig`, data type mapping, or Spring integration
+- Debugging sessions, transactions, result handling, or causal consistency in Java
+
+## When NOT to Use
+
+- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
+- **Upgrading from an older driver version** → use `neo4j-migration-skill`
+- **Spring Data Neo4j** (`@Node`, `@Relationship`, `Neo4jRepository`) → use `neo4j-spring-data-skill`
 
 ---
 
@@ -100,8 +114,11 @@ AuthTokens.none()                        // unauthenticated (dev only)
 | `driver.executableQuery()` | Most queries — simple, safe default | ✅ | ❌ (eager) |
 | `session.executeRead/Write()` | Large results, complex callback logic | ✅ | ✅ |
 | `session.beginTransaction()` | Multi-function work, external coordination | ❌ | ✅ |
+| `session.run()` | Self-managing queries only (see below) | ❌ | ✅ |
 | `driver.asyncSession()` | Non-blocking I/O with `CompletableFuture` | ✅ | ✅ |
 | Reactive (`RxSession`) | Project Reactor / RxJava backpressure | ✅ | ✅ |
+
+> **Self-managing transactions** — `CALL { … } IN TRANSACTIONS` and `USING PERIODIC COMMIT` manage their own transactions internally and **fail** if run inside a managed transaction. Use `session.run()` (auto-commit) for these queries; neither `executableQuery` nor `executeRead/Write` will work.
 
 ---
 
