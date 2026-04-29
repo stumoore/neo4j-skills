@@ -63,6 +63,24 @@ OPTIONS {
 }
 ```
 
+Node index **with filterable properties** [2026.01+] — `WITH` declares which properties can be used in `SEARCH ... WHERE`:
+```cypher
+CYPHER 25
+CREATE VECTOR INDEX chunk_embedding IF NOT EXISTS
+FOR (c:Chunk) ON (c.embedding)
+WITH [c.source, c.lang, c.published_year]  -- stored as metadata; filterable in SEARCH WHERE
+OPTIONS { indexConfig: { `vector.dimensions`: 1536, `vector.similarity_function`: 'cosine' } }
+```
+
+Multi-label index with filterable properties [2026.01+]:
+```cypher
+CYPHER 25
+CREATE VECTOR INDEX doc_embedding IF NOT EXISTS
+FOR (n:Document|Article) ON n.embedding
+WITH [n.author, n.published_year, n.lang]
+OPTIONS { indexConfig: { `vector.dimensions`: 1536, `vector.similarity_function`: 'cosine' } }
+```
+
 Relationship index:
 ```cypher
 CYPHER 25
@@ -71,13 +89,7 @@ FOR ()-[r:HAS_CHUNK]-() ON (r.embedding)
 OPTIONS { indexConfig: { `vector.dimensions`: 768, `vector.similarity_function`: 'cosine' } }
 ```
 
-Multi-label index (2026.01+ only, vector-3.0 provider):
-```cypher
-CYPHER 25
-CREATE VECTOR INDEX multi_chunk IF NOT EXISTS
-FOR (n:Chunk|Document) ON n.embedding
-OPTIONS { indexConfig: { `vector.dimensions`: 1536, `vector.similarity_function`: 'cosine' } }
-```
+**`WITH` property types** — only scalar types allowed: `INTEGER`, `FLOAT`, `STRING`, `BOOLEAN`, `DATE`, `ZONED DATETIME`, `LOCAL DATETIME`, `ZONED TIME`, `LOCAL TIME`, `DURATION`. Not allowed: `LIST`, `POINT`, or the vector property itself.
 
 **Index config reference:**
 
@@ -170,29 +182,43 @@ RETURN c.text, score
 ORDER BY score DESC
 ```
 
-With in-index filter (AND only — no OR/NOT):
+With in-index filter [2026.01+] — properties must be declared in `WITH` at index creation:
 ```cypher
+-- Index must have been created with: WITH [c.source, c.lang, c.published_year]
 CYPHER 25
 MATCH (c:Chunk)
   SEARCH c IN (
     VECTOR INDEX chunk_embedding
     FOR $queryEmbedding
-    WHERE c.source = $source AND c.lang = 'en'
+    WHERE c.source = $source AND c.lang = 'en' AND c.published_year >= 2024
     LIMIT 10
   ) SCORE AS score
 RETURN c.text, c.source, score
 ORDER BY score DESC
 ```
 
-### Procedure fallback (2025.x)
+**Filtering strategy — choose one:**
+
+| Strategy | When to use | Tradeoff |
+|---|---|---|
+| In-index `WHERE` [2026.01+] | Filters on pre-declared `WITH` properties; known at index design time | Fast, consistent latency; properties must be declared upfront |
+| Post-filter (MATCH + procedure) | Arbitrary Cypher predicates, graph traversal, OR/NOT | Full flexibility; may over-fetch then discard |
+| Pre-filter (MATCH first, then SEARCH) | Small known candidate set; exact nearest-neighbor within subset | Deterministic; slow on large candidate sets |
+
+**In-index `WHERE` hard limits [2026.01+]:**
+- Property must be listed in `WITH [...]` at index creation — undeclared properties silently fall back to post-filtering
+- AND predicates only — no OR, NOT, list ops, string ops
+- Scalar types only: `INTEGER`, `FLOAT`, `STRING`, `BOOLEAN`, temporal types — not VECTOR/LIST/POINT
+
+### Post-filter pattern (2025.x or arbitrary predicates)
 
 ```cypher
 CYPHER 25
-CALL db.index.vector.queryNodes('chunk_embedding', 10, $queryEmbedding)
+CALL db.index.vector.queryNodes('chunk_embedding', 50, $queryEmbedding)
 YIELD node AS c, score
-WHERE c.source = $source
+WHERE c.source = $source    -- post-filter: fetch more, then filter
 RETURN c.text, score
-ORDER BY score DESC
+ORDER BY score DESC LIMIT 10
 ```
 
 Relationship index procedure:
@@ -203,8 +229,7 @@ YIELD relationship AS r, score
 RETURN r.text, score
 ```
 
-**SEARCH clause hard limits:**
-- `WHERE` inside SEARCH: AND predicates only; no OR, NOT, list ops, string ops, VECTOR/LIST/POINT types
+**SEARCH clause hard limits (all versions):**
 - Index name cannot be a parameter (`$indexName` not allowed — use literal string)
 - Binding variable must come from the enclosing MATCH pattern
 - Query vector cannot reference the binding variable
@@ -390,63 +415,6 @@ For Python-generated embeddings, use the Python UNWIND batch pattern (Step 3) in
 
 ---
 
-## Chunking Strategy Before Ingestion
-
-Embedding models have token limits. Chunk before embedding.
-
-**Strategy decision table:**
-
-| Data type | Recommended strategy |
-|---|---|
-| API docs, structured pages | Split by method / endpoint / section |
-| Prose documents, PDFs | Paragraph split (`\n\n`) with size cap |
-| Arbitrary/mixed text | Character split with overlap |
-| Audio/image | Equal-length segments |
-
-**Python chunking pattern (LangChain `CharacterTextSplitter`):**
-```python
-from langchain_text_splitters import CharacterTextSplitter
-
-splitter = CharacterTextSplitter(
-    separator="\n\n",       # split on paragraph boundaries
-    chunk_size=1500,        # max chars per chunk
-    chunk_overlap=200,      # overlap to preserve cross-paragraph context
-)
-chunks = splitter.split_documents(documents)
-```
-
-**How splitter combines:**
-1. Splits on `separator` (`\n\n`) → paragraph list
-2. Combines paragraphs up to `chunk_size` chars
-3. If single paragraph > `chunk_size` → kept as oversized chunk (not split further)
-4. Last paragraph of chunk appended to start of next if ≤ `chunk_overlap` chars
-
-**Batch embed + store pattern (large corpora):**
-```python
-BATCH_SIZE = 500  # tune: 100–1000 depending on model rate limits
-
-for i in range(0, len(chunks), BATCH_SIZE):
-    batch = chunks[i : i + BATCH_SIZE]
-    texts = [c.page_content for c in batch]
-    embeddings = embed_batch(texts)          # single API call for whole batch
-    rows = [{"id": c.metadata["id"], "text": t, "embedding": emb}
-            for c, t, emb in zip(batch, texts, embeddings)]
-    driver.execute_query(
-        """
-        UNWIND $rows AS row
-        MERGE (c:Chunk {id: row.id})
-        SET c.text = row.text
-        WITH c, row
-        CALL db.create.setNodeVectorProperty(c, 'embedding', row.embedding)
-        """,
-        rows=rows
-    )
-```
-
-**Overlapping chunks**: End of chunk N = start of chunk N+1. Improves recall for queries that span paragraph boundaries.
-
----
-
 ## Similarity Function — Extended Guidance
 
 Existing table (Step 1) gives the basic rule. Additional guidance from course patterns:
@@ -496,3 +464,5 @@ Load on demand:
 - [Vector functions docs](https://neo4j.com/docs/cypher-manual/25/functions/vector/)
 - [ai.text.embed() / GenAI plugin docs](https://neo4j.com/docs/genai/plugin/current/) [2025.12] — replaces deprecated `genai.vector.encode()`
 - [db.create.setNodeVectorProperty docs](https://neo4j.com/docs/operations-manual/current/reference/procedures/)
+- [Chunking strategy, batch embed+store, splitter patterns](../neo4j-document-import-skill/SKILL.md) — see document import skill
+- [Vector search with filters — 2026.01 preview](https://neo4j.com/blog/genai/vector-search-with-filters-in-neo4j-v2026-01-preview/)
