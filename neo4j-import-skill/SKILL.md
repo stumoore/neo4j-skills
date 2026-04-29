@@ -473,6 +473,8 @@ Do NOT run production queries until all indexes are ONLINE.
 - [APOC periodic execution](https://neo4j.com/docs/apoc/current/graph-updates/periodic-execution/)
 - [APOC load procedures](https://neo4j.com/docs/apoc/current/import/)
 - [GraphAcademy: Importing CSV Data](https://graphacademy.neo4j.com/courses/importing-cypher/)
+- [Data Importer GUI — when to use, Aura access, multi-pass, gotchas](references/data-importer-gui.md)
+- [Post-import refactoring — split lists, extract nodes, add labels, FK validation](references/post-import-refactoring.md)
 
 ---
 

@@ -423,6 +423,69 @@ If rows returned: wait, then re-run. ONLINE = safe to ingest.
 
 ---
 
+## GraphSchema — Current API (≥1.7.1)
+
+`entities`/`relations`/`potential_schema` deprecated since 1.7.1. Use `schema=GraphSchema(...)`:
+
+```python
+from neo4j_graphrag.experimental.components.schema import (
+    GraphSchema, NodeType, RelationshipType, PropertyType
+)
+schema = GraphSchema(
+    node_types=[
+        NodeType(label="Person", properties=[PropertyType(name="name", type="STRING")]),
+        NodeType(label="Organization", properties=[PropertyType(name="name", type="STRING")]),
+    ],
+    relationship_types=[RelationshipType(label="WORKS_AT")],
+    patterns=[("Person", "WORKS_AT", "Organization")],
+)
+pipeline = SimpleKGPipeline(llm=llm, driver=driver, embedder=embedder, schema=schema)
+```
+
+`schema="FREE"` (no guidance) or `schema="EXTRACTED"` (LLM infers) — exploration only, noisier output.
+
+---
+
+## LexicalGraphConfig — Customize Labels
+
+Override default lexical layer labels (keep defaults unless integrating with existing graph):
+```python
+from neo4j_graphrag.experimental.components.types import LexicalGraphConfig
+# All fields have sensible defaults — only override what differs from your graph's conventions
+config = LexicalGraphConfig(
+    document_node_label="Article",             # default: "Document"
+    chunk_node_label="Passage",                # default: "Chunk"
+    node_to_chunk_relationship_type="HAS_ENTITY",  # default: "MENTIONS"
+    chunk_text_property="content",             # default: "text"
+)
+pipeline = SimpleKGPipeline(..., lexical_graph_config=config)
+```
+
+---
+
+## Custom Document Loaders
+
+Default `file_loader` auto-dispatches by extension (`.pdf`→`PdfLoader`, `.md`→`MarkdownLoader`).
+Supports fsspec URIs (`s3://`, `gcs://`). Subclass `DataLoader` for HTML/web/custom formats:
+
+```python
+from neo4j_graphrag.experimental.components.data_loader import DataLoader
+from neo4j_graphrag.experimental.components.types import DocumentInfo, LoadedDocument
+
+class WebPageLoader(DataLoader):
+    async def run(self, filepath, metadata=None):
+        import httpx
+        text = httpx.get(filepath).text   # strip HTML in real impl
+        return LoadedDocument(text=text,
+            document_info=DocumentInfo(path=filepath, metadata=metadata))
+
+pipeline = SimpleKGPipeline(..., file_loader=WebPageLoader(), from_file=True)
+```
+
+Chunking strategy by use-case and full resolver config: [references/kg-construction.md](references/kg-construction.md).
+
+---
+
 ## References
 
 Load on demand:
@@ -434,3 +497,4 @@ Load on demand:
 - [GraphAcademy: Building Knowledge Graphs with LLMs](https://graphacademy.neo4j.com/courses/llm-knowledge-graph-construction/)
 - [LangChain Neo4j Integration](https://python.langchain.com/docs/integrations/graphs/neo4j_cypher/)
 - [LlamaIndex Neo4jQueryEngine](https://docs.llamaindex.ai/en/stable/examples/index_structs/knowledge_graph/Neo4jKGIndexDemo/)
+- [Extended KG Construction Reference](references/kg-construction.md)

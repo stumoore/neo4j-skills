@@ -394,6 +394,82 @@ response = rag.search(
 
 ---
 
+## Step 11 — KG Pipeline Customization
+
+### Chunking (FixedSizeSplitter)
+
+```python
+from neo4j_graphrag.experimental.components.text_splitters.fixed_size_splitter import FixedSizeSplitter
+
+splitter = FixedSizeSplitter(chunk_size=500, chunk_overlap=100)
+pipeline = SimpleKGPipeline(..., text_splitter=splitter)
+```
+
+| Goal | chunk_size | chunk_overlap |
+|---|---|---|
+| Semantic search quality | 500–1000 chars | 100–200 |
+| Dense entity extraction | 200–500 chars | 50–100 |
+| Max LLM context (fewer chunks) | 1500–2000 chars | 200–400 |
+
+LangChain adapter: `from neo4j_graphrag.experimental.components.text_splitters.langchain import LangChainTextSplitterAdapter`
+
+### LexicalGraphConfig (rename Document/Chunk node labels)
+
+```python
+from neo4j_graphrag.experimental.components.kg_writer import LexicalGraphConfig
+
+config = LexicalGraphConfig(
+    document_node_label="Lesson",
+    chunk_node_label="Section",
+    chunk_to_document_relationship_type="PART_OF",
+)
+pipeline = SimpleKGPipeline(..., lexical_graph_config=config)
+```
+
+### Entity Resolution (post-processing)
+
+Default: merge entities with identical label+name. Post-processing resolvers available:
+
+```python
+from neo4j_graphrag.experimental.components.resolver import (
+    SpacySemanticMatchResolver,   # spaCy similarity; pip install neo4j-graphrag[spacy]
+    FuzzyMatchResolver,           # rapidfuzz; pip install neo4j-graphrag[fuzzy]
+)
+resolver = FuzzyMatchResolver(driver=driver, neo4j_database="neo4j")
+asyncio.run(resolver.run())  # run after pipeline ingestion
+```
+
+### Custom PDF / Data Loader
+
+```python
+from neo4j_graphrag.experimental.components.pdf_loader import PdfLoader
+
+class CustomPDFLoader(PdfLoader):
+    async def run(self, filepath):           # override to pre-process text
+        doc = await super().run(filepath)
+        doc.text = re.sub(r"^:.*$", "", doc.text, flags=re.MULTILINE)
+        return doc
+
+pipeline = SimpleKGPipeline(..., pdf_loader=CustomPDFLoader())
+```
+
+### KG Builder Prompt Customization
+
+```python
+from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
+from neo4j_graphrag.experimental.components.entity_relation_extractor import OnError
+
+domain_instructions = "Extract ONLY technology companies and their products."
+pipeline = SimpleKGPipeline(
+    ...,
+    prompt_template=domain_instructions + "\n\n{default_prompt}",
+)
+```
+
+Full reference: [references/knowledge-graph-construction.md](references/knowledge-graph-construction.md)
+
+---
+
 ## Checklist
 
 - [ ] `neo4j-genai` uninstalled; `neo4j-graphrag` installed; import paths updated
@@ -406,4 +482,6 @@ response = rag.search(
 - [ ] `retriever_config={"top_k": N}` set on `rag.search()` (default 5)
 - [ ] `SimpleKGPipeline.run_async()` called with `asyncio.run()`
 - [ ] `on_error="RAISE"` used during development; switch to `"IGNORE"` in production
+- [ ] `chunk_size` tuned for use case (500–1000 chars for semantic search)
+- [ ] Post-processing resolvers run after ingestion if `perform_entity_resolution=False`
 - [ ] Credentials in env vars; never hardcoded

@@ -8,7 +8,7 @@ Configure via environment variables or agent plugin settings:
 
 | Variable | Description |
 |---|---|
-| `NEO4J_URI` | Bolt URI — `neo4j+s://xxxx.databases.neo4j.io` (Aura) or `neo4j://localhost:7687` (local) |
+| `NEO4J_URI` | Bolt URI — `neo4j+s://<dbid>.databases.neo4j.io` (Aura) or `neo4j://localhost:7687` (local) |
 | `NEO4J_USERNAME` | Database username (default: `neo4j`) |
 | `NEO4J_PASSWORD` | Database password |
 | `NEO4J_DATABASE` | Target database (default: `neo4j`) |
@@ -43,11 +43,14 @@ Configure via environment variables or agent plugin settings:
 
 ```bash
 # Aura (cloud)
-NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io
-NEO4J_USERNAME=neo4j
+NEO4J_URI=neo4j+s://<dbid>.databases.neo4j.io
+NEO4J_USERNAME=neo4j or <dbid>
 NEO4J_PASSWORD=<your-password>
+NEO4J_DATABASE=neo4j or <dbid>
 
 # Local (Docker)
-docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:2025
+docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j
 NEO4J_URI=neo4j://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
 ```

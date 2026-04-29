@@ -326,8 +326,170 @@ DROP INDEX chunk_embedding IF EXISTS;
 
 ---
 
+## In-Cypher Embedding Generation — genai.vector.encode()
+
+Generate embeddings at query time without external Python code:
+
+```cypher
+// Syntax
+genai.vector.encode(resource :: STRING, provider :: STRING, configuration :: MAP) :: LIST<FLOAT>
+```
+
+**Supported providers:**
+
+| Provider string | Required config keys | Notes |
+|---|---|---|
+| `'OpenAI'` | `token` (API key), optional `model` | Default model: `text-embedding-ada-002` |
+| `'VertexAI'` | `token`, `projectId`, `location` | Google Vertex AI |
+| `'Bedrock'` | `accessKeyId`, `secretAccessKey`, `region` | AWS Bedrock |
+| `'Azure'` | `token`, `resource`, `deployment` | Azure OpenAI |
+
+Full query pattern — encode at query time, search immediately:
+```cypher
+WITH genai.vector.encode(
+    "What are good open source projects",
+    "OpenAI",
+    { token: $openaiKey }) AS userEmbedding
+CALL db.index.vector.queryNodes('chunk_embedding', 6, userEmbedding)
+YIELD node AS c, score
+RETURN c.text, score
+ORDER BY score DESC
+```
+
+With SEARCH clause (2026.01+):
+```cypher
+WITH genai.vector.encode("my query", "OpenAI", { token: $openaiKey }) AS userEmbedding
+MATCH (c:Chunk)
+  SEARCH c IN (VECTOR INDEX chunk_embedding FOR userEmbedding LIMIT 6) SCORE AS score
+RETURN c.text, score
+ORDER BY score DESC
+```
+
+❌ Never pass API key as literal string in production — use `$param` or `apoc.static.get()`.
+✅ Use `$openaiKey` parameter; inject via driver params dict.
+
+**Rule**: Use same model at ingest time and query time — embeddings from different models are not comparable.
+
+---
+
+## Cypher-Based Embedding Ingestion — db.create.setNodeVectorProperty
+
+Set vector property via Cypher (e.g. during LOAD CSV or MERGE pipeline):
+```cypher
+LOAD CSV WITH HEADERS FROM 'https://example.com/data.csv' AS row
+MERGE (q:Question {text: row.question})
+WITH q, row
+CALL db.create.setNodeVectorProperty(q, 'embedding', apoc.convert.fromJsonList(row.question_embedding))
+```
+
+Use when embedding is already in CSV/JSON form as a string — `apoc.convert.fromJsonList()` converts `"[0.1,0.2,...]"` to `LIST<FLOAT>`.
+For Python-generated embeddings, use the Python UNWIND batch pattern (Step 3) instead.
+
+---
+
+## Chunking Strategy Before Ingestion
+
+Embedding models have token limits. Chunk before embedding.
+
+**Strategy decision table:**
+
+| Data type | Recommended strategy |
+|---|---|
+| API docs, structured pages | Split by method / endpoint / section |
+| Prose documents, PDFs | Paragraph split (`\n\n`) with size cap |
+| Arbitrary/mixed text | Character split with overlap |
+| Audio/image | Equal-length segments |
+
+**Python chunking pattern (LangChain `CharacterTextSplitter`):**
+```python
+from langchain_text_splitters import CharacterTextSplitter
+
+splitter = CharacterTextSplitter(
+    separator="\n\n",       # split on paragraph boundaries
+    chunk_size=1500,        # max chars per chunk
+    chunk_overlap=200,      # overlap to preserve cross-paragraph context
+)
+chunks = splitter.split_documents(documents)
+```
+
+**How splitter combines:**
+1. Splits on `separator` (`\n\n`) → paragraph list
+2. Combines paragraphs up to `chunk_size` chars
+3. If single paragraph > `chunk_size` → kept as oversized chunk (not split further)
+4. Last paragraph of chunk appended to start of next if ≤ `chunk_overlap` chars
+
+**Batch embed + store pattern (large corpora):**
+```python
+BATCH_SIZE = 500  # tune: 100–1000 depending on model rate limits
+
+for i in range(0, len(chunks), BATCH_SIZE):
+    batch = chunks[i : i + BATCH_SIZE]
+    texts = [c.page_content for c in batch]
+    embeddings = embed_batch(texts)          # single API call for whole batch
+    rows = [{"id": c.metadata["id"], "text": t, "embedding": emb}
+            for c, t, emb in zip(batch, texts, embeddings)]
+    driver.execute_query(
+        """
+        UNWIND $rows AS row
+        MERGE (c:Chunk {id: row.id})
+        SET c.text = row.text
+        WITH c, row
+        CALL db.create.setNodeVectorProperty(c, 'embedding', row.embedding)
+        """,
+        rows=rows
+    )
+```
+
+**Overlapping chunks**: End of chunk N = start of chunk N+1. Improves recall for queries that span paragraph boundaries.
+
+---
+
+## Similarity Function — Extended Guidance
+
+Existing table (Step 1) gives the basic rule. Additional guidance from course patterns:
+
+**Choose based on training loss function:**
+- Check embedding model docs — models trained with cosine loss → use `'cosine'`
+- Models trained with L2/Euclidean loss → use `'euclidean'`
+- When docs are silent: default to `'cosine'` (all major hosted APIs use it)
+
+**Common pitfall — wrong similarity function:**
+```
+❌ Created index with 'euclidean' but model outputs L2-normalized vectors
+   → scores are mathematically correct but rankings differ from expected cosine order
+   → no error thrown; wrong results silently returned
+✅ Verify: run vector.similarity.cosine(a.embedding, b.embedding) manually on known
+   similar pairs — score should be > 0.9 for near-duplicate text
+```
+
+**Sanity check query after index creation:**
+```cypher
+MATCH (c:Chunk) WITH c LIMIT 2
+WITH collect(c) AS nodes
+RETURN vector.similarity.cosine(nodes[0].embedding, nodes[1].embedding) AS cosine_check,
+       vector.similarity.euclidean(nodes[0].embedding, nodes[1].embedding) AS euclidean_check
+```
+If both return `null` → embeddings not set. If cosine returns `1.0` → identical vectors (embed call failed).
+
+---
+
+## Gotchas — Extended
+
+| Gotcha | Detail | Fix |
+|---|---|---|
+| Index not ONLINE at ingest time | Inserting nodes before index exists is valid — index auto-populates. But querying during `POPULATING` returns partial results | Always poll `state = 'ONLINE'` before first query |
+| Wrong dimensions — silent failure | Stored vector dim ≠ `vector.dimensions` → `IllegalArgumentException` at query time, not at ingest time | Assert `len(emb) == expected_dim` before every `SET c.embedding` |
+| Different models at ingest vs query | No error; cosine scores ~0.3–0.5 for clearly similar text | Use same model string/version for both; store model name as node metadata |
+| Missing model at query | `genai.vector.encode` returns `null` silently if provider config wrong | Test encode call standalone; check `RETURN genai.vector.encode(...)` before embedding into pipeline |
+| Large single-transaction ingest | One transaction for 10k nodes → OOM or timeout | Use `UNWIND $rows ... CALL IN TRANSACTIONS OF 500 ROWS` or Python batch loop |
+| Chunk overlap not set | Adjacent chunks with no overlap → context at boundaries lost → poor recall for cross-paragraph queries | Set `chunk_overlap` ≥ 10% of `chunk_size` |
+
+---
+
 ## References
 Load on demand:
 - [Vector index docs](https://neo4j.com/docs/cypher-manual/25/indexes/semantic-indexes/vector-indexes/)
 - [SEARCH clause docs](https://neo4j.com/docs/cypher-manual/25/clauses/search/)
 - [Vector functions docs](https://neo4j.com/docs/cypher-manual/25/functions/vector/)
+- [genai.vector.encode() docs](https://neo4j.com/docs/cypher-manual/current/genai-integrations/)
+- [db.create.setNodeVectorProperty docs](https://neo4j.com/docs/operations-manual/current/reference/procedures/)
