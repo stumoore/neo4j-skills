@@ -1,53 +1,33 @@
 # neo4j-aura-graph-analytics-skill
 
-Guides agents through **Aura Graph Analytics (AGA)** — Neo4j's serverless, on-demand graph algorithm compute environment. AGA runs GDS algorithms in isolated ephemeral sessions, billed per minute, with no embedded plugin required.
+Guides agents through **Aura Graph Analytics (AGA)** — Neo4j's serverless, on-demand GDS compute environment. Algorithms run in isolated ephemeral sessions billed per minute; no embedded GDS plugin required.
 
 ## What this skill covers
 
-**Session Lifecycle**
-- Authentication with Aura API credentials (`GdsSessions`, `AuraAPICredentials`)
-- Memory sizing and estimation (`sessions.estimate()`, `SessionMemory` tiers)
-- Cloud location selection
-- Session creation, reconnection, listing, and deletion (`get_or_create`, `sessions.list()`, `sessions.delete()`)
-- TTL (time-to-live) configuration to avoid unexpected costs
+- Authentication with Aura API credentials (`GdsSessions`, `AuraAPICredentials.from_env()`)
+- Memory estimation and `SessionMemory` tier selection
+- Session creation, reconnection, listing, and deletion (`get_or_create`, TTL)
+- Three data source modes: AuraDB-connected, self-managed Neo4j, standalone (Pandas/Spark)
+- Remote graph projection (`gds.graph.project.remote()`)
+- Standalone graph construction from DataFrames (`gds.graph.construct()`)
+- Algorithm execution: mutate / stream / write modes
+- Async job polling pattern
+- Result retrieval (`gds.graph.nodeProperties.stream()`, `db_node_properties`)
+- Write-back to connected Neo4j; cleanup before session deletion
+- Common errors and mitigations (session expired, graph not projected, memory exceeded)
 
-**Three Data Source Modes**
-- **AuraDB-connected**: remote projection from AuraDB via `gds.graph.project.remote()` in Cypher
-- **Self-managed Neo4j**: same remote projection against a self-hosted instance
-- **Standalone**: load from Pandas DataFrames via `gds.graph.construct()` — no Neo4j database needed
+## Compatibility
 
-**Graph Projection**
-- Remote projection with multi-label, multi-relationship, node properties
-- `CALL () { ... }` pattern for multi-pattern MATCH clauses
-- `gds.graph.construct()` from DataFrames (standalone) with required column conventions
-- Spark integration via the Arrow client (`gds.arrow_client()`, `mapInArrow`)
+`graphdatascience >= 1.15` · Aura Business Critical and VDC tiers · Python >= 3.8
 
-**Algorithm Execution**
-- All GDS algorithms work in AGA (mutate / write / stream / stats modes)
-- Exception: topological link prediction is not supported
-- ML pipelines with session-local model catalog
+## Not covered
 
-**Results**
-- `gds.graph.nodeProperties.stream()` with `db_node_properties` context
-- `gds.graph.nodeProperties.write()` — bulk write back to connected Neo4j
-- Algorithm `.write()` modes — persist directly to the connected database
-- `gds.run_cypher()` — query the connected Neo4j instance from within the session
-
-## When to use this skill vs neo4j-gds-skill
-
-| Scenario | Skill to use |
-|---|---|
-| AuraDB Business Critical or VDC | **this skill** |
-| Non-Neo4j data source (Pandas, Spark, CSV) | **this skill** |
-| On-demand / pipeline workload (pay per use) | **this skill** |
-| Aura Pro with embedded GDS plugin | `neo4j-gds-skill` |
-| Self-managed Neo4j with GDS plugin | `neo4j-gds-skill` |
+- **Embedded GDS plugin** (Aura Pro, self-managed Neo4j) → `neo4j-gds-skill`
+- **Cypher query authoring** → `neo4j-cypher-skill`
+- **Snowflake Graph Analytics** → `neo4j-snowflake-graph-analytics-skill`
 
 ## Install
 
 ```bash
 npx skills add https://github.com/neo4j-contrib/neo4j-skills --skill neo4j-aura-graph-analytics-skill
 ```
-
-Or paste this link into your coding assistant:
-https://github.com/neo4j-contrib/neo4j-skills/tree/main/neo4j-aura-graph-analytics-skill

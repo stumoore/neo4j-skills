@@ -1,18 +1,31 @@
-> **Status: Draft / WIP**
-
 # neo4j-driver-python-skill
 
-Comprehensive guide to using the official Neo4j Python Driver (v6, current stable) — covering
-installation, driver lifecycle, all three query APIs (execute_query, managed transactions via
-execute_read/write, implicit transactions via session.run), async patterns with AsyncGraphDatabase,
-result handling and consumption, data type mapping (including temporal and graph types), UNWIND
-batching, null safety, performance tuning, causal consistency/bookmarks, and connection
-configuration.
+Skill for writing Python applications that connect to Neo4j using the official Neo4j Python Driver.
+
+**Covers:**
+- Installation and driver lifecycle (singleton pattern, `verify_connectivity`)
+- URI schemes and auth options (Aura, bolt, bearer, Kerberos)
+- `execute_query` — default API with `RoutingControl`, `result_transformer_`, trailing-underscore convention
+- Managed transactions (`execute_read` / `execute_write`) — retry safety, result lifetime, `@unit_of_work`
+- Implicit transactions (`session.run`) — `LOAD CSV`, `CALL {} IN TRANSACTIONS`
+- Async driver (`AsyncGraphDatabase`) — FastAPI lifespan pattern, `asyncio.gather`
+- Error handling — `ConstraintError`, `ServiceUnavailable`, `TransientError`, GQL status codes
+- Result access — `Record`, `record.data()`, JSON serialization gotchas
+- Data type mapping — Python ↔ Cypher, temporal types, graph objects (`Node`, `Relationship`)
+- UNWIND batch writes (`list[dict]` only)
+- Connection pool tuning and session exhaustion
+- Causal consistency and bookmarks
+
+**Version / compatibility:**
+- Driver v6.x (Jan 2026+) — package name is `neo4j`, not `neo4j-driver`
+- Python ≥ 3.10 required
+
+**Not covered:**
+- Cypher query authoring → use `neo4j-cypher-skill`
+- Driver version upgrades / breaking changes → use `neo4j-migration-skill`
+- GraphRAG pipelines (`neo4j-graphrag` package) → use `neo4j-graphrag-skill`
 
 **Install:**
 ```bash
-npx skills add https://github.com/neo4j-contrib/neo4j-skills --skill neo4j-driver-python-skill
+pip install neo4j
 ```
-
-Or paste this link into your coding assistant:
-https://github.com/neo4j-contrib/neo4j-skills/tree/main/neo4j-driver-python-skill

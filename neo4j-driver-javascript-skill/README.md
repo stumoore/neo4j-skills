@@ -1,18 +1,23 @@
-> **Status: Draft / WIP**
-
 # neo4j-driver-javascript-skill
 
-Comprehensive guide to using the official Neo4j JavaScript/TypeScript Driver (v6) — covering
-installation, driver lifecycle, all three query APIs (executeQuery, managed transactions via
-executeRead/Write, auto-commit via session.run), Integer handling and JSON serialization,
-temporal and graph types, result consumption, async/Promise error handling and session closure,
-UNWIND batching, performance, causal consistency, TypeScript usage, and browser/WebSocket
-support.
+Skill for the official Neo4j JavaScript/TypeScript Driver (v6) — covering:
+
+- Driver setup, connection URIs, and authentication
+- `executeQuery` (default API), `executeRead/Write` (managed transactions), `session.run` (implicit transactions)
+- Integer handling (`neo4j.int`, `disableLosslessIntegers`, `useBigInt`) and JSON serialization
+- Record access (`.get()`) and common serialization pitfalls
+- Async/await patterns and session close safety (`finally` block)
+- TypeScript types (`Driver`, `Session`, `ManagedTransaction`, `Node<Integer>`)
+- Error handling (`Neo4jError`, `SERVICE_UNAVAILABLE`, retriable errors)
+- Batch writes with `UNWIND`
+
+**Not covered** (see sibling skills):
+- Cypher query authoring → `neo4j-cypher-skill`
+- Driver version migration → `neo4j-migration-skill`
+
+**Compatibility**: `neo4j-driver` v6; Node.js >=18; browser via bundler (webpack/Vite/Rollup)
 
 **Install:**
 ```bash
-npx skills add https://github.com/neo4j-contrib/neo4j-skills --skill neo4j-driver-javascript-skill
+npm install neo4j-driver
 ```
-
-Or paste this link into your coding assistant:
-https://github.com/neo4j-contrib/neo4j-skills/tree/main/neo4j-driver-javascript-skill

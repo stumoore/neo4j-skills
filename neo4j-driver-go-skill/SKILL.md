@@ -1,80 +1,57 @@
 ---
 name: neo4j-driver-go-skill
-description: Comprehensive guide to using the official Neo4j Go Driver (v6, current stable) — covering
-  installation, driver lifecycle, all three transaction APIs (ExecuteQuery, managed transactions,
-  explicit transactions), error handling, data type mapping, performance tuning, causal
-  consistency, and connection configuration. Use this skill whenever writing Go code that talks
-  to Neo4j, whenever reviewing or debugging Neo4j driver usage in Go, or whenever questions
-  arise about sessions, transactions, bookmarks, result handling, or driver configuration.
-  Also triggers on neo4j-go-driver, NewDriver, ExecuteQuery, SessionConfig, ManagedTransaction,
-  or any Neo4j Bolt/Aura connection work in Go.
-  
+description: Covers the Neo4j Go Driver v6 — driver lifecycle, ExecuteQuery, managed and
+  explicit transactions, session config, error handling, data type mapping, and connection
+  tuning. Use when writing Go code that connects to Neo4j, setting up NewDriver or ExecuteQuery,
+  debugging sessions/transactions/result handling, or working with neo4j-go-driver v5→v6 migration.
+  Triggers on NewDriver, ExecuteQuery, SessionConfig, ManagedTransaction, neo4j-go-driver.
   Does NOT handle Cypher query authoring — use neo4j-cypher-skill.
-status: draft
-version: 0.1.1
-allowed-tools: Bash, WebFetch
+  Does NOT cover driver version migration steps — use neo4j-migration-skill.
+version: 1.0.0
+allowed-tools: Bash WebFetch
 ---
 
- 
-# Neo4j Go Driver
- 
-**Import path**: `github.com/neo4j/neo4j-go-driver/v6/neo4j`  
-**Current stable**: v6  
-**Docs**: https://neo4j.com/docs/go-manual/current/  
-**API ref**: https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v6/neo4j
- 
 ## When to Use
-
 - Writing Go code that connects to Neo4j
-- Setting up `neo4j.NewDriver()`, `ExecuteQuery()`, or session/transaction patterns in Go
-- Questions about managed vs explicit transactions, error handling, or data type mapping in Go
-- Debugging connection, result handling, or causal consistency issues
+- Setting up `neo4j.NewDriver()`, `ExecuteQuery()`, or session/transaction patterns
+- Debugging connection errors, result iteration, type assertions, causal consistency
 
 ## When NOT to Use
-
-- **Writing or optimizing Cypher queries** → use `neo4j-cypher-skill`
-- **Upgrading from an older driver version** → use `neo4j-migration-skill`
+- **Writing/optimizing Cypher** → `neo4j-cypher-skill`
+- **v5→v6 migration steps** → `neo4j-migration-skill`
 
 ---
 
 ## Installation
- 
+
 ```bash
 go get github.com/neo4j/neo4j-go-driver/v6
 ```
- 
-### Migrating from v5?
- 
-In v6 the `WithContext` suffix was dropped — the whole API is now context-aware by default:
- 
+
+Import: `github.com/neo4j/neo4j-go-driver/v6/neo4j`
+
+**v5→v6 rename** (deprecated aliases still compile, remove before v7):
+
 | v5 | v6 |
 |----|----|
 | `neo4j.NewDriverWithContext(...)` | `neo4j.NewDriver(...)` |
 | `neo4j.DriverWithContext` | `neo4j.Driver` |
- 
-The old names still exist as **deprecated aliases** (removed in v7), so v5 code compiles unchanged — but new code should use the v6 names.
- 
+
 ---
- 
-## 1. Driver Lifecycle
- 
-`Driver` is **immutable, goroutine-safe, and expensive to create** — create exactly one instance per application and share it everywhere.
- 
+
+## Driver Lifecycle
+
+One `Driver` per application. Goroutine-safe, connection-pooled, expensive to create.
+
 ```go
-import (
-    "context"
-    "github.com/neo4j/neo4j-go-driver/v6/neo4j"
-)
- 
 func NewNeo4jDriver(uri, user, password string) (neo4j.Driver, error) {
     driver, err := neo4j.NewDriver(
-        uri, // e.g. "neo4j+s://xxx.databases.neo4j.io" for Aura
+        uri, // "neo4j+s://xxx.databases.neo4j.io" for Aura
         neo4j.BasicAuth(user, password, ""),
     )
     if err != nil {
         return nil, fmt.Errorf("create driver: %w", err)
     }
- 
     ctx := context.Background()
     if err := driver.VerifyConnectivity(ctx); err != nil {
         driver.Close(ctx)
@@ -82,169 +59,137 @@ func NewNeo4jDriver(uri, user, password string) (neo4j.Driver, error) {
     }
     return driver, nil
 }
- 
+
 // In main / app teardown:
 defer driver.Close(ctx)
 ```
- 
-### URI Schemes
- 
-| Scheme | When to use |
-|--------|-------------|
-| `neo4j://` | Unencrypted, cluster-routing |
-| `neo4j+s://` | Encrypted (TLS), cluster-routing — **use for Aura** |
-| `bolt://` | Unencrypted, single instance |
-| `bolt+s://` | Encrypted, single instance |
- 
-### Auth Options
- 
-```go
-neo4j.BasicAuth(user, password, "")           // username + password
-neo4j.BearerAuth(token)                        // SSO / JWT
-neo4j.KerberosAuth(base64EncodedTicket)        // Kerberos
-neo4j.NoAuth()                                 // unauthenticated (dev only)
-```
- 
----
- 
-## 2. Choosing the Right API
- 
-The driver offers three levels of transaction control. Pick the lowest complexity that meets your needs:
- 
-| API | When to use | Auto-retry? | Lazy results? |
-|-----|-------------|-------------|---------------|
-| `ExecuteQuery()` | Most queries — simple, safe default | ✅ | ❌ (eager) |
-| `session.ExecuteRead/Write()` | Need lazy streaming, or complex callback logic | ✅ | ✅ |
-| `session.BeginTransaction()` | Spanning multiple functions, external API coordination | ❌ | ✅ |
-| `session.Run()` | Self-managing queries only (see below) | ❌ | ✅ |
 
-> **Self-managing transactions** — `CALL { … } IN TRANSACTIONS` and `USING PERIODIC COMMIT` manage their own transactions internally and **fail** if run inside a managed transaction. Use `session.Run()` (auto-commit) for these queries; neither `ExecuteQuery` nor `ExecuteRead/Write` will work.
- 
+❌ Never create driver per-request. Create once at startup; share across goroutines.
+
+URI schemes: `neo4j+s://` (Aura/TLS+routing), `neo4j://` (plain+routing), `bolt+s://` (TLS+single), `bolt://` (plain+single).
+
 ---
- 
-## 3. ExecuteQuery (Recommended Default)
- 
-The simplest, highest-level API. Manages sessions, transactions, retries, and bookmarks automatically.
- 
+
+## Choosing the Right API
+
+| API | Use when | Auto-retry | Lazy results |
+|-----|----------|:----------:|:------------:|
+| `neo4j.ExecuteQuery()` | Most queries — simple default | ✅ | ❌ eager |
+| `session.ExecuteRead/Write()` | Large result sets / streaming | ✅ | ✅ |
+| `session.BeginTransaction()` | Spans multiple functions / ext coordination | ❌ | ✅ |
+| `session.Run()` | `CALL IN TRANSACTIONS` / auto-commit only | ❌ | ✅ |
+
+`CALL { … } IN TRANSACTIONS` and `USING PERIODIC COMMIT` manage their own transactions — use `session.Run()`. They fail inside managed transactions.
+
+---
+
+## ExecuteQuery (Recommended Default)
+
+Manages sessions, transactions, retries, and bookmarks automatically.
+
 ```go
 result, err := neo4j.ExecuteQuery(ctx, driver,
     `MATCH (p:Person {name: $name})-[:KNOWS]->(friend)
      RETURN friend.name AS name`,
     map[string]any{"name": "Alice"},
     neo4j.EagerResultTransformer,
-    neo4j.ExecuteQueryWithDatabase("neo4j"),        // ← always specify
-    neo4j.ExecuteQueryWithReadersRouting(),          // ← for read queries
+    neo4j.ExecuteQueryWithDatabase("neo4j"),       // always specify
+    neo4j.ExecuteQueryWithReadersRouting(),         // for read queries
 )
 if err != nil {
     return fmt.Errorf("query people: %w", err)
 }
- 
+
 for _, record := range result.Records {
     name, _ := record.Get("name")
     fmt.Println(name)
 }
- 
-// Summary / counters
 fmt.Println(result.Summary.Counters().NodesCreated())
 ```
- 
-**Key options** (variadic callbacks):
- 
+
+Key options:
 ```go
-neo4j.ExecuteQueryWithDatabase("mydb")         // required for performance
-neo4j.ExecuteQueryWithReadersRouting()          // route reads to replicas
-neo4j.ExecuteQueryWithAuthToken(token)          // per-query auth / impersonation
-neo4j.ExecuteQueryWithImpersonatedUser("jane")  // impersonate without password
+neo4j.ExecuteQueryWithDatabase("mydb")          // required for performance
+neo4j.ExecuteQueryWithReadersRouting()           // route reads to replicas
+neo4j.ExecuteQueryWithImpersonatedUser("jane")  // impersonate
 neo4j.ExecuteQueryWithoutBookmarkManager()       // opt out of causal consistency
 ```
- 
-**⚠ Never concatenate user input into query strings.** Always use `map[string]any` parameters.
- 
+
+❌ Never concatenate user input into query strings. Always use `map[string]any` parameters.
+
 ---
- 
-## 4. Session-Based Transactions
- 
-Use when you need **lazy streaming** (large result sets) or more control within the callback.
- 
+
+## Managed Transactions (Session-Based)
+
+Use for lazy streaming (large result sets) or callback-level control.
+
 ```go
 session := driver.NewSession(ctx, neo4j.SessionConfig{
     DatabaseName: "neo4j", // always specify
     AccessMode:   neo4j.AccessModeRead,
 })
 defer session.Close(ctx)
- 
+
 result, err := session.ExecuteRead(ctx,
     func(tx neo4j.ManagedTransaction) (any, error) {
-        result, err := tx.Run(ctx,
+        res, err := tx.Run(ctx,
             `MATCH (p:Person) RETURN p.name AS name LIMIT $limit`,
             map[string]any{"limit": 100},
         )
         if err != nil {
             return nil, err
         }
- 
         var names []string
-        for result.Next(ctx) { // lazy iteration — don't call Collect() on large sets
-            name, _ := result.Record().Get("name")
+        for res.Next(ctx) { // lazy — don't Collect() on large sets
+            name, _ := res.Record().Get("name")
             names = append(names, name.(string))
         }
-        return names, result.Err()
+        return names, res.Err()
     },
 )
 ```
- 
-- The callback is **automatically retried** on transient failures (leader election, lock timeouts, etc.)
-- **Do not perform side effects** in the callback that you don't want repeated on retry
-- `ExecuteRead` routes to read replicas; `ExecuteWrite` routes to the cluster leader
+
+❌ No side effects in callback — retried on transient failures.
+`ExecuteRead` → replicas. `ExecuteWrite` → cluster leader.
+
 ---
- 
-## 5. Explicit Transactions
- 
-Use when transaction work spans multiple functions or requires coordination with external systems.
- 
+
+## Explicit Transactions
+
+Use when transaction work spans multiple functions or requires external coordination.
+
 ```go
 session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 defer session.Close(ctx)
- 
+
 tx, err := session.BeginTransaction(ctx)
 if err != nil {
     return err
 }
- 
-// Pass tx to subordinate functions
 if err := doPartA(ctx, tx); err != nil {
-    tx.Rollback(ctx) // always rollback on error
+    tx.Rollback(ctx)
     return err
 }
 if err := doPartB(ctx, tx); err != nil {
     tx.Rollback(ctx)
     return err
 }
- 
 return tx.Commit(ctx)
 ```
- 
-**Explicit transactions are NOT automatically retried.** Your caller is responsible for retry logic. Prefer managed transactions unless you specifically need this control.
- 
+
+❌ Not auto-retried. Caller handles retry. Prefer managed transactions unless you need explicit control.
+
 ---
- 
-## 6. Error Handling
- 
+
+## Error Handling
+
 ```go
-import (
-    "errors"
-    "github.com/neo4j/neo4j-go-driver/v6/neo4j"
-)
- 
 result, err := neo4j.ExecuteQuery(...)
 if err != nil {
     var neo4jErr *neo4j.Neo4jError
     if errors.As(err, &neo4jErr) {
-        // neo4jErr.Code is the GQLSTATUS/Neo4j error code
-        // neo4jErr.Msg is the server message
         slog.Error("database error", "code", neo4jErr.Code, "msg", neo4jErr.Msg)
     }
- 
     var connErr *neo4j.ConnectivityError
     if errors.As(err, &connErr) {
         slog.Error("connectivity error", "err", connErr)
@@ -252,35 +197,22 @@ if err != nil {
     return fmt.Errorf("execute query: %w", err)
 }
 ```
- 
-**Error classification helpers** (useful for custom retry logic):
- 
+
+Helpers:
 ```go
-neo4j.IsNeo4jError(err)            // server-side Cypher/database error
-neo4j.IsTransactionExecutionLimit(err) // retries exhausted
-// IsRetryable is internal; rely on managed transactions for automatic retry
+neo4j.IsNeo4jError(err)                // server-side Cypher/database error
+neo4j.IsTransactionExecutionLimit(err) // managed tx retries exhausted
 ```
- 
-**Within a managed transaction callback**, return the error to trigger retry:
- 
-```go
-session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-    _, err := tx.Run(ctx, query, params)
-    if err != nil {
-        return nil, err // driver retries if transient
-    }
-    // ...
-})
-```
- 
+
+In managed tx callback: return error → driver retries if transient.
+`ConnectivityError` at startup: check URI scheme, credentials, firewall.
+
 ---
- 
-## 7. Data Types
- 
-Go ↔ Cypher type mapping:
- 
-| Cypher type | Go type |
-|-------------|---------|
+
+## Data Types
+
+| Cypher | Go |
+|--------|----|
 | `Integer` | `int64` |
 | `Float` | `float64` |
 | `String` | `string` |
@@ -294,75 +226,49 @@ Go ↔ Cypher type mapping:
 | `DateTime` | `neo4j.Time` |
 | `Duration` | `neo4j.Duration` |
 | `null` | `nil` |
- 
-**Extracting typed values safely**:
- 
+
 ```go
-record.Get("name")          // returns (any, bool) — bool is whether key exists
-record.AsMap()              // returns map[string]any for the whole record
-neo4j.GetRecordValue[string](record, "name")   // typed extraction — no manual type assert needed (v6+)
- 
-// Type assert after extraction:
+// Typed extraction (v6+, preferred):
+neo4j.GetRecordValue[string](record, "name")
+
+// Manual extraction:
 rawAge, ok := record.Get("age")
-if !ok {
-    return errors.New("missing 'age' field")
-}
-age, ok := rawAge.(int64) // Neo4j integers come back as int64
-if !ok {
-    return errors.New("'age' is not an integer")
-}
- 
+if !ok { return errors.New("missing 'age' field") }
+age := rawAge.(int64) // Neo4j integers → int64
+
 // Node access:
 rawNode, _ := record.Get("p")
 node := rawNode.(neo4j.Node)
 name := node.Props["name"].(string)
 labels := node.Labels // []string
 ```
- 
+
+❌ Always check `ok` from `record.Get()` before type-asserting — panics on missing key.
+❌ After lazy `for res.Next(ctx)` loop, always check `res.Err()`.
+
 ---
- 
-## 8. Best practices
- 
-### Always Specify the Database
- 
-```go
-// With ExecuteQuery:
-neo4j.ExecuteQueryWithDatabase("neo4j")
- 
-// With sessions:
-neo4j.SessionConfig{DatabaseName: "neo4j"}
-```
- 
-Omitting this costs a network round-trip on every call to resolve the home database.
 
-### Context  
+## Key Patterns
 
-Always pass a `context.Context` for cancellation and timeout.  `context.WithTimeout`is recommended for production queries. `context.Background()` has no deadline — a slow query will block indefinitely.
- 
-### Lazy vs Eager Loading
- 
+### Context — always propagate
+
 ```go
-// Eager (default with ExecuteQuery) — fine for small/medium result sets
-result, _ := neo4j.ExecuteQuery(ctx, driver, query, nil, neo4j.EagerResultTransformer, ...)
- 
-// Lazy — use with session.ExecuteRead/Write for large result sets
-result, _ := tx.Run(ctx, query, params)
-for result.Next(ctx) {       // stream records one at a time
-    record := result.Record()
-    // process...
-}
-if err := result.Err(); err != nil { ... }
+ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+defer cancel()
+// pass ctx to all driver calls
 ```
- 
+
+`context.Background()` has no deadline — slow queries block indefinitely.
+
 ### Batching Writes
- 
+
 ```go
 // Bad: one transaction per record
 for _, item := range items {
     neo4j.ExecuteQuery(ctx, driver, writeQuery, item, ...)
 }
- 
-// Good: all in one transaction using UNWIND
+
+// Good: UNWIND batch in one transaction
 neo4j.ExecuteQuery(ctx, driver,
     `UNWIND $items AS item
      MERGE (n:Node {id: item.id})
@@ -372,129 +278,62 @@ neo4j.ExecuteQuery(ctx, driver,
     neo4j.ExecuteQueryWithDatabase("neo4j"),
 )
 ```
- 
-### CREATE vs MERGE
- 
-Use `CREATE` when you know the data is new — `MERGE` issues two queries internally (match then create).
- 
-### Connection Pool
- 
-```go
-import "github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
- 
-driver, _ := neo4j.NewDriver(uri, auth,
-    func(conf *config.Config) {
-        conf.MaxConnectionPoolSize = 50              // default: 100
-        conf.ConnectionAcquisitionTimeout = 30 * time.Second
-        conf.MaxConnectionLifetime = 1 * time.Hour
-    },
-)
-```
- 
----
- 
-## 9. Causal Consistency & Bookmarks
- 
-**Within a single session**, queries are automatically causally chained — no action required.
- 
-**Across sessions** (e.g. parallel workers), use `ExecuteQuery` (auto-managed) or share bookmarks explicitly:
- 
-```go
-// sessionA and sessionB run concurrently; sessionC waits for both
-sessionC := driver.NewSession(ctx, neo4j.SessionConfig{
-    DatabaseName: "neo4j",
-    Bookmarks:    neo4j.CombineBookmarks(
-        sessionA.LastBookmarks(),
-        sessionB.LastBookmarks(),
-    ),
-})
-```
- 
-`ExecuteQuery` manages bookmarks automatically across calls to the same database — this is usually all you need.
- 
----
- 
-## 10. Advanced Connection Config
- 
-```go
-import (
-    "github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
-    "github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
-)
- 
-driver, err := neo4j.NewDriver(uri, auth,
-    func(conf *config.Config) {
-        // Custom address resolver (e.g. for local dev against a cluster)
-        conf.AddressResolver = func(addr config.ServerAddress) []config.ServerAddress {
-            return []config.ServerAddress{
-                neo4j.NewServerAddress("localhost", "7687"),
-            }
-        }
- 
-        // Reduce notification noise
-        conf.NotificationsMinSeverity = notifications.WarningLevel
-        conf.NotificationsDisabledClassifications = notifications.DisableClassifications(
-            notifications.Hint, notifications.Generic,
-        )
- 
-        // Bolt-level logging (debug)
-        conf.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
-    },
-)
-```
- 
----
- 
-## 11. Wrapping the Driver — Recommended Pattern
- 
-For testability and clean separation, wrap the driver behind a repository interface:
- 
-```go
-type PersonRepo struct {
-    driver neo4j.Driver
-    db     string
-}
- 
-func NewPersonRepo(driver neo4j.Driver, db string) *PersonRepo {
-    return &PersonRepo{driver: driver, db: db}
-}
- 
-func (r *PersonRepo) FindByName(ctx context.Context, name string) ([]Person, error) {
-    result, err := neo4j.ExecuteQuery(ctx, r.driver,
-        `MATCH (p:Person {name: $name}) RETURN p`,
-        map[string]any{"name": name},
-        neo4j.EagerResultTransformer,
-        neo4j.ExecuteQueryWithDatabase(r.db),
-        neo4j.ExecuteQueryWithReadersRouting(),
-    )
-    if err != nil {
-        return nil, fmt.Errorf("find person %q: %w", name, err)
-    }
- 
-    people := make([]Person, 0, len(result.Records))
-    for _, rec := range result.Records {
-        raw, _ := rec.Get("p")
-        node := raw.(neo4j.Node)
-        people = append(people, Person{
-            Name: node.Props["name"].(string),
-        })
-    }
-    return people, nil
-}
-```
- 
----
- 
-## Quick Reference: Common Mistakes
- 
-| Mistake | Fix |
-|---------|-----|
-| String-interpolating Cypher params | Use `map[string]any` params always |
-| Omitting `DatabaseName` | Always set in `SessionConfig` or `ExecuteQueryWithDatabase` |
-| Creating a new driver per request | Create once, share across goroutines |
-| Calling `Collect()` on huge result sets | Iterate with `result.Next(ctx)` instead |
-| Side effects inside managed tx callbacks | Move side effects outside; callback may be retried |
-| Using `MERGE` for guaranteed-new data | Use `CREATE` for new data; saves one round-trip |
-| Not checking `result.Err()` after lazy iteration | Always check after the `for result.Next()` loop |
-| Using explicit tx where managed tx suffices | Prefer `ExecuteRead/Write` for automatic retry |
 
+### Always Specify Database
+
+```go
+neo4j.ExecuteQueryWithDatabase("neo4j")    // in ExecuteQuery
+neo4j.SessionConfig{DatabaseName: "neo4j"} // in sessions
+```
+
+Omitting costs a network round-trip per call to resolve home database.
+
+### Causal Consistency
+
+`ExecuteQuery` manages bookmarks automatically — no action needed for sequential calls.
+Cross-session (parallel workers): combine bookmarks explicitly — see [references/repository-pattern.md](references/repository-pattern.md).
+
+---
+
+## Common Errors
+
+| Error / Symptom | Cause | Fix |
+|-----------------|-------|-----|
+| `ConnectivityError` at startup | URI wrong / TLS mismatch / firewall | Check scheme (`neo4j+s://` for Aura), credentials, port 7687 |
+| `ConnectivityError` mid-run | Pool exhausted | Increase `MaxConnectionPoolSize`; check for leaked sessions |
+| Panic on type assertion | `record.Get()` returned nil/wrong type | Use `neo4j.GetRecordValue[T]()` or check `ok` first |
+| `res.Err()` non-nil after loop | Network error mid-stream | Handle error; re-run transaction |
+| Callback retried unexpectedly | Side effect inside managed tx | Move side effects outside callback |
+| Context deadline exceeded | No timeout on context | Use `context.WithTimeout` |
+| 0 results, query looks correct | Wrong `DatabaseName` | Always set `DatabaseName` in config |
+| `CALL IN TRANSACTIONS` fails | Run inside managed tx | Use `session.Run()` (auto-commit) |
+
+---
+
+## References
+
+Load on demand:
+- [references/advanced-config.md](references/advanced-config.md) — connection pool tuning, custom address resolver, notification config, Bolt logging, auth options, URI scheme table
+- [references/repository-pattern.md](references/repository-pattern.md) — repository wrapper pattern, cross-session causal consistency with bookmarks
+
+## WebFetch
+
+| Need | URL |
+|------|-----|
+| Go driver manual | `https://neo4j.com/docs/go-manual/current/` |
+| API reference | `https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v6/neo4j` |
+
+---
+
+## Checklist
+- [ ] One driver created at startup; shared across goroutines; `defer driver.Close(ctx)`
+- [ ] `driver.VerifyConnectivity(ctx)` called at startup
+- [ ] `DatabaseName` set in all `SessionConfig` / `ExecuteQueryWithDatabase`
+- [ ] `context.WithTimeout` used for production queries
+- [ ] `map[string]any` parameters used — no string interpolation
+- [ ] `ExecuteQueryWithReadersRouting()` on read-only `ExecuteQuery` calls
+- [ ] `res.Err()` checked after lazy `for result.Next(ctx)` loop
+- [ ] Type assertions guarded (use `GetRecordValue[T]` or check `ok`)
+- [ ] No side effects inside managed transaction callbacks
+- [ ] `session.Run()` used for `CALL IN TRANSACTIONS` / auto-commit queries
+- [ ] Sessions closed with `defer session.Close(ctx)`
