@@ -110,74 +110,43 @@ Credentials: store in `.env`; never hardcode. Verify `.env` is in `.gitignore`.
 
 ## Entity Mapping
 
-### Node entity — internal generated ID
-
 ```java
 import org.springframework.data.neo4j.core.schema.*;
 
+// Internal generated ID (default for most cases)
 @Node("Person")
 public class PersonEntity {
-
-    @Id @GeneratedValue
-    private Long id;                    // Neo4j internal element ID (Long)
-
+    @Id @GeneratedValue private Long id;         // element ID (Long)
     private String name;
-
-    @Property("birth_year")             // maps Java field → Neo4j property name
-    private Integer birthYear;
-
+    @Property("birth_year") private Integer birthYear;  // custom property name
     @Relationship(type = "KNOWS", direction = Relationship.Direction.OUTGOING)
     private List<PersonEntity> friends = new ArrayList<>();
 }
-```
 
-### Node entity — UUID business key
-
-```java
+// UUID business key
 @Node("Product")
 public class ProductEntity {
-
     @Id @GeneratedValue(generatorClass = GeneratedValue.UUIDStringGenerator.class)
     private String id;
-
-    private String sku;
-
-    @Version
-    private Long version;               // optimistic locking; required with business IDs
+    @Version private Long version;               // optimistic locking; required with business key
 }
-```
 
-### Node entity — user-assigned key
-
-```java
+// User-assigned key (caller sets value; no @GeneratedValue)
 @Node("Country")
 public class CountryEntity {
-
-    @Id                                 // no @GeneratedValue — caller sets value
-    private String isoCode;
-
+    @Id private String isoCode;
     private String name;
 }
-```
 
-### Multiple labels
-
-```java
+// Multiple static labels
 @Node(primaryLabel = "Vehicle", labels = {"Car", "Auditable"})
 public class CarEntity { ... }
-```
 
-### Dynamic labels
-
-```java
+// Runtime labels
 @Node("Content")
 public class ContentEntity {
-
-    @Id @GeneratedValue
-    private Long id;
-
-    @DynamicLabels                      // Collection<String> — labels added at runtime
-    private Set<String> tags = new HashSet<>();
+    @Id @GeneratedValue private Long id;
+    @DynamicLabels private Set<String> tags = new HashSet<>();  // labels added at runtime
 }
 ```
 
@@ -448,40 +417,21 @@ Requires Neo4j 5.15+. Reuses `spring.neo4j.*` connection config.
 ### Usage
 
 ```java
-@Service
-public class VectorSearchService {
+@Autowired VectorStore vectorStore;
 
-    private final VectorStore vectorStore;
+// Store
+vectorStore.add(List.of(new Document("text", Map.of("author", "alice"))));
 
-    public VectorSearchService(VectorStore vectorStore) {
-        this.vectorStore = vectorStore;
-    }
+// Similarity search
+List<Document> results = vectorStore.similaritySearch(
+    SearchRequest.builder().query("spring neo4j").topK(5).similarityThreshold(0.75).build()
+);
 
-    public void store(List<Document> docs) {
-        vectorStore.add(docs);
-    }
-
-    public List<Document> search(String query) {
-        return vectorStore.similaritySearch(
-            SearchRequest.builder()
-                .query(query)
-                .topK(5)
-                .similarityThreshold(0.75)
-                .build()
-        );
-    }
-
-    // With metadata filter
-    public List<Document> searchFiltered(String query, String author) {
-        return vectorStore.similaritySearch(
-            SearchRequest.builder()
-                .query(query)
-                .topK(5)
-                .filterExpression("author == '" + author + "'")
-                .build()
-        );
-    }
-}
+// With metadata filter
+vectorStore.similaritySearch(
+    SearchRequest.builder().query("spring neo4j").topK(5)
+        .filterExpression("author == 'alice'").build()
+);
 ```
 
 ---
