@@ -53,15 +53,26 @@ Confirm with EXPLAIN — header must show `Runtime PARALLEL`. Only useful for la
 
 **Common triggers:**
 
-| Pattern | Why Eager appears |
-|---|---|
-| `MATCH (n:A) ... MERGE (:A {...})` | MERGE on same label as MATCH |
-| `UNWIND list MERGE (a:X) MERGE (b:X)` | Two MERGEs on same label in one row |
-| `MATCH (n:A) CREATE (m:A)` | CREATE on same label as MATCH |
-| `FOREACH (x IN list \| CREATE (:A))` | Write inside FOREACH visible to outer read |
+| Pattern | Why Eager appears | Fix |
+|---|---|---|
+| `MATCH (n:A) ... MERGE (:A {...})` | MERGE on same label as MATCH | collect first, then UNWIND+write |
+| `UNWIND list MERGE (a:X) MERGE (b:X)` | Two MERGEs on same label in one row | `CALL IN TRANSACTIONS` |
+| `MATCH (n:A) CREATE (m:A)` | CREATE on same label as MATCH | collect first |
+| `FOREACH (x IN list \| CREATE (:A))` | Write inside FOREACH visible to outer read | `UNWIND` + write |
+| `MATCH (n:A)-[]-(m) MERGE (:A {name:'London'})` | Ambiguous label scope | Add specific label to MATCH nodes |
 
-**Fix: collect first, then write**
+**Fix 1: Add specific labels to disambiguate** [official — LP Eagerness planner]
+```cypher
+// BEFORE -- Eager: planner can't tell if new :City hits :LondonGroup MATCH
+MATCH (station:LondonGroup)<-[:CALLS_AT]-(london_calling)
+MERGE (london_calling)-[:CALLS_AT_CITY]->(city:City {name: 'London'})
 
+// AFTER -- label :CallingPoint eliminates ambiguity; Eager removed
+MATCH (station:LondonGroup)<-[:CALLS_AT]-(london_calling:CallingPoint)
+MERGE (london_calling)-[:CALLS_AT_CITY]->(city:City {name: 'London'})
+```
+
+**Fix 2: collect first, then write**
 ```cypher
 // BEFORE -- triggers Eager
 MATCH (u:User {status: 'active'})
@@ -75,6 +86,7 @@ UNWIND users AS u
 MERGE (u)-[:HAS_SESSION]->(s:Session {id: randomUUID()})
 ```
 
+**Fix 3: CALL IN TRANSACTIONS** — isolates each batch; each transaction is independent
 ```cypher
 // BEFORE -- double Eager from two MERGEs on same label
 CYPHER 25
@@ -83,7 +95,7 @@ MERGE (a:Person {id: pair.a})
 MERGE (b:Person {id: pair.b})
 MERGE (a)-[:KNOWS]->(b)
 
-// AFTER -- CALL IN TRANSACTIONS isolates writes per batch
+// AFTER
 CYPHER 25
 UNWIND $pairs AS pair
 CALL (pair) {
@@ -92,3 +104,54 @@ CALL (pair) {
   MERGE (a)-[:KNOWS]->(b)
 } IN TRANSACTIONS OF 500 ROWS
 ```
+
+---
+
+## Label Inference [Neo4j 5 / 2025.x]
+
+When the planner underestimates selectivity on multi-label queries, enable label inference:
+
+```cypher
+// Per-query hint
+CYPHER inferSchemaParts = most_selective_label
+MATCH (admin:Administrator {name: $adminName}),
+      (resource:Resource {name: $resourceName})
+MATCH p=(admin)-[:MEMBER_OF]->()-[:ALLOWED_INHERIT]->(company)
+          -[:WORKS_FOR|HAS_ACCOUNT]-()-[:WORKS_FOR|HAS_ACCOUNT]-(resource)
+RETURN count(p) AS accessCount
+```
+
+Instance-wide config: `dbms.cypher.infer_schema_parts = MOST_SELECTIVE_LABEL`
+
+Impact: uses existing statistics + advanced deduction; can improve OLTP plans from ~13ms → ~80µs on complex multi-hop patterns. Verify with `EXPLAIN` — plan should show index seeks, not NodeByLabelScan.
+
+---
+
+## Batching Best Practices [Neo4j 5 / 2025.x]
+
+Prefer native `CALL IN TRANSACTIONS` over `apoc.periodic.iterate` (APOC Core is maintenance-mode):
+
+```cypher
+// Modern pattern — full planner visibility, accurate stats, memory tracking
+CYPHER 25
+MATCH (n:Person)
+CALL (n) {
+  SET n.score = toInteger(rand() * 20 + 1)
+} IN TRANSACTIONS OF 1000 ROWS
+  ON ERROR CONTINUE
+  REPORT STATUS AS s
+WITH s WHERE s.errorMessage IS NOT NULL
+RETURN s.transactionId, s.errorMessage
+
+// Parallel batches [2025.01]
+CYPHER 25
+LOAD CSV WITH HEADERS FROM 'file:///data.csv' AS row
+CALL (row) {
+  MERGE (:Movie {id: row.id})
+} IN 4 CONCURRENT TRANSACTIONS OF 500 ROWS
+  ON ERROR RETRY FOR 30 SECS
+```
+
+`ON ERROR` options: `FAIL` (default) | `CONTINUE` | `BREAK` | `RETRY FOR N SECS` [2025.03+]
+
+Advantages over `apoc.periodic.iterate`: memory tracking prevents OOM, planner shows execution plan, accurate query statistics, no double entity ID fetch.

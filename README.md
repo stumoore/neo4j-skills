@@ -85,7 +85,8 @@ Add to `~/.agents/plugins/marketplace.json`:
 
 | Skill | Description |
 |---|---|
-| [`neo4j-vector-index-skill`](./neo4j-vector-index-skill) | Create and query vector indexes for semantic similarity search. Covers index creation, embedding ingestion, and `genai.vector.encode()`. |
+| [`neo4j-vector-index-skill`](./neo4j-vector-index-skill) | Create and query vector indexes for semantic similarity search. Covers index creation, embedding ingestion, and `ai.text.embed()` [2025.12]. |
+| [`neo4j-genai-plugin-skill`](./neo4j-genai-plugin-skill) | In-Cypher LLM integration via `ai.text.*` functions [2025.12]: embeddings, text completion, structured output, chat, tokenization, and pure-Cypher GraphRAG. |
 | [`neo4j-graphrag-skill`](./neo4j-graphrag-skill) | Build GraphRAG retrieval pipelines with `neo4j-graphrag`. Covers retriever selection (`VectorCypherRetriever`, `HybridCypherRetriever`), `retrieval_query` patterns, and LangChain/LlamaIndex integration. |
 | [`neo4j-agent-memory-skill`](./neo4j-agent-memory-skill) | Graph-native agent memory: short-term (conversations), long-term (POLE+O entity model), and reasoning traces. Covers `neo4j-agent-memory`, NAMS, MCP, LangChain, CrewAI, ADK. |
 | [`neo4j-mcp-skill`](./neo4j-mcp-skill) | Set up and use the Neo4j MCP server for tool-based agent access to the database. |

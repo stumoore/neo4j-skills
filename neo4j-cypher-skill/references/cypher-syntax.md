@@ -630,4 +630,160 @@ CALL (row) {
 
 `IN TRANSACTIONS` comes **after** the `{ }` block. Never use for reads. Requires auto-commit — do not wrap in `beginTransaction()`.
 
-**ON ERROR options**: `FAIL` (default) | `CONTINUE` (skip failed batch) | `BREAK` (stop after first error) | `RETRY FOR N SECS`
+**ON ERROR options**: `FAIL` (default) | `CONTINUE` (skip failed batch) | `BREAK` (stop after first error) | `RETRY FOR N SECS` [2025.03+]
+
+---
+
+## Conditional CALL Subqueries (WHEN…THEN…ELSE) [2025.06 / Neo4j 2025.06+]
+
+Provides if-else-if semantics within a single subquery block. Replaces multiple independent `CALL` blocks or complex `CASE` expressions with side effects.
+
+```cypher
+// Move a linked-list item: insert before/after depending on context
+CYPHER 25
+MATCH (move:Item {id: $id})
+OPTIONAL MATCH (insertBefore:Item {id: $before})
+OPTIONAL MATCH (insertAfter:Item  {id: $after})
+CALL (move, insertBefore, insertAfter) {
+  WHEN insertBefore IS NULL THEN {
+    MATCH (last:Item) WHERE NOT (last)-[:NEXT]->() AND last <> move
+    CREATE (last)-[:NEXT]->(move)
+  }
+  WHEN insertAfter IS NULL THEN {
+    CREATE (move)-[:NEXT]->(insertBefore)
+  }
+  ELSE {
+    CREATE (insertAfter)-[:NEXT]->(move)
+    CREATE (move)-[:NEXT]->(insertBefore)
+  }
+}
+```
+
+Rules:
+- `WHEN` branches receive only params declared in `CALL(params)`
+- Mutually exclusive — first matching WHEN wins (not all-of-the-above)
+- Each branch can contain full write clauses; `ELSE` is optional
+- Cannot mix `WHEN...THEN` and regular subquery body in same `CALL`
+
+---
+
+## Label Pattern Expressions [Neo4j 5+]
+
+Boolean logic on labels using `|` (OR), `&` (AND), `!` (NOT):
+
+```cypher
+// Nodes with label A OR B
+MATCH (n:Person|Organization) RETURN n
+
+// Nodes with label A AND B
+MATCH (n:Employee&Manager) RETURN n
+
+// Nodes with label A but NOT B
+MATCH (n:Person&!VIP) RETURN n
+
+// Complex expression
+MATCH (n:Marvel|(DCComics&!Batman)) RETURN n
+```
+
+Dynamic label quantifiers in MATCH (require `$()` wrapper) [2025.01]:
+```cypher
+// Node must have ALL labels in the list
+MATCH (n:$all($labelList)) RETURN n
+
+// Node must have ANY label in the list
+MATCH (n:$any($labelList)) RETURN n
+```
+
+---
+
+## Compact CASE WHEN [Neo4j 5+]
+
+Multiple values and comparison operators in a single WHEN branch:
+
+```cypher
+// Multiple values in WHEN (simple CASE)
+MATCH (n:Event)
+RETURN CASE n.dayOfWeek
+  WHEN 1, 7 THEN 'weekend'
+  WHEN 2, 3, 4, 5, 6 THEN 'weekday'
+  ELSE 'unknown'
+END AS dayType
+
+// Comparison operators in WHEN (generic CASE)
+RETURN CASE n.age
+  WHEN > 65 THEN 'senior'
+  WHEN > 18 THEN 'adult'
+  WHEN < 0  THEN 'invalid'
+  ELSE 'minor'
+END AS ageGroup
+```
+
+---
+
+## String Normalization [Neo4j 5+]
+
+`normalize(s)` converts string to NFC Unicode normal form — solves accented character comparison issues where identical glyphs have different code points:
+
+```cypher
+// Match regardless of Unicode encoding differences (e.g., 'ö' as U+00F6 vs o + combining diacritic)
+MATCH (c:City)
+WHERE normalize(c.name) = normalize($cityName)
+RETURN c
+
+// Index on normalized form for consistent lookups
+CREATE RANGE INDEX city_name IF NOT EXISTS FOR (c:City) ON (c.normalizedName)
+MATCH (c:City) SET c.normalizedName = normalize(c.name)
+```
+
+---
+
+## allReduce Function (Traversal State) [CYPHER 25]
+
+Accumulates state during QPE traversal; enables mid-traversal filtering and stateful path constraints. Prevents visiting invalid paths instead of post-filtering.
+
+```cypher
+// Syntax: allReduce(accumulator = initial, var IN list | updateExpr, predicate)
+// Returns true only if predicate holds for every intermediate accumulator value
+
+// Example: track visited small nodes, require no revisits
+CYPHER 25
+MATCH REPEATABLE ELEMENTS path = (:Start)((xs:!End)--(:!Start)){0,100}(e:End)
+WHERE allReduce(
+  visited = [],
+  x IN xs | CASE WHEN x:Big THEN visited ELSE visited + [x] END,
+  size(visited) <= size(apoc.coll.toSet(visited)) + 1
+)
+RETURN count(path)
+
+// Example: stateful battery charge simulation during route traversal
+CYPHER 25 runtime=parallel
+MATCH REPEATABLE ELEMENTS p=(a:Geo {name: $src})(()-[r:ROAD|CHARGE]-(x:Geo)){1,12}(b:Geo {name: $dst})
+WHERE allReduce(
+  curr = {soc: $initial_soc, mins: 0.0},
+  r IN relationships(p) |
+    CASE
+      WHEN r:ROAD   THEN {soc: curr.soc - r.drain,   mins: curr.mins + r.drive_mins}
+      WHEN r:CHARGE THEN {soc: curr.soc + r.charge,  mins: curr.mins + r.charge_mins}
+    END,
+  $min_soc <= curr.soc <= $max_soc AND curr.mins <= $max_mins
+)
+RETURN p, reduce(d=0, r IN relationships(p) | d + r.drive_mins) AS total_mins
+ORDER BY total_mins LIMIT 1
+```
+
+`allReduce` is evaluated inline during path expansion — prunes branches early rather than filtering after full traversal.
+
+---
+
+## NEXT Clause [CYPHER 25]
+
+Chains query blocks without re-traversal; each block can add computed columns:
+
+```cypher
+CYPHER 25
+MATCH (a:Airport {iata: $src})-[r:FLIGHT]->(b:Airport {iata: $dst})
+RETURN a, b, r
+NEXT
+RETURN a, b, r, r.duration + r.layover AS totalTime
+ORDER BY totalTime ASC LIMIT 5
+```

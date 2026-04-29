@@ -146,6 +146,39 @@ RETURN b.name
 ```
 Quantifier outside group: `(pattern){N,M}`. Groups start+end with node. `REPEATABLE ELEMENTS` needs bounded `{m,n}`.
 
+Match mode — add after `MATCH`:
+- `DIFFERENT RELATIONSHIPS` (default) — each rel traversed once per path
+- `REPEATABLE ELEMENTS` [2025.x] — nodes/rels revisitable; use for circular routes, weight-optimized paths, constrained backtracking; requires bounded `{m,n}`
+
+### Conditional CALL subqueries [2025.06]
+```cypher
+CYPHER 25
+MATCH (move:Item {id: $id})
+OPTIONAL MATCH (insertBefore:Item {id: $before})
+OPTIONAL MATCH (insertAfter:Item  {id: $after})
+CALL (move, insertBefore, insertAfter) {
+  WHEN insertBefore IS NULL THEN {
+    MATCH (last:Item) WHERE NOT (last)-[:NEXT]->() AND last <> move
+    CREATE (last)-[:NEXT]->(move)
+  }
+  WHEN insertAfter IS NULL THEN {
+    CREATE (move)-[:NEXT]->(insertBefore)
+  }
+  ELSE {
+    CREATE (insertAfter)-[:NEXT]->(move)
+    CREATE (move)-[:NEXT]->(insertBefore)
+  }
+}
+```
+Use WHEN…THEN…ELSE for if-else-if write logic; mutually exclusive (first match wins). Not available pre-2025.06.
+
+### Dynamic relationship types [2025.x]
+```cypher
+// Create/match/merge with dynamic rel type (must resolve to exactly one STRING)
+CYPHER 25 CREATE (a:Node)-[:$($relType)]->(b:Node)
+CYPHER 25 MATCH  (a:Node)-[:$($relType)]->(b:Node) RETURN a, b
+```
+
 ### Spatial / Point
 ```cypher
 // WGS84 geographic point
@@ -253,19 +286,23 @@ Default to 2025.01-safe features when version unknown.
 
 EXPLAIN/PROFILE red flags: `AllNodesScan` `CartesianProduct` `NodeByLabelScan` `Eager`
 
-Fix Eager — collect first, then write:
-```cypher
-// BEFORE: triggers Eager (MERGE on same label as MATCH)
-MATCH (u:User {status:'active'}) MERGE (u)-[:HAS_SESSION]->(s:Session {id:randomUUID()})
+Fix Eager — three approaches (choose simplest that works):
+1. **Add specific labels** to MATCH nodes to eliminate read/write ambiguity:
+   `MATCH (x:CallingPoint)` instead of bare `MATCH (x)` when writing `:City` nodes
+2. **Collect first, then write**: `WITH collect(u) AS users UNWIND users AS u ...`
+3. **CALL IN TRANSACTIONS**: isolates each batch in its own transaction
 
-// AFTER:
-CYPHER 25
-MATCH (u:User {status:'active'}) WITH collect(u) AS users
-UNWIND users AS u MERGE (u)-[:HAS_SESSION]->(s:Session {id:randomUUID()})
+Label inference — when planner underestimates selectivity on multi-label queries: [Neo4j 5]
+```cypher
+CYPHER inferSchemaParts = most_selective_label
+MATCH (admin:Administrator {name: $name}), (resource:Resource {name: $res})
+MATCH p=(admin)-[:MEMBER_OF]->()-[:ALLOWED_INHERIT]->(company)
+RETURN count(p)
 ```
 
 `CONTAINS`/`ENDS WITH` → needs TEXT index (range index doesn't support them).
 Chained `OPTIONAL MATCH` for nested data → replace with `COLLECT { MATCH ... RETURN }`.
+Dynamic labels (`$($label)`) → `AllNodesScan`+Filter; use static labels when possible.
 
 Full anti-patterns → [references/performance.md](references/performance.md)
 
@@ -287,9 +324,10 @@ Full anti-patterns → [references/performance.md](references/performance.md)
 ## References
 
 Load on demand:
-- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; index/constraint types table; functions annotated with version introduced
+- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; conditional CALL (WHEN/THEN/ELSE); label pattern expressions; allReduce; NEXT clause; compact CASE WHEN; normalize(); index/constraint types table; functions annotated with version introduced
 - [references/syntax-traps.md](references/syntax-traps.md) — 40+ syntax trap table
-- [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager, parallel runtime
+- [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager (3 fix strategies), label inference, batching best practices, parallel runtime
+- [references/advanced-patterns.md](references/advanced-patterns.md) — REPEATABLE ELEMENTS patterns, allReduce stateful traversal, multi-stop QPE, route planning simulation, DAG critical path, temporal fraud detection component graph, cycle detection, OPTIONAL CALL
 
 ## WebFetch
 
