@@ -6,6 +6,57 @@ Version markers: `[2025.01]` = new/changed in Cypher 25 / Neo4j 2025.x — older
 
 ---
 
+## Index and Constraint Types
+
+### Index decision table
+
+| Index type | Best for | `CONTAINS`/`ENDS WITH` | Spatial | Fulltext |
+|---|---|---|---|---|
+| `RANGE` | `=`, `>`, `<`, `STARTS WITH`, `IS NOT NULL` | Slow (use TEXT instead) | ❌ | ❌ |
+| `TEXT` | `CONTAINS`, `ENDS WITH`, `=` on strings, list `IN` with strings | ✅ | ❌ | ❌ |
+| `POINT` | `point.distance()`, `point.withinBBox()` | ❌ | ✅ | ❌ |
+| `FULLTEXT` | Lucene tokenized search; multiple labels/props | ❌ | ❌ | ✅ |
+| `COMPOSITE` | Queries always testing 2+ properties together | — | ❌ | ❌ |
+
+Create syntax:
+```cypher
+CREATE RANGE INDEX    name IF NOT EXISTS FOR (n:Label) ON (n.prop)
+CREATE TEXT INDEX     name IF NOT EXISTS FOR (n:Label) ON (n.prop)
+CREATE POINT INDEX    name IF NOT EXISTS FOR (n:Label) ON (n.prop)
+CREATE COMPOSITE INDEX name IF NOT EXISTS FOR (n:Label) ON (n.p1, n.p2)
+CREATE FULLTEXT INDEX  name IF NOT EXISTS FOR (n:Label|OtherLabel) ON EACH [n.p1, n.p2]
+// Relationship index:
+CREATE RANGE INDEX    name IF NOT EXISTS FOR ()-[r:TYPE]-() ON (r.prop)
+```
+
+### Constraint types
+
+```cypher
+// Uniqueness (+ implicitly creates RANGE index)
+CREATE CONSTRAINT name IF NOT EXISTS FOR (n:Label) REQUIRE n.prop IS UNIQUE
+
+// Existence (node property must not be null)
+CREATE CONSTRAINT name IF NOT EXISTS FOR (n:Label) REQUIRE n.prop IS NOT NULL
+
+// Relationship existence
+CREATE CONSTRAINT name IF NOT EXISTS FOR ()-[r:TYPE]-() REQUIRE r.prop IS NOT NULL
+
+// Node key = unique + existence (Enterprise only)
+CREATE CONSTRAINT name IF NOT EXISTS FOR (n:Label) REQUIRE n.prop IS NODE KEY
+// Multi-property node key:
+CREATE CONSTRAINT name IF NOT EXISTS FOR (n:Label) REQUIRE (n.p1, n.p2) IS NODE KEY
+
+// Relationship key (Enterprise only)
+CREATE CONSTRAINT name IF NOT EXISTS FOR ()-[r:TYPE]-() REQUIRE r.prop IS RELATIONSHIP KEY
+```
+
+Rules:
+- Always add uniqueness constraint on MERGE key before loading data
+- `IF NOT EXISTS` prevents error on re-run
+- `SHOW CONSTRAINTS YIELD name, type` to inspect
+
+---
+
 ## MERGE Safety
 
 ```cypher
@@ -315,6 +366,45 @@ MATCH (n:Contractor) RETURN n.name AS name, n.email AS email
 ```
 
 `SHOW` commands cannot be combined with `UNION`. Never repeat `CYPHER 25` on subsequent branches.
+
+---
+
+## Spatial / Point
+
+```cypher
+// Create a point (WGS84 geographic)
+point({longitude: -122.4194, latitude: 37.7749})               // 2D
+point({longitude: -122.4194, latitude: 37.7749, height: 100})  // 3D
+
+// Create a point (Cartesian)
+point({x: 1.5, y: 2.3})             // 2D cartesian
+point({x: 1.5, y: 2.3, z: 4.0})    // 3D cartesian
+
+// Store on node
+MATCH (p:Location {id: $id})
+SET p.coords = point({longitude: $lon, latitude: $lat})
+
+// Distance in metres
+MATCH (a:Location) WHERE a.name = 'HQ'
+MATCH (b:Location)
+RETURN b.name, point.distance(a.coords, b.coords) AS distM
+ORDER BY distM LIMIT 10
+
+// Bounding-box filter before distance (uses POINT index)
+MATCH (b:Location)
+WHERE point.withinBBox(b.coords,
+        point({longitude: -123.0, latitude: 37.0}),
+        point({longitude: -122.0, latitude: 38.0}))
+RETURN b.name, point.distance(b.coords, $origin) AS distM
+```
+
+POINT index (required for fast spatial queries):
+```cypher
+CREATE POINT INDEX location_coords IF NOT EXISTS
+FOR (n:Location) ON (n.coords)
+```
+
+Point components: `.x` / `.y` / `.z` (Cartesian) and `.longitude` / `.latitude` / `.height` (WGS84).
 
 ---
 

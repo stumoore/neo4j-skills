@@ -146,6 +146,36 @@ RETURN b.name
 ```
 Quantifier outside group: `(pattern){N,M}`. Groups start+end with node. `REPEATABLE ELEMENTS` needs bounded `{m,n}`.
 
+### Spatial / Point
+```cypher
+// WGS84 geographic point
+SET n.coords = point({longitude: $lon, latitude: $lat})
+
+// Distance in metres; requires POINT index for performance
+MATCH (a:Place {name: $origin}) MATCH (b:Place)
+RETURN b.name, point.distance(a.coords, b.coords) AS distM
+ORDER BY distM LIMIT 10
+
+// Bounding-box pre-filter (uses POINT index) then distance
+MATCH (b:Place)
+WHERE point.withinBBox(b.coords,
+        point({longitude: $west, latitude: $south}),
+        point({longitude: $east, latitude: $north}))
+RETURN b.name, point.distance(b.coords, $origin) AS distM
+```
+Create POINT index: `CREATE POINT INDEX name IF NOT EXISTS FOR (n:Place) ON (n.coords)`
+
+### Aggregation grouping keys
+Non-aggregating expressions in `RETURN`/`WITH` are implicit grouping keys — no `GROUP BY` needed:
+```cypher
+// actor + director are grouping keys; count(*) is the aggregate
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+RETURN a.name, d.name, count(*) AS collaborations
+ORDER BY collaborations DESC
+```
+`count(n)` counts non-null; `count(*)` counts rows including nulls. `collect(DISTINCT expr)` deduplicates.
+`count()` is faster than `size(collect())` — count() reads the internal store; collect() builds a list first.
+
 ---
 
 ## Common Syntax Traps (top causes of broken queries)
@@ -257,7 +287,7 @@ Full anti-patterns → [references/performance.md](references/performance.md)
 ## References
 
 Load on demand:
-- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; functions annotated with version introduced
+- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; index/constraint types table; functions annotated with version introduced
 - [references/syntax-traps.md](references/syntax-traps.md) — 40+ syntax trap table
 - [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager, parallel runtime
 
@@ -268,6 +298,8 @@ Load on demand:
 | Clause semantics | `https://neo4j.com/docs/cypher-manual/25/clauses/{clause}/` |
 | Function signatures | `https://neo4j.com/docs/cypher-manual/25/functions/{type}/` |
 | QPE / paths | `https://neo4j.com/docs/cypher-manual/25/patterns/` |
+| Spatial/point functions | `https://neo4j.com/docs/cypher-manual/25/functions/spatial/` |
+| Index/constraint reference | `https://neo4j.com/docs/cypher-manual/25/indexes/` |
 | Full cheat sheet | `https://neo4j.com/docs/cypher-cheat-sheet/25/all/` |
 
 ---
