@@ -59,3 +59,5 @@ Important: when you plan the upgrade, always include replacement of deprecated f
 4. Prepend `CYPHER 25` to every query
 5. Fetch the migration guide for any syntax not covered above:
    `https://neo4j.com/docs/cypher-manual/25/deprecations-additions-removals-compatibility/`
+
+For version-branched changelog selection (4.x → 5.x → 2025.06+) see [references/cypher-queries.md](references/cypher-queries.md).
