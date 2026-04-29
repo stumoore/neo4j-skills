@@ -176,7 +176,7 @@ Use WHEN…THEN…ELSE for if-else-if write logic; mutually exclusive (first mat
 ```cypher
 // Create/match/merge with dynamic rel type (must resolve to exactly one STRING)
 CYPHER 25 CREATE (a:Node)-[:$($relType)]->(b:Node)
-CYPHER 25 MATCH  (a:Node)-[:$($relType)]->(b:Node) RETURN a, b
+CYPHER 25 MATCH  (a:Node)-[:$($relType)]->(b:Node) RETURN a.name, b.name
 ```
 
 ### Spatial / Point
@@ -241,11 +241,15 @@ Full trap table → [references/syntax-traps.md](references/syntax-traps.md)
 
 ## Output Mode and Write Gate
 
-Default: parameterized queries.
+Default: parameterized queries. **Return named properties, not full nodes or `RETURN *`.**
 ```cypher
-CYPHER 25 MATCH (n:Organization {name: $name}) RETURN n.name LIMIT 10
-// parameters: {name: "Apple"}
+-- RIGHT: agent gets named fields it can reason over
+CYPHER 25 MATCH (n:Organization {name: $name}) RETURN n.name, n.founded, n.industry LIMIT 10
+
+-- WRONG: full node object wastes tokens, leaks all properties, agent can't extract fields cleanly
+CYPHER 25 MATCH (n:Organization {name: $name}) RETURN n LIMIT 10
 ```
+Exception: schema/diagnostic queries (`CALL db.schema.visualization()`, `SHOW INDEXES YIELD *`, `EXPLAIN`) where the object is the point.
 
 **Validation workflow:**
 1. `EXPLAIN` before any write — catches syntax errors, missing indexes
@@ -300,7 +304,7 @@ MATCH p=(admin)-[:MEMBER_OF]->()-[:ALLOWED_INHERIT]->(company)
 RETURN count(p)
 ```
 
-`CONTAINS`/`ENDS WITH` → needs TEXT index (range index doesn't support them).
+Index anchors: every MATCH/MERGE/WHERE on a property needs an index on the lookup property or Neo4j scans all nodes. **Index only activates when the node has a label** — `MATCH (n {prop: $v})` never uses an index; `MATCH (n:Label {prop: $v})` does. MERGE without a constraint has no atomicity guarantee (two concurrent MERGEs can create duplicates). `CONTAINS`/`ENDS WITH` → TEXT index (RANGE does not support them). Force a plan with `USING INDEX n:Label(prop)` when EXPLAIN shows a scan.
 Chained `OPTIONAL MATCH` for nested data → replace with `COLLECT { MATCH ... RETURN }`.
 Dynamic labels (`$($label)`) → `AllNodesScan`+Filter; use static labels when possible.
 
@@ -324,6 +328,7 @@ Full anti-patterns → [references/performance.md](references/performance.md)
 ## References
 
 Load on demand:
+- [references/indexes.md](references/indexes.md) — index types (RANGE/TEXT/FULLTEXT/POINT/COMPOSITE/LOOKUP), constraints, MERGE lock semantics, fulltext Lucene syntax, import pre-flight
 - [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; conditional CALL (WHEN/THEN/ELSE); label pattern expressions; allReduce; NEXT clause; compact CASE WHEN; normalize(); index/constraint types table; functions annotated with version introduced
 - [references/syntax-traps.md](references/syntax-traps.md) — 40+ syntax trap table
 - [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager (3 fix strategies), label inference, batching best practices, parallel runtime

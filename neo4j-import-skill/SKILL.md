@@ -50,7 +50,12 @@ allowed-tools: Bash WebFetch
 
 ## Pre-Import Checklist
 
-Run in this exact order — skipping causes hard-to-debug duplicates:
+Run in this exact order — skipping causes hard-to-debug duplicates or missed index usage:
+
+**Constraints BEFORE import. Additional indexes AFTER import.**
+- Constraints create implicit RANGE indexes used by MERGE during load + enforce uniqueness
+- Additional non-unique indexes (TEXT, RANGE on non-key props, FULLTEXT) created after load — Neo4j populates them async from the committed data; poll `populationPercent` until 100%
+- Creating extra indexes before import slows every write during load with no benefit
 
 1. **Create uniqueness constraints** (enables index used by MERGE):
    ```cypher
@@ -301,6 +306,30 @@ p002,tt0133093,Morpheus,ACTED_IN
 | `--overwrite-destination` | false | Required if DB already exists |
 | `--dry-run` | false | 2026.02+ — validate without writing |
 
+### Schema file (--schema) [Enterprise, block format]
+
+Pass a Cypher file with `CREATE CONSTRAINT` / `CREATE INDEX` statements; executed automatically after import completes. Constraints are created first (correct order enforced). File paths can be local or remote (`s3://`, `gs://`, `https://`).
+
+```bash
+neo4j-admin database import full \
+  --format=block \
+  --schema=schema.cypher \
+  --nodes=Person="persons_header.csv,persons.csv" \
+  neo4j
+```
+
+```cypher
+-- schema.cypher
+CREATE CONSTRAINT person_id IF NOT EXISTS FOR (n:Person) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT movie_id  IF NOT EXISTS FOR (n:Movie)  REQUIRE n.id IS UNIQUE;
+CREATE RANGE INDEX person_email IF NOT EXISTS FOR (n:Person) ON (n.email);
+CREATE TEXT  INDEX movie_title  IF NOT EXISTS FOR (n:Movie)  ON (n.title);
+```
+
+For incremental import, `DROP CONSTRAINT` / `DROP INDEX` are also supported [2025.02+] — used to remove indexes before the merge phase and recreate them after for faster writes.
+
+---
+
 ### Incremental import (Enterprise only)
 
 Three-phase process — use when DB must stay online during import preparation:
@@ -369,41 +398,9 @@ CALL (value) {
 
 ---
 
-## Driver Batch Write Pattern (Python)
+## Driver Batch Write Pattern
 
-Use when source is not a file — API responses, database migrations, programmatic generation.
-
-```python
-from neo4j import GraphDatabase
-
-driver = GraphDatabase.driver("neo4j+s://xxx.databases.neo4j.io",
-                              auth=("neo4j", "password"))
-
-BATCH_SIZE = 10_000
-
-def import_batch(tx, rows):
-    tx.run("""
-        UNWIND $rows AS row
-        MERGE (p:Person {id: row.id})
-        ON CREATE SET p.name = row.name, p.age = row.age
-    """, rows=rows)
-
-all_rows = [...]  # your source data
-
-with driver.session(database="neo4j") as session:
-    batch = []
-    for row in all_rows:
-        batch.append(row)
-        if len(batch) == BATCH_SIZE:
-            session.execute_write(import_batch, batch)
-            batch.clear()
-    if batch:
-        session.execute_write(import_batch, batch)
-
-driver.close()
-```
-
-UNWIND-based batching: ~10x faster than one-at-a-time because network round-trips are the bottleneck.
+Use when source is not a file (API responses, DB migrations). Collect into `BATCH_SIZE` (10 000) lists, call `UNWIND $rows AS row MERGE ...` per batch. ~10x faster than row-at-a-time. → [Python + JS examples](references/driver-batch-write.md)
 
 ---
 
@@ -454,8 +451,15 @@ After import completes — run all:
 MATCH (n:Person) RETURN count(n) AS persons;
 MATCH ()-[:KNOWS]->() RETURN count(*) AS knows_rels;
 
-// Index states — must all be ONLINE; poll every 5s until empty
-SHOW INDEXES YIELD name, state WHERE state <> 'ONLINE' RETURN name, state;
+// After import: create additional non-unique indexes (populated async)
+CREATE TEXT INDEX movie_title IF NOT EXISTS FOR (n:Movie) ON (n.title);
+CREATE RANGE INDEX person_born IF NOT EXISTS FOR (n:Person) ON (n.born);
+
+// Poll population — wait until populationPercent = 100 before opening to queries
+SHOW INDEXES YIELD name, state, populationPercent
+WHERE state <> 'ONLINE' OR populationPercent < 100
+RETURN name, state, populationPercent
+ORDER BY populationPercent;
 
 // Spot check: null keys = import bug
 MATCH (p:Person) WHERE p.id IS NULL RETURN count(p) AS missing_id;
@@ -473,6 +477,7 @@ Do NOT run production queries until all indexes are ONLINE.
 - [APOC periodic execution](https://neo4j.com/docs/apoc/current/graph-updates/periodic-execution/)
 - [APOC load procedures](https://neo4j.com/docs/apoc/current/import/)
 - [GraphAcademy: Importing CSV Data](https://graphacademy.neo4j.com/courses/importing-cypher/)
+- [Indexes and constraints — types, MERGE lock semantics, import pre-flight](../neo4j-cypher-skill/references/indexes.md)
 - [Data Importer GUI — when to use, Aura access, multi-pass, gotchas](references/data-importer-gui.md)
 - [Post-import refactoring — split lists, extract nodes, add labels, FK validation](references/post-import-refactoring.md)
 

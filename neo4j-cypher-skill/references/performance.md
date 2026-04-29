@@ -8,7 +8,7 @@ Severity: **[ALWAYS]** fix unconditionally. **[USUALLY]** fix unless confirmed r
 
 | Anti-Pattern | Severity | Problem | Fix |
 |---|---|---|---|
-| `MATCH (n)` label-free | [ALWAYS] | AllNodesScan | Add label: `MATCH (n:Person)` |
+| `MATCH (n)` label-free | [ALWAYS] | AllNodesScan | Add label: `MATCH (n:Person)` — indexes require a label |
 | `MATCH ()-[r]->()` label-free rel | [ALWAYS] | Full rel scan | `MATCH (n:User)-[r:POSTS]->()` |
 | Assumed stored GDS props (`n.pageRank`) | [ALWAYS] | Property doesn't exist unless `.write` ran | Stream via `.stream` procedure |
 | `CONTAINS`/`ENDS WITH` without a text index | [ALWAYS] | Range index does not support these; causes full label scan | `CREATE TEXT INDEX idx FOR (n:Label) ON (n.prop)` |
@@ -17,6 +17,8 @@ Severity: **[ALWAYS]** fix unconditionally. **[USUALLY]** fix unless confirmed r
 | Chained `OPTIONAL MATCH` for nested optional data | [USUALLY] | Fan-out multiplies row count | `COLLECT { MATCH (a)-[:R]->(b) RETURN b }` |
 | `LIMIT` only at final `RETURN` | [USUALLY] | Full traversal runs before limit | Push `WITH n LIMIT 100` before expensive joins |
 | Cartesian product (two MATCHes, no join) | [USUALLY] | Multiplies all rows | Add join predicate in `WHERE` |
+
+→ See [indexes.md](indexes.md) for index type selection, MERGE lock semantics, hints, and `SHOW INDEXES YIELD *`.
 
 ## Text indexes vs fulltext indexes
 
