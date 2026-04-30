@@ -78,9 +78,7 @@ jobs:
 
       - name: Lint skills
         run: |
-          # Stage new/modified skill files so linter sees them
-          git add $(git ls-files --modified --others --exclude-standard \
-            | grep -E '^neo4j-.*-skill/') || true
+          git add neo4j-*-skill/ || true
           python3 scripts/lint_skills.py
 
       - name: Check for changes
@@ -95,14 +93,15 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Stage only tracked skill files and the prompt itself
-          git add $(git ls-files --modified --others --exclude-standard \
-            | grep -E '^neo4j-.*-skill/|^\.github/prompts/') || true
+          git add neo4j-*-skill/ .github/prompts/ || true
           git commit -m "skill-refresh: update skills against Neo4j release notes $(date +%Y-%m-%d)"
 
       - name: Push branch
         if: steps.changes.outputs.changed == 'true'
-        run: git push origin "${{ steps.branch.outputs.name }}"
+        run: |
+          git fetch origin main
+          git rebase origin/main
+          git push --force-with-lease origin "${{ steps.branch.outputs.name }}"
 
       - name: Extract summary for PR body
         if: steps.changes.outputs.changed == 'true'
