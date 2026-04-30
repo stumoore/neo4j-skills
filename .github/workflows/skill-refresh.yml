@@ -37,12 +37,20 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
+      - name: Verify API key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          [ -n "$ANTHROPIC_API_KEY" ] || { echo "ANTHROPIC_API_KEY secret not set"; exit 1; }
+          echo "API key present (${#ANTHROPIC_API_KEY} chars)"
+
       - name: Run skill refresh
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude --bare \
-            --print \
+          cat .github/prompts/skill-refresh.md \
+            | claude --bare \
+            -p - \
             --output-format stream-json \
             --verbose \
             --include-partial-messages \
@@ -50,9 +58,8 @@ jobs:
             --allowedTools "Bash,WebFetch,Read,Edit,Write" \
             --max-turns 200 \
             --max-budget-usd 5.00 \
-            "$(cat .github/prompts/skill-refresh.md)" \
-            | tee /tmp/refresh-raw.jsonl \
-            | jq -r '
+            | stdbuf -oL tee /tmp/refresh-raw.jsonl \
+            | jq -r --unbuffered '
                 if .type == "assistant" then
                   (.message.content[]? |
                     if .type == "text" then .text
@@ -67,7 +74,7 @@ jobs:
                 else empty
                 end
               ' \
-            | tee /tmp/refresh-summary.txt
+            | stdbuf -oL tee /tmp/refresh-summary.txt
 
       - name: Lint skills
         run: |
