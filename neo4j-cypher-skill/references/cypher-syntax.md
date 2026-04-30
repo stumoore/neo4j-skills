@@ -246,6 +246,15 @@ RETURN n.name, n.value
 
 **DateTime vs date() mismatch**: `datetime_prop >= date('2025-01-01')` returns 0 rows — use `.year` accessor or `datetime()` literals for `ZONED DATETIME` properties.
 
+**GQL compliance aliases [2026.03–04]** — valid syntax, but use the Cypher form in new code:
+| GQL alias | Cypher equivalent |
+|---|---|
+| `FOR x IN list` | `UNWIND list AS x` |
+| `PROPERTY_EXISTS(n, 'prop')` | `n.prop IS NOT NULL` |
+| `n IS [NOT] LABELED Label` | `n:Label` / `NOT n:Label` |
+| `FILTER` | `WHERE` |
+| `LET x = expr` | `WITH expr AS x` |
+
 ---
 
 ## List Expressions
@@ -524,6 +533,10 @@ Match modes [2025.01] (immediately after `MATCH`):
 |---|---|
 | `DIFFERENT RELATIONSHIPS` | Default — each relationship traversed at most once per path |
 | `REPEATABLE ELEMENTS` | Nodes AND relationships may be revisited; requires bounded `{m,n}` |
+| `ACYCLIC` [2026.03] | No repeated nodes within a path; GQL path mode — prevents cycles |
+
+`ACYCLIC` is placed before the path pattern: `MATCH p = ACYCLIC (a)-[:R]-+(b)`.  
+Nodes cannot repeat within a path; may still repeat across paths (equijoins work).
 
 Path selectors (immediately after `MATCH`, before the pattern):
 

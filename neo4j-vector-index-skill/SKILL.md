@@ -1,11 +1,11 @@
 ---
 name: neo4j-vector-index-skill
 description: Create and manage Neo4j vector indexes, run vector similarity search (ANN/kNN),
-  store embeddings on nodes or relationships, use SEARCH clause (Neo4j 2026.01+) or
-  db.index.vector.queryNodes() procedure (2025.x fallback), configure HNSW and quantization
-  options, pick similarity function and embedding provider dimensions, and batch-update
-  embeddings. Use when tasks involve CREATE VECTOR INDEX, vector.dimensions, cosine/euclidean
-  search, embedding ingestion pipelines, or semantic nearest-neighbor lookup in Neo4j.
+  store embeddings on nodes or relationships, use SEARCH clause (Neo4j 2026.01+, preferred) or
+  db.index.vector.queryNodes() procedure (deprecated 2026.04, still works on 2025.x), configure
+  HNSW and quantization options, pick similarity function and embedding provider dimensions, and
+  batch-update embeddings. Use when tasks involve CREATE VECTOR INDEX, vector.dimensions,
+  cosine/euclidean search, embedding ingestion pipelines, or semantic nearest-neighbor lookup.
   Does NOT handle GraphRAG retrieval_query graph traversal — use neo4j-graphrag-skill.
   Does NOT handle fulltext/keyword indexes (FULLTEXT INDEX, db.index.fulltext) — use neo4j-cypher-skill.
   Does NOT handle GDS graph embeddings (FastRP, Node2Vec) — use neo4j-gds-skill.
@@ -41,7 +41,7 @@ CALL dbms.components() YIELD versions RETURN versions[0] AS neo4j_version
 | Version | Use |
 |---|---|
 | `2026.01` or higher | `SEARCH` clause (in-index filtering, preferred) |
-| `2025.x` | `db.index.vector.queryNodes()` procedure |
+| `2025.x` | `db.index.vector.queryNodes()` procedure (**deprecated 2026.04** — use `SEARCH` when on 2026.x) |
 
 ---
 
@@ -344,7 +344,7 @@ DROP INDEX chunk_embedding IF EXISTS;
 - [ ] Similarity function chosen explicitly (`cosine` for normalized, `euclidean` for distance-based)
 - [ ] Index polled to `state = 'ONLINE'` before first query
 - [ ] Dimension validated on every embedding before ingest
-- [ ] `SEARCH` clause only on Neo4j >= 2026.01; procedure fallback on 2025.x
+- [ ] `SEARCH` clause on Neo4j >= 2026.01 (preferred); procedure fallback only on 2025.x (deprecated 2026.04)
 - [ ] SEARCH `WHERE` uses AND-only predicates with scalar types
 - [ ] Batch UNWIND pattern used for > 100 nodes
 - [ ] If model changes: drop index → recreate with new dimensions → re-generate all embeddings
@@ -363,14 +363,14 @@ CYPHER 25
 
 Provider strings are lowercase (`'openai'`, `'vertexai'`, `'bedrock-titan'`, `'azure-openai'`). Full provider config → `neo4j-genai-plugin-skill`.
 
-Full query pattern — embed at query time, search immediately:
+Full query pattern — embed at query time, search immediately (procedure fallback for 2025.x):
 ```cypher
 CYPHER 25
 WITH ai.text.embed(
     "What are good open source projects",
     "openai",
     { token: $openaiKey, model: 'text-embedding-3-small' }) AS userEmbedding
-CALL db.index.vector.queryNodes('chunk_embedding', 6, userEmbedding)
+CALL db.index.vector.queryNodes('chunk_embedding', 6, userEmbedding)  // deprecated 2026.04
 YIELD node AS c, score
 RETURN c.text, score
 ORDER BY score DESC
