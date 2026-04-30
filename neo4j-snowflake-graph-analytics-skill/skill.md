@@ -9,6 +9,8 @@ description: >
   project-compute-write pattern, SQL procedure syntax, and all available
   algorithms. Do NOT use for standard Neo4j DBMS or Cypher queries against
   a Neo4j database — use the neo4j-cypher-skill for those.
+version: 1.0.0
+allowed-tools: Bash WebFetch
 ---
 
 # Neo4j Graph Analytics for Snowflake
@@ -21,6 +23,18 @@ written back to Snowflake tables.
 **Docs:** https://neo4j.com/docs/snowflake-graph-analytics/current/
 
 ---
+
+## When to Use
+- Running graph algorithms / GDS in Snowflake
+- Data in Snowflake tables
+- On-demand / pipeline workloads — ephemeral sessions, pay per session-minute
+- Full isolation from the live database during analytics
+
+## When NOT to Use
+- **Aura Pro with embedded GDS plugin** → `neo4j-gds-skill`
+- **Aura Graph Analytics** → `neo4j-aura-graph-analytics-skill`
+- **Self-managed Neo4j with embedded GDS plugin** → `neo4j-gds-skill`
+- **Writing Cypher queries** → `neo4j-cypher-skill`
 
 ## Key Concepts
 
