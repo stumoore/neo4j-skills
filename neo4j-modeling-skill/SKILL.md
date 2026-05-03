@@ -63,10 +63,13 @@ MCP tool map:
 2. Nodes = entities (nouns) with identity; rels = connections (verbs) with direction
 3. Labels PascalCase; rel types SCREAMING_SNAKE_CASE; properties camelCase
 4. Every node type used in MERGE has a uniqueness constraint on its key property
-5. No generic labels (`:Entity`, `:Node`, `:Thing`); no generic rel types (`:RELATED_TO`, `:HAS`)
-6. Rel direction encodes semantic meaning — not arbitrary
-7. Inspect schema before proposing any change on an existing database
-8. All constraint/index DDL uses `IF NOT EXISTS` — safe to rerun
+5. Add property type constraints (`REQUIRE n.prop IS :: STRING`) where the type is known — helps the query planner and catches bad writes early
+6. No generic labels (`:Entity`, `:Node`, `:Thing`); no generic rel types (`:RELATED_TO`, `:HAS`)
+7. Security labels (used for row-level access control) should start with a common prefix (e.g. `Sec`) so application code can reliably filter them out of the domain schema
+8. Rel direction encodes semantic meaning — not arbitrary
+9. Inspect schema before proposing any change on an existing database
+10. All constraint/index DDL uses `IF NOT EXISTS` — safe to rerun
+11. **On Neo4j 2026.02+ (Enterprise/Aura):** consider `ALTER CURRENT GRAPH TYPE SET { … }` or `EXTEND GRAPH TYPE WITH { … }` to declare the full model in one block instead of individual `CREATE CONSTRAINT` statements — see `neo4j-cypher-skill/references/graph-type.md`. **PREVIEW** — syntax may change before GA.
 
 ---
 
@@ -275,7 +278,7 @@ Rules:
 | MERGE without uniqueness constraint | Duplicate nodes silently created | Add constraint before any MERGE |
 | Missing relationship direction meaning | Arbitrary direction; confusing model | Direction = semantic flow of action |
 | Junction table modeled as bare property | Loses history and extensibility | Intermediate node with its own properties |
-| `id` as property name | Conflicts with driver internal `id(n)` | Use `personId`, `movieId`, `tmdbId` |
+| `id` as property name | `id(n)` is a deprecated Cypher function (use `elementId(n)`); bare `id` is fine as a property name in practice, but domain-qualified names (`personId`, `movieId`) are clearer and avoid any future ambiguity | Prefer `personId`, `movieId`, `tmdbId` where it aids readability |
 | All dates as strings | No range queries; no temporal operators | Use Neo4j `date()` or `datetime()` type |
 
 ---

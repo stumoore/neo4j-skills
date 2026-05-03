@@ -240,6 +240,7 @@ ORDER BY collaborations DESC
 | `n.$key` dynamic property | `n[$key]` |
 | `SET n:$label` | `SET n:$($label)` |
 | `ZONED DATETIME >= date(...)` → 0 rows | Use `datetime(...)` or `.year` accessor |
+| ISO string with `Z` suffix stored/compared as UTC | **`Z` ≠ UTC in Neo4j** — `Z` is parsed as an offset, not the UTC timezone; planner and range indexes treat them differently. Explicitly coerce: `datetime({datetime: datetime('2025-09-10T03:43:00Z'), timezone: 'UTC'})` ([neo4j#13519](https://github.com/neo4j/neo4j/issues/13519)) |
 | `FOREACH ... RETURN` | `UNWIND ... RETURN` |
 
 Full trap table → [references/syntax-traps.md](references/syntax-traps.md)
@@ -292,6 +293,7 @@ Default to 2025.01-safe features when version unknown.
 | `SEARCH` clause (vector/fulltext) | 2026.01 | `CALL db.index.vector.queryNodes(...)` (deprecated 2026.04) |
 | `ACYCLIC` path mode (no repeated nodes in path) | 2026.03 | post-filter with `size(nodes(p)) = size(apoc.coll.toSet(nodes(p)))` |
 | GQL aliases: `FOR`=`UNWIND`, `PROPERTY_EXISTS`=`IS NOT NULL`, `IS [NOT] LABELED`=`n:Label` | 2026.03–04 | GQL compliance only — use Cypher equivalents |
+| **GRAPH TYPE** schema DDL (`ALTER CURRENT GRAPH TYPE SET`, `EXTEND GRAPH TYPE WITH`, `DROP GRAPH TYPE ELEMENTS`, `SHOW CURRENT GRAPH TYPE`) | **2026.02 — PREVIEW** | Use individual `CREATE CONSTRAINT` / `CREATE INDEX` |
 
 ---
 
@@ -328,6 +330,7 @@ Full anti-patterns → [references/performance.md](references/performance.md)
 - Variable out of scope: not listed in `WITH` → use `count(*)` not `count(droppedVar)`
 - Timeouts: fix AllNodesScan → add early `LIMIT` → `CALL IN TRANSACTIONS OF 1000 ROWS`
 - DateTime mismatch: `ZONED DATETIME >= date(...)` → 0 rows; use `datetime()` or `.year`
+- `Z` suffix ≠ UTC timezone: ISO strings with `Z` are stored as a UTC-offset, not the UTC zone — range queries across `Z` and `UTC` stored values return 0 rows. Coerce on write: `datetime({datetime: datetime($isoStr), timezone: 'UTC'})`
 - Duration: `.inDays`/`.inMonths` don't exist; use `.days`/`.months`
 - `Cannot merge node using null property value`: MERGE key resolved to null — validate params first
 - `IndexNotFoundError`: `SHOW INDEXES YIELD name, state WHERE state <> 'ONLINE'`
@@ -343,6 +346,7 @@ Load on demand:
 - [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager (3 fix strategies), label inference, batching best practices, parallel runtime
 - [references/advanced-patterns.md](references/advanced-patterns.md) — REPEATABLE ELEMENTS patterns, allReduce stateful traversal, multi-stop QPE, route planning simulation, DAG critical path, temporal fraud detection component graph, cycle detection, OPTIONAL CALL
 - [references/apoc.md](references/apoc.md) — APOC Core: refactoring, virtual graph, merge helpers, path expanders, triggers, collections, conditional execution
+- [references/graph-type.md](references/graph-type.md) — **PREVIEW (2026.02+)** GRAPH TYPE DDL: `ALTER CURRENT GRAPH TYPE SET`, `EXTEND GRAPH TYPE WITH`, `DROP GRAPH TYPE ELEMENTS`, property types, constraints, label implications, relationship type enforcement
 
 ## WebFetch
 

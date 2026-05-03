@@ -62,6 +62,7 @@ Run in this exact order — skipping causes hard-to-debug duplicates or missed i
    CREATE CONSTRAINT IF NOT EXISTS FOR (n:Person) REQUIRE n.id IS UNIQUE;
    CREATE CONSTRAINT IF NOT EXISTS FOR (n:Movie)  REQUIRE n.movieId IS UNIQUE;
    ```
+   > **Neo4j 2026.02+ (Enterprise/Aura) — PREVIEW:** `ALTER CURRENT GRAPH TYPE SET { … }` can replace all individual constraint statements with a single declarative block. See `neo4j-cypher-skill/references/graph-type.md`. Use individual `CREATE CONSTRAINT` on older versions or Community Edition.
 
 2. **Verify APOC if using apoc.* procedures**:
    ```cypher
