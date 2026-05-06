@@ -59,7 +59,7 @@ them that aliases to `nodeId`, `sourceNodeId`, `targetNodeId`.
 
 ### Graph Orientation
 
-When projecting relationships you can set `orientation`:
+When projecting relationships, you can set `orientation`:
 - `NATURAL` (default) — directed, source → target
 - `UNDIRECTED` — treated as bidirectional
 - `REVERSE` — direction flipped
@@ -109,7 +109,7 @@ GRANT SELECT ON FUTURE TABLES IN SCHEMA MY_DATABASE.MY_SCHEMA TO ROLE MY_CONSUME
 USE ROLE MY_CONSUMER_ROLE;
 ```
 
-> Replace `MY_DATABASE`, `MY_SCHEMA`, `MY_CONSUMER_ROLE`, and `MY_DB_ROLE`
+> Replace `P2P`, `PUBLIC`, `GRAPH_USER_ROLE`, and `GRAPH_DB_ROLE`
 > with your actual names throughout.
 
 ---
@@ -119,16 +119,17 @@ USE ROLE MY_CONSUMER_ROLE;
 ```sql
 -- Optional: set default database to avoid fully-qualified names
 USE DATABASE Neo4j_Graph_Analytics;
-USE ROLE MY_CONSUMER_ROLE;
+USE ROLE GRAPH_USER_ROLE;
 
 -- Call WCC (Weakly Connected Components)
 CALL Neo4j_Graph_Analytics.graph.wcc('CPU_X64_XS', {
+    'defaultTablePrefix': 'P2P.PUBLIC',
     'project': {
-        'nodeTables': ['MY_DATABASE.MY_SCHEMA.NODES'],
+        'nodeTables': ['USER_VW'],
         'relationshipTables': {
-            'MY_DATABASE.MY_SCHEMA.RELATIONSHIPS': {
-                'sourceTable': 'MY_DATABASE.MY_SCHEMA.NODES',
-                'targetTable': 'MY_DATABASE.MY_SCHEMA.NODES',
+            'AGG_TRANSACTIONS_VW': {
+                'sourceTable': 'P2P.PUBLIC.USER_VW',
+                'targetTable': 'P2P.PUBLIC.USER_VW',
                 'orientation': 'NATURAL'
             }
         }
@@ -136,12 +137,12 @@ CALL Neo4j_Graph_Analytics.graph.wcc('CPU_X64_XS', {
     'compute': { 'consecutiveIds': true },
     'write': [{
         'nodeLabel': 'NODES',
-        'outputTable': 'MY_DATABASE.MY_SCHEMA.NODES_COMPONENTS'
+        'outputTable': 'USER_COMPONENTS'
     }]
 });
 
 -- Inspect results
-SELECT * FROM MY_DATABASE.MY_SCHEMA.NODES_COMPONENTS;
+SELECT * FROM P2P.PUBLIC.USER_COMPONENTS;
 ```
 
 The first argument to `CALL` is the **compute pool size**. Common values:
@@ -149,7 +150,7 @@ The first argument to `CALL` is the **compute pool size**. Common values:
 - `CPU_X64_S`, `CPU_X64_M`, `CPU_X64_L` — progressively larger
 - `HIGHMEM_X64_S`, `HIGHMEM_X64_M`, `HIGHMEM_X64_L` - for when you need larger graphs but dont always require more CPU
 - `GPU_NV_S`, `GPU_NV_XS`, `GPU_GCP_NV_L4_1_24G` - for algorithms that are compute intensive e.g. GraphSAGE and are capable of running on the python runtime
-- Note, not all regions offer all compute pools especially GPU types
+- Note, not all regions offer all compute pools, especially GPU types
 - See [Estimating Jobs](https://neo4j.com/docs/snowflake-graph-analytics/current/jobs/estimation/) to choose the right size
 ---
 
@@ -223,11 +224,12 @@ The first argument to `CALL` is the **compute pool size**. Common values:
   }
 }
 ```
-
+- Use defaultTablePrefix if all the views and or tables are in the same schema.
 - Multiple node tables are supported — each maps to a different node label.
 - Multiple relationship tables are supported — each maps to a different relationship type.
 - Node and relationship properties (extra columns) are automatically available
   to algorithms that use them (e.g. weighted shortest path uses a `weight` column).
+
 
 ---
 
@@ -282,7 +284,7 @@ CALL Neo4j_Graph_Analytics.graph.knn('CPU_X64_XS', { ... });
 ```
 
 ### Using Views Instead of Renaming Columns
-
+Create views for the required column names, with only support data types. Convert categorical data to numerical scores.
 ```sql
 CREATE VIEW MY_SCHEMA.NODES_VIEW AS
   SELECT user_id AS nodeId, name, age
