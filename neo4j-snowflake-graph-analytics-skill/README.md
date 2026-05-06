@@ -33,15 +33,18 @@ An [Agent Skill](https://agentskills.io/specification) that helps AI agents work
 | Graph ML | GraphSAGE (node classification & embeddings, train & predict) |
 
 ## Quick example
+Peer-to-Peer (P2P) Payment 
+- USER_VW contains the NODEIDs of the users in P2P payment network
+- AGG_TRANSACTIONS_VW contains the aggregated transactions made between SOURCEID and TARGETID users within that network
 
 ```sql
 CALL Neo4j_Graph_Analytics.graph.wcc('CPU_X64_XS', {
     'project': {
-        'nodeTables': ['MY_DB.MY_SCHEMA.NODES'],
+        'nodeTables': ['P2P.PUBLIC.USERS'],
         'relationshipTables': {
-            'MY_DB.MY_SCHEMA.RELATIONSHIPS': {
-                'sourceTable': 'MY_DB.MY_SCHEMA.NODES',
-                'targetTable': 'MY_DB.MY_SCHEMA.NODES',
+            'P2P.PUBLIC.AGG_TRANSACTIONS_VW': {
+                'sourceTable': 'P2P.PUBLIC.USER_VW',
+                'targetTable': ''P2P.PUBLIC.USER_VW',
                 'orientation': 'NATURAL'
             }
         }
@@ -49,7 +52,7 @@ CALL Neo4j_Graph_Analytics.graph.wcc('CPU_X64_XS', {
     'compute': { 'consecutiveIds': true },
     'write': [{
         'nodeLabel': 'NODES',
-        'outputTable': 'MY_DB.MY_SCHEMA.NODES_COMPONENTS'
+        'outputTable': 'P2P.PUBLIC.USER_COMPONENTS'
     }]
 });
 ```
